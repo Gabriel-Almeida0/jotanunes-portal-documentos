@@ -592,7 +592,7 @@ senha provisória 12 caracteres, 7 dias; bloqueio 5 falhas / 15 min; login `trim
 
 ### INFRA (final)
 
-- [ ] T176 [INFRA] Executar o roteiro E2E de `specs/001-portal-documentos-terceirizadas/quickstart.md` §6 com as áreas integradas (`VITE_USE_MOCKS=false`), começando sem usuários internos: passos 1 e 39–56 (bootstrap, login, troca obrigatória, cadastro com e-mail, comum sem "Usuários" e com 403, revogação ao desativar/mudar papel/redefinir/sair, bloqueio, regra do último administrador, entrada pelo Fluig) e regressão dos passos 2, 31 e 34–36 com tokens Fluig; conferir no log da API que nenhuma senha provisória aparece fora do adaptador de e-mail de desenvolvimento; registrar divergências para a área responsável; per SC-011, SC-012, SC-013, SC-014, SC-015, SC-016, US8, US9, US10
+- [X] T176 [INFRA] Executar o roteiro E2E de `specs/001-portal-documentos-terceirizadas/quickstart.md` §6 com as áreas integradas (`VITE_USE_MOCKS=false`), começando sem usuários internos: passos 1 e 39–56 (bootstrap, login, troca obrigatória, cadastro com e-mail, comum sem "Usuários" e com 403, revogação ao desativar/mudar papel/redefinir/sair, bloqueio, regra do último administrador, entrada pelo Fluig) e regressão dos passos 2, 31 e 34–36 com tokens Fluig; conferir no log da API que nenhuma senha provisória aparece fora do adaptador de e-mail de desenvolvimento; registrar divergências para a área responsável; per SC-011, SC-012, SC-013, SC-014, SC-015, SC-016, US8, US9, US10
 
 ### Phase 11 — Dependencies & Execution Order
 
