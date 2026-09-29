@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/fluig';
 import { useConsulta } from '../api/useConsulta';
+import { useEhAdmin } from '../auth/contexto';
+import { AvisoPagina } from '../components/AvisoPagina';
+import { AvisoSomenteAdmin } from '../components/AvisoSomenteAdmin';
 import { Botao } from '../components/Botao';
 import { Campo, CampoSelecao } from '../components/Campo';
 import { Carregando, EstadoErro, EstadoVazio } from '../components/Estados';
@@ -10,8 +13,10 @@ import { FormularioObra } from '../components/FormularioObra';
 import { IconeMais, IconeObra, IconePin, IconeSeta } from '../components/icons';
 import { Paginacao } from '../components/Paginacao';
 import { SeloAtivo } from '../components/Selo';
+import { SomenteAdmin } from '../components/SomenteAdmin';
 import { Tabela } from '../components/Tabela';
 import { TituloPagina } from '../components/TituloPagina';
+import { useAviso } from '../hooks/useAviso';
 
 type FiltroSituacao = 'ativas' | 'inativas' | 'todas';
 const TAMANHO_PAGINA = 20;
@@ -26,6 +31,8 @@ export function Obras() {
   const [rascunhoBusca, setRascunhoBusca] = useState(busca);
   const [rascunhoSituacao, setRascunhoSituacao] = useState<FiltroSituacao>(situacao);
   const [criando, setCriando] = useState(false);
+  const [aviso, mostrarAviso] = useAviso();
+  const ehAdmin = useEhAdmin();
 
   const ativa = situacao === 'ativas' ? true : situacao === 'inativas' ? false : undefined;
   const consulta = useConsulta(
@@ -48,13 +55,21 @@ export function Obras() {
     <>
       <TituloPagina
         titulo="Obras"
-        descricao="Cadastre as obras e indique quais empresas atuam em cada uma."
+        descricao={
+          ehAdmin
+            ? 'Cadastre as obras e indique quais empresas atuam em cada uma.'
+            : 'As obras da Jotanunes e as empresas que atuam em cada uma.'
+        }
         acoes={
-          <Botao icone={<IconeMais tamanho={18} />} onClick={() => setCriando(true)}>
-            Nova obra
-          </Botao>
+          <SomenteAdmin>
+            <Botao icone={<IconeMais tamanho={18} />} onClick={() => setCriando(true)}>
+              Nova obra
+            </Botao>
+          </SomenteAdmin>
         }
       />
+
+      <AvisoSomenteAdmin />
 
       <Filtros
         titulo="Encontre a obra"
@@ -88,6 +103,8 @@ export function Obras() {
         </CampoSelecao>
       </Filtros>
 
+      <AvisoPagina aviso={aviso} onFechar={() => mostrarAviso(null)} />
+
       {consulta.carregando && !consulta.dados ? (
         <Carregando texto="Carregando obras…" />
       ) : consulta.erro ? (
@@ -99,11 +116,17 @@ export function Obras() {
           <EstadoVazio
             icone={<IconeObra tamanho={32} />}
             titulo="Nenhuma obra cadastrada ainda."
-            texto="Comece cadastrando a obra; depois vincule as empresas que trabalham nela."
+            texto={
+              ehAdmin
+                ? 'Comece cadastrando a obra; depois vincule as empresas que trabalham nela.'
+                : 'Quando um administrador cadastrar as obras, elas aparecem aqui.'
+            }
             acao={
-              <Botao icone={<IconeMais tamanho={18} />} onClick={() => setCriando(true)}>
-                Nova obra
-              </Botao>
+              ehAdmin ? (
+                <Botao icone={<IconeMais tamanho={18} />} onClick={() => setCriando(true)}>
+                  Nova obra
+                </Botao>
+              ) : undefined
             }
           />
         )
@@ -164,6 +187,10 @@ export function Obras() {
         <FormularioObra
           obra={null}
           onFechar={() => setCriando(false)}
+          onSemPermissao={(mensagem) => {
+            setCriando(false);
+            mostrarAviso({ tom: 'erro', texto: mensagem });
+          }}
           onSalvo={(obra) =>
             navigate(`/obras/${obra.id}`, {
               state: { aviso: { tom: 'sucesso', texto: 'Obra cadastrada. Agora vincule as empresas que trabalham nela.' } },

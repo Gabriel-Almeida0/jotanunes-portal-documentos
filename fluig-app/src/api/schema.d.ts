@@ -28,7 +28,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Dados do usuário Fluig identificado pelo token */
+        /** Dados do usuário Fluig identificado pelo token (inclui se é administrador) */
         get: operations["fluigObterUsuarioAtual"];
         put?: never;
         post?: never;
@@ -170,7 +170,8 @@ export interface paths {
         put?: never;
         /**
          * Envia (ou reenvia) o convite por e-mail
-         * @description Gera token de link (7 dias) e senha temporária, invalida convites anteriores, redefine o
+         * @description Permitido aos dois perfis (administrador e comum).
+         *     Gera token de link (7 dias) e senha temporária, invalida convites anteriores, redefine o
          *     acesso (troca de senha obrigatória) e envia o e-mail ao `emailContato`.
          *     Se o e-mail falhar, nada é gravado (502 `EMAIL_FALHOU`).
          */
@@ -512,6 +513,7 @@ export interface components {
          *     | VALIDACAO | 400 | Confira os dados informados. |
          *     | NAO_AUTENTICADO | 401 | Sua sessão expirou. Entre de novo. |
          *     | TROCA_SENHA_OBRIGATORIA | 403 | Crie uma nova senha para continuar. |
+         *     | SEM_PERMISSAO | 403 | Só administradores podem fazer isso. Se você precisa, fale com a TI. |
          *     | NAO_ENCONTRADO | 404 | Não encontramos o que você procurou. |
          *     | CNPJ_DUPLICADO | 409 | Já existe uma empresa com este CNPJ. |
          *     | CNPJ_IMUTAVEL | 409 | O CNPJ não pode ser alterado depois do convite. |
@@ -534,7 +536,7 @@ export interface components {
          *     | ERRO_INTERNO | 500 | Algo deu errado do nosso lado. Tente de novo. |
          * @enum {string}
          */
-        CodigoErro: "VALIDACAO" | "NAO_AUTENTICADO" | "TROCA_SENHA_OBRIGATORIA" | "NAO_ENCONTRADO" | "CNPJ_DUPLICADO" | "CNPJ_IMUTAVEL" | "CODIGO_OBRA_DUPLICADO" | "NOME_DUPLICADO" | "EMPRESA_INATIVA" | "CREDENCIAIS_INVALIDAS" | "ACESSO_BLOQUEADO" | "CONVITE_INVALIDO" | "CONVITE_EXPIRADO" | "SENHA_FRACA" | "SENHA_ATUAL_INCORRETA" | "ENVIO_NAO_PERMITIDO" | "ENVIO_JA_ANALISADO" | "ARQUIVO_INVALIDO" | "ARQUIVO_MUITO_GRANDE" | "ARQUIVO_TIPO_NAO_SUPORTADO" | "EMAIL_FALHOU" | "LIMITE_REQUISICOES" | "ERRO_INTERNO";
+        CodigoErro: "VALIDACAO" | "NAO_AUTENTICADO" | "TROCA_SENHA_OBRIGATORIA" | "SEM_PERMISSAO" | "NAO_ENCONTRADO" | "CNPJ_DUPLICADO" | "CNPJ_IMUTAVEL" | "CODIGO_OBRA_DUPLICADO" | "NOME_DUPLICADO" | "EMPRESA_INATIVA" | "CREDENCIAIS_INVALIDAS" | "ACESSO_BLOQUEADO" | "CONVITE_INVALIDO" | "CONVITE_EXPIRADO" | "SENHA_FRACA" | "SENHA_ATUAL_INCORRETA" | "ENVIO_NAO_PERMITIDO" | "ENVIO_JA_ANALISADO" | "ARQUIVO_INVALIDO" | "ARQUIVO_MUITO_GRANDE" | "ARQUIVO_TIPO_NAO_SUPORTADO" | "EMAIL_FALHOU" | "LIMITE_REQUISICOES" | "ERRO_INTERNO";
         Problema: {
             /** @example https://jotanunes.com/problemas/nao-encontrado */
             type: string;
@@ -576,6 +578,11 @@ export interface components {
             login: string;
             nome: string;
             email: string;
+            /**
+             * @description true quando o token Fluig traz `roles` com `admin`. O front usa para esconder as ações
+             *     de administrador; a API confere o papel em toda operação `x-requer-admin`.
+             */
+            admin: boolean;
         };
         AutorFluig: {
             login: string;
@@ -868,6 +875,23 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problema"];
             };
         };
+        /** @description `SEM_PERMISSAO` — operação só para administradores; o token Fluig não tem `roles` com `admin` */
+        SemPermissao: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "type": "https://jotanunes.com/problemas/sem-permissao",
+                 *       "title": "Só administradores podem fazer isso. Se você precisa, fale com a TI.",
+                 *       "status": 403,
+                 *       "code": "SEM_PERMISSAO"
+                 *     }
+                 */
+                "application/problem+json": components["schemas"]["Problema"];
+            };
+        };
         /** @description `NAO_ENCONTRADO` — recurso inexistente ou de outra empresa */
         NaoEncontrado: {
             headers: {
@@ -1038,6 +1062,7 @@ export interface operations {
             };
             400: components["responses"]["Validacao"];
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["SemPermissao"];
             /** @description `CODIGO_OBRA_DUPLICADO` */
             409: {
                 headers: {
@@ -1099,6 +1124,7 @@ export interface operations {
             };
             400: components["responses"]["Validacao"];
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["SemPermissao"];
             404: components["responses"]["NaoEncontrado"];
             /** @description `CODIGO_OBRA_DUPLICADO` */
             409: {
@@ -1131,6 +1157,7 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["SemPermissao"];
             404: components["responses"]["NaoEncontrado"];
         };
     };
@@ -1154,6 +1181,7 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["SemPermissao"];
             404: components["responses"]["NaoEncontrado"];
         };
     };
@@ -1214,6 +1242,7 @@ export interface operations {
             };
             400: components["responses"]["Validacao"];
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["SemPermissao"];
             /** @description `CNPJ_DUPLICADO` */
             409: {
                 headers: {
@@ -1275,6 +1304,7 @@ export interface operations {
             };
             400: components["responses"]["Validacao"];
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["SemPermissao"];
             404: components["responses"]["NaoEncontrado"];
             /** @description `CNPJ_DUPLICADO` ou `CNPJ_IMUTAVEL` */
             409: {
@@ -1451,6 +1481,7 @@ export interface operations {
             };
             400: components["responses"]["Validacao"];
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["SemPermissao"];
             /** @description `NOME_DUPLICADO` */
             409: {
                 headers: {
@@ -1512,6 +1543,7 @@ export interface operations {
             };
             400: components["responses"]["Validacao"];
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["SemPermissao"];
             404: components["responses"]["NaoEncontrado"];
             /** @description `NOME_DUPLICADO` */
             409: {
@@ -1615,6 +1647,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["SemPermissao"];
             404: components["responses"]["NaoEncontrado"];
             /** @description `ENVIO_JA_ANALISADO` */
             409: {
@@ -1653,6 +1686,7 @@ export interface operations {
             };
             400: components["responses"]["Validacao"];
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["SemPermissao"];
             404: components["responses"]["NaoEncontrado"];
             /** @description `ENVIO_JA_ANALISADO` */
             409: {

@@ -17,6 +17,7 @@ import {
   API,
   adicionarErro,
   booleano,
+  exigirAdmin,
   exigirFluig,
   latencia,
   paginar,
@@ -93,7 +94,7 @@ export const handlersEmpresas = [
 
   http.post(`${API}/empresas`, async ({ request }) => {
     await latencia();
-    const negado = exigirFluig(request);
+    const negado = exigirFluig(request) ?? exigirAdmin();
     if (negado) return negado;
     const dados = validarEmpresa((await request.json()) as Record<string, unknown>, false);
     if (dados instanceof HttpResponse) return dados;
@@ -129,7 +130,7 @@ export const handlersEmpresas = [
 
   http.put(`${API}/empresas/:empresaId`, async ({ request, params }) => {
     await latencia();
-    const negado = exigirFluig(request);
+    const negado = exigirFluig(request) ?? exigirAdmin();
     if (negado) return negado;
     const empresa = db.empresas.find((e) => e.id === params.empresaId);
     if (!empresa) return problema('NAO_ENCONTRADO');

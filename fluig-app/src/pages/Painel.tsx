@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/fluig';
 import { useConsulta } from '../api/useConsulta';
 import { useUsuarioFluig } from '../auth/contexto';
+import { AvisoSomenteAdmin } from '../components/AvisoSomenteAdmin';
 import { Carregando, EstadoErro } from '../components/Estados';
 import { IconeAlerta, IconeEmail, IconeEmpresa, IconeFila, IconeObra, IconeSeta } from '../components/icons';
 import { TituloPagina } from '../components/TituloPagina';
@@ -49,6 +50,8 @@ export function Painel() {
         titulo="Painel"
         descricao={`Olá, ${primeiroNome}! Veja o que precisa da sua atenção nos documentos das terceirizadas.`}
       />
+
+      <AvisoSomenteAdmin />
 
       {consulta.carregando && !p ? (
         <Carregando texto="Carregando indicadores…" />

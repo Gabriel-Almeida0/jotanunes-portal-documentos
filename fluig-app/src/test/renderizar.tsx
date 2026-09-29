@@ -4,7 +4,7 @@ import { MemoryRouter, useLocation, useNavigate, type NavigateFunction } from 'r
 import { FUTURO_ROUTER, RotasApp } from '../App';
 import { definirTokenFluig } from '../api/client';
 import { ContextoUsuarioFluig } from '../auth/contexto';
-import { USUARIO_MOCK } from '../mocks/dados';
+import { usuarioMock } from '../mocks/dados';
 
 let localAtual = '';
 let navegarAtual: NavigateFunction | null = null;
@@ -21,7 +21,7 @@ export function renderizarRota(caminho: string) {
   definirTokenFluig('token-de-teste');
   const usuario = userEvent.setup();
   const resultado = render(
-    <ContextoUsuarioFluig.Provider value={USUARIO_MOCK}>
+    <ContextoUsuarioFluig.Provider value={usuarioMock()}>
       <MemoryRouter initialEntries={[caminho]} future={FUTURO_ROUTER}>
         <RotasApp />
         <EspiaoLocal />

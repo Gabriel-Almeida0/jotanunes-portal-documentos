@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useEhAdmin } from '../../auth/contexto';
 import { mensagemDeErro } from '../../api/client';
 import { api } from '../../api/fluig';
 import type { DocumentoSituacao, Envio, TipoDocumentoRef } from '../../api/tipos';
@@ -127,6 +128,7 @@ function TiposDesativados({
 function LinhaDocumento({ documento, onHistorico }: { documento: DocumentoSituacao; onHistorico: () => void }) {
   const envio = documento.envioAtual ?? null;
   const qtd = documento.quantidadeEnvios ?? 0;
+  const acao = useEhAdmin() ? 'Analisar' : 'Ver';
   return (
     <tr>
       <td>
@@ -166,8 +168,8 @@ function LinhaDocumento({ documento, onHistorico }: { documento: DocumentoSituac
       <td className="jn-tabela__acoes">
         <span className="jn-acoes-linha">
           {documento.situacao === 'EM_ANALISE' && envio ? (
-            <Link className="jn-link-acao" to={`/analise/${envio.id}`} aria-label={`Analisar ${documento.tipoDocumento.nome}`}>
-              Analisar <IconeSeta tamanho={16} />
+            <Link className="jn-link-acao" to={`/analise/${envio.id}`} aria-label={`${acao} ${documento.tipoDocumento.nome}`}>
+              {acao} <IconeSeta tamanho={16} />
             </Link>
           ) : null}
           <Botao

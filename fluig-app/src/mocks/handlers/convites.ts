@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { USUARIO_MOCK, agora, convitesDaEmpresa, db, novoId, paraConvite, type ConviteDb } from '../dados';
+import { agora, convitesDaEmpresa, db, novoId, paraConvite, type ConviteDb, usuarioMock } from '../dados';
 import { API, exigirFluig, latencia, problema } from '../util';
 
 const SETE_DIAS = 7 * 24 * 3_600_000;
@@ -39,7 +39,7 @@ export const handlersConvites = [
       expiraEm: new Date(enviadoEm.getTime() + SETE_DIAS).toISOString(),
       usadoEm: null,
       substituidoEm: null,
-      enviadoPor: { login: USUARIO_MOCK.login, nome: USUARIO_MOCK.nome },
+      enviadoPor: { login: usuarioMock().login, nome: usuarioMock().nome },
     };
     db.convites.push(convite);
     empresa.trocaSenhaObrigatoria = true;

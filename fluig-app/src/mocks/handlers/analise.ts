@@ -10,7 +10,7 @@ import {
   paraEnvioFila,
   tiposAtivos,
 } from '../dados';
-import { API, exigirFluig, latencia, paginar, problema, validacao } from '../util';
+import { API, exigirAdmin, exigirFluig, latencia, paginar, problema, validacao } from '../util';
 import { pdfExemplo, pngExemplo } from './arquivoExemplo';
 
 const STATUS: StatusEnvio[] = ['EM_ANALISE', 'APROVADO', 'REJEITADO'];
@@ -69,7 +69,7 @@ export const handlersAnalise = [
 
   http.post(`${API}/envios/:envioId/aprovar`, async ({ request, params }) => {
     await latencia();
-    const negado = exigirFluig(request);
+    const negado = exigirFluig(request) ?? exigirAdmin();
     if (negado) return negado;
     const envio = db.envios.find((e) => e.id === params.envioId);
     if (!envio) return problema('NAO_ENCONTRADO');
@@ -85,7 +85,7 @@ export const handlersAnalise = [
 
   http.post(`${API}/envios/:envioId/rejeitar`, async ({ request, params }) => {
     await latencia();
-    const negado = exigirFluig(request);
+    const negado = exigirFluig(request) ?? exigirAdmin();
     if (negado) return negado;
     const envio = db.envios.find((e) => e.id === params.envioId);
     if (!envio) return problema('NAO_ENCONTRADO');

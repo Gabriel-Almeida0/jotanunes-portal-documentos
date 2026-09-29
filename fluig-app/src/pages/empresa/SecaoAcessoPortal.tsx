@@ -3,6 +3,7 @@ import { mensagemDeErro } from '../../api/client';
 import { api } from '../../api/fluig';
 import type { Empresa, SituacaoAcesso } from '../../api/tipos';
 import { useConsulta } from '../../api/useConsulta';
+import { useEhAdmin } from '../../auth/contexto';
 import { Alerta } from '../../components/Alerta';
 import { Botao } from '../../components/Botao';
 import { Carregando, EstadoErro } from '../../components/Estados';
@@ -25,6 +26,7 @@ export function SecaoAcessoPortal({ empresa, onAlterada }: { empresa: Empresa; o
   const [confirmando, setConfirmando] = useState(false);
   const [resultado, setResultado] = useState<{ tom: 'sucesso' | 'erro'; texto: string } | null>(null);
   const [versao, setVersao] = useState(0);
+  const ehAdmin = useEhAdmin();
   const convites = useConsulta((sinal) => api.listarConvites(empresa.id, sinal), [empresa.id, versao]);
 
   const ultimo = empresa.ultimoConvite ?? null;
@@ -105,7 +107,11 @@ export function SecaoAcessoPortal({ empresa, onAlterada }: { empresa: Empresa; o
           {reenvio ? 'Reenviar convite' : 'Enviar convite'}
         </Botao>
         {!empresa.ativa ? (
-          <p className="jn-acesso__nota">Ative a empresa para enviar o convite.</p>
+          <p className="jn-acesso__nota">
+            {ehAdmin
+              ? 'Ative a empresa para enviar o convite.'
+              : 'Empresa desativada. Um administrador precisa ativá-la antes do convite.'}
+          </p>
         ) : (
           <p className="jn-acesso__nota">
             O e-mail leva o link do portal e uma senha temporária, que vale por 7 dias. A senha não aparece aqui.

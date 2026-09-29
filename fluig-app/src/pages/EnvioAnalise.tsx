@@ -4,7 +4,9 @@ import { ErroApi, mensagemDeErro, salvarComo } from '../api/client';
 import { api } from '../api/fluig';
 import type { EnvioFila, FormatoArquivo } from '../api/tipos';
 import { useConsulta } from '../api/useConsulta';
+import { useEhAdmin } from '../auth/contexto';
 import { Alerta } from '../components/Alerta';
+import { AvisoSomenteAdmin } from '../components/AvisoSomenteAdmin';
 import { Botao } from '../components/Botao';
 import { CampoArea } from '../components/Campo';
 import { Carregando, EstadoErro } from '../components/Estados';
@@ -37,6 +39,7 @@ export function EnvioAnalise() {
   const [erroDecisao, setErroDecisao] = useState<string | null>(null);
   const [erroArquivo, setErroArquivo] = useState<string | null>(null);
   const [baixando, setBaixando] = useState<'abrir' | 'baixar' | null>(null);
+  const ehAdmin = useEhAdmin();
 
   if (consulta.carregando && !consulta.dados) return <Carregando texto="Carregando envio…" />;
   if (consulta.erro || !consulta.dados) {
@@ -51,6 +54,8 @@ export function EnvioAnalise() {
 
   const envio = consulta.dados;
   const emAnalise = envio.status === 'EM_ANALISE';
+  /** Só o administrador decide; o comum vê os dados e o arquivo (FR-081, FR-082). */
+  const podeDecidir = emAnalise && ehAdmin;
 
   async function decidir(acao: () => Promise<unknown>, aviso: Aviso) {
     setDecidindo(true);
@@ -114,6 +119,8 @@ export function EnvioAnalise() {
         </span>
       </TituloPagina>
 
+      <AvisoSomenteAdmin />
+
       {erroDecisao ? (
         <div className="jn-avisos">
           <Alerta tom="erro" onFechar={() => setErroDecisao(null)}>
@@ -174,10 +181,10 @@ export function EnvioAnalise() {
           <section className="jn-painel-bloco" aria-labelledby="jn-envio-decisao">
             <div className="jn-painel-bloco__cabecalho">
               <h2 className="jn-painel-bloco__titulo" id="jn-envio-decisao">
-                {emAnalise ? 'Sua decisão' : 'Resultado da análise'}
+                {podeDecidir ? 'Sua decisão' : emAnalise ? 'Análise' : 'Resultado da análise'}
               </h2>
             </div>
-            {emAnalise ? (
+            {podeDecidir ? (
               <>
                 <p className="jn-texto-secundario">
                   Confira o arquivo antes de decidir. Ao rejeitar, a empresa recebe um e-mail com o motivo e pode
@@ -192,6 +199,13 @@ export function EnvioAnalise() {
                   </Botao>
                 </div>
               </>
+            ) : emAnalise ? (
+              <div className="jn-pilha">
+                <div>
+                  <SeloSituacao situacao={envio.status} />
+                </div>
+                <p className="jn-texto-secundario">Este documento aguarda a decisão de um administrador.</p>
+              </div>
             ) : (
               <ResultadoAnalise envio={envio} />
             )}
@@ -216,7 +230,7 @@ export function EnvioAnalise() {
       </div>
 
       <ModalConfirmacao
-        aberto={aprovando}
+        aberto={podeDecidir && aprovando}
         titulo="Aprovar documento?"
         mensagem={
           <p>
@@ -235,7 +249,7 @@ export function EnvioAnalise() {
         onCancelar={() => setAprovando(false)}
       />
 
-      {rejeitando ? (
+      {podeDecidir && rejeitando ? (
         <ModalRejeicao
           descricao={descricao}
           enviando={decidindo}

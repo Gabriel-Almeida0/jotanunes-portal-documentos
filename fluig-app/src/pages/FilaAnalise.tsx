@@ -3,7 +3,9 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api, listarTodasEmpresas, listarTodasObras } from '../api/fluig';
 import type { StatusEnvio } from '../api/tipos';
 import { useConsulta } from '../api/useConsulta';
+import { useEhAdmin } from '../auth/contexto';
 import { AvisoPagina } from '../components/AvisoPagina';
+import { AvisoSomenteAdmin } from '../components/AvisoSomenteAdmin';
 import { CampoSelecao } from '../components/Campo';
 import { Carregando, EstadoErro, EstadoVazio } from '../components/Estados';
 import { Filtros } from '../components/Filtros';
@@ -82,6 +84,9 @@ export function FilaAnalise() {
   const vazio: FiltrosFila = { status: 'EM_ANALISE', obraId: '', empresaId: '', tipoDocumentoId: '' };
   const filtrado = Boolean(filtros.obraId || filtros.empresaId || filtros.tipoDocumentoId);
   const naFila = filtros.status === 'EM_ANALISE';
+  const ehAdmin = useEhAdmin();
+  /** Mesma rota para os dois perfis; só o administrador decide, então só ele "analisa". */
+  const rotuloLink = naFila && ehAdmin ? 'Analisar' : 'Ver';
   const envios = consulta.dados?.itens ?? [];
 
   return (
@@ -90,10 +95,14 @@ export function FilaAnalise() {
         titulo="Fila de análise"
         descricao={
           naFila
-            ? 'Documentos enviados pelas empresas, do mais antigo para o mais novo. Abra, confira e decida.'
+            ? ehAdmin
+              ? 'Documentos enviados pelas empresas, do mais antigo para o mais novo. Abra, confira e decida.'
+              : 'Documentos enviados pelas empresas, do mais antigo para o mais novo.'
             : 'Envios já analisados, do mais recente para o mais antigo.'
         }
       />
+
+      <AvisoSomenteAdmin />
 
       <Filtros
         titulo="Encontre o envio"
@@ -215,9 +224,9 @@ export function FilaAnalise() {
                     <Link
                       className="jn-link-acao"
                       to={`/analise/${e.id}`}
-                      aria-label={`${naFila ? 'Analisar' : 'Ver'} ${e.tipoDocumento.nome} de ${e.empresa.razaoSocial}`}
+                      aria-label={`${rotuloLink} ${e.tipoDocumento.nome} de ${e.empresa.razaoSocial}`}
                     >
-                      {naFila ? 'Analisar' : 'Ver'} <IconeSeta tamanho={16} />
+                      {rotuloLink} <IconeSeta tamanho={16} />
                     </Link>
                   </td>
                 </tr>

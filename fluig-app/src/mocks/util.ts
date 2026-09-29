@@ -1,6 +1,7 @@
 import { HttpResponse, delay } from 'msw';
 import { MENSAGENS_ERRO, STATUS_ERRO } from '../api/mensagens';
 import type { CodigoErro, Problema } from '../api/tipos';
+import { perfilMock } from './dados';
 
 /** Prefixo que casa com qualquer `VITE_API_URL` (ou nenhuma). */
 export const API = '*/api/fluig';
@@ -40,6 +41,14 @@ export function exigirFluig(request: Request): HttpResponse<Problema> | null {
     return problema('NAO_AUTENTICADO');
   }
   return null;
+}
+
+/**
+ * Operações `x-requer-admin` do contrato: com o perfil comum → 403 `SEM_PERMISSAO`. Chamar logo depois
+ * de `exigirFluig` (sem token continua 401) e antes de ler o corpo ou procurar o recurso (FR-083).
+ */
+export function exigirAdmin(): HttpResponse<Problema> | null {
+  return perfilMock() === 'comum' ? problema('SEM_PERMISSAO') : null;
 }
 
 /** Latência realista no navegador (MSW ignora em Node/testes). */

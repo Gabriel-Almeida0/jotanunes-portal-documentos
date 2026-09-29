@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ErroApi, mensagemDeErro } from '../api/client';
+import { ErroApi, ehSemPermissao, mensagemDeErro } from '../api/client';
 import { api } from '../api/fluig';
 import type { TipoDocumento } from '../api/tipos';
 import { useConsulta } from '../api/useConsulta';
 import { Alerta } from '../components/Alerta';
 import { AvisoPagina } from '../components/AvisoPagina';
+import { AvisoSomenteAdmin } from '../components/AvisoSomenteAdmin';
 import { Botao } from '../components/Botao';
 import { Campo, CampoArea, CampoSelecao } from '../components/Campo';
 import { Carregando, EstadoErro, EstadoVazio } from '../components/Estados';
@@ -13,8 +14,10 @@ import { Filtros } from '../components/Filtros';
 import { IconeLapis, IconeMais } from '../components/icons';
 import { Modal, ModalConfirmacao } from '../components/Modal';
 import { SeloAtivo } from '../components/Selo';
+import { SomenteAdmin } from '../components/SomenteAdmin';
 import { Tabela } from '../components/Tabela';
 import { TituloPagina } from '../components/TituloPagina';
+import { useEhAdmin } from '../auth/contexto';
 import { useAviso } from '../hooks/useAviso';
 import { formatarData } from '../utils/datas';
 import './TiposDocumento.css';
@@ -35,6 +38,7 @@ export function TiposDocumento() {
   const [aviso, mostrarAviso] = useAviso();
   const [editando, setEditando] = useState<TipoDocumento | 'novo' | null>(null);
   const [alternando, setAlternando] = useState<TipoDocumento | null>(null);
+  const ehAdmin = useEhAdmin();
 
   const ativo = situacao === 'ativos' ? true : situacao === 'inativos' ? false : undefined;
   const consulta = useConsulta((sinal) => api.listarTipos({ ativo }, sinal), [ativo]);
@@ -62,6 +66,13 @@ export function TiposDocumento() {
     consulta.recarregar();
   }
 
+  /** 403 SEM_PERMISSAO: fecha o modal e mostra a mensagem, mantendo a lista. */
+  function semPermissao(mensagem: string) {
+    setEditando(null);
+    setAlternando(null);
+    mostrarAviso({ tom: 'erro', texto: mensagem });
+  }
+
   const tipos = consulta.dados ?? [];
 
   return (
@@ -70,11 +81,15 @@ export function TiposDocumento() {
         titulo="Tipos de documento"
         descricao="Os documentos que a Jotanunes exige. Todo tipo ativo é pedido de todas as empresas ativas."
         acoes={
-          <Botao icone={<IconeMais tamanho={18} />} onClick={() => setEditando('novo')}>
-            Novo tipo de documento
-          </Botao>
+          <SomenteAdmin>
+            <Botao icone={<IconeMais tamanho={18} />} onClick={() => setEditando('novo')}>
+              Novo tipo de documento
+            </Botao>
+          </SomenteAdmin>
         }
       />
+
+      <AvisoSomenteAdmin />
 
       <Filtros titulo="Encontre o documento" onPesquisar={pesquisar} onLimpar={situacao !== 'todos' ? limpar : undefined}>
         <CampoSelecao
@@ -98,11 +113,17 @@ export function TiposDocumento() {
         situacao === 'todos' ? (
           <EstadoVazio
             titulo="Nenhum tipo de documento cadastrado."
-            texto="Cadastre os documentos que as empresas precisam enviar, como Cartão CNPJ ou ASO."
+            texto={
+              ehAdmin
+                ? 'Cadastre os documentos que as empresas precisam enviar, como Cartão CNPJ ou ASO.'
+                : 'Quando um administrador cadastrar os documentos exigidos, eles aparecem aqui.'
+            }
             acao={
-              <Botao icone={<IconeMais tamanho={18} />} onClick={() => setEditando('novo')}>
-                Novo tipo de documento
-              </Botao>
+              ehAdmin ? (
+                <Botao icone={<IconeMais tamanho={18} />} onClick={() => setEditando('novo')}>
+                  Novo tipo de documento
+                </Botao>
+              ) : undefined
             }
           />
         ) : (
@@ -115,9 +136,11 @@ export function TiposDocumento() {
               <th scope="col">Documento</th>
               <th scope="col">Situação</th>
               <th scope="col">Cadastrado em</th>
-              <th scope="col" className="jn-tabela__acoes">
-                <span className="jn-sr-only">Ações</span>
-              </th>
+              {ehAdmin ? (
+                <th scope="col" className="jn-tabela__acoes">
+                  <span className="jn-sr-only">Ações</span>
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody>
@@ -131,27 +154,29 @@ export function TiposDocumento() {
                   <SeloAtivo ativo={t.ativo} />
                 </td>
                 <td className="jn-tabela__nowrap">{formatarData(t.criadoEm)}</td>
-                <td className="jn-tabela__acoes">
-                  <span className="jn-acoes-linha">
-                    <Botao
-                      variante="fantasma"
-                      tamanho="pequeno"
-                      icone={<IconeLapis tamanho={16} />}
-                      onClick={() => setEditando(t)}
-                      aria-label={`Editar ${t.nome}`}
-                    >
-                      Editar
-                    </Botao>
-                    <Botao
-                      variante="fantasma"
-                      tamanho="pequeno"
-                      onClick={() => setAlternando(t)}
-                      aria-label={`${t.ativo ? 'Desativar' : 'Ativar'} ${t.nome}`}
-                    >
-                      {t.ativo ? 'Desativar' : 'Ativar'}
-                    </Botao>
-                  </span>
-                </td>
+                {ehAdmin ? (
+                  <td className="jn-tabela__acoes">
+                    <span className="jn-acoes-linha">
+                      <Botao
+                        variante="fantasma"
+                        tamanho="pequeno"
+                        icone={<IconeLapis tamanho={16} />}
+                        onClick={() => setEditando(t)}
+                        aria-label={`Editar ${t.nome}`}
+                      >
+                        Editar
+                      </Botao>
+                      <Botao
+                        variante="fantasma"
+                        tamanho="pequeno"
+                        onClick={() => setAlternando(t)}
+                        aria-label={`${t.ativo ? 'Desativar' : 'Ativar'} ${t.nome}`}
+                      >
+                        {t.ativo ? 'Desativar' : 'Ativar'}
+                      </Botao>
+                    </span>
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
@@ -163,12 +188,14 @@ export function TiposDocumento() {
           tipo={editando === 'novo' ? null : editando}
           onFechar={() => setEditando(null)}
           onSalvo={aoSalvar}
+          onSemPermissao={semPermissao}
         />
       ) : null}
 
       <ConfirmarAlternancia
         tipo={alternando}
         onFechar={() => setAlternando(null)}
+        onSemPermissao={semPermissao}
         onConcluido={(tipo) => {
           setAlternando(null);
           consulta.definirDados(tipos.map((x) => (x.id === tipo.id ? tipo : x)));
@@ -186,10 +213,12 @@ function FormularioTipo({
   tipo,
   onFechar,
   onSalvo,
+  onSemPermissao,
 }: {
   tipo: TipoDocumento | null;
   onFechar: () => void;
   onSalvo: (tipo: TipoDocumento, novo: boolean) => void;
+  onSemPermissao: (mensagem: string) => void;
 }) {
   const [nome, setNome] = useState(tipo?.nome ?? '');
   const [instrucoes, setInstrucoes] = useState(tipo?.instrucoes ?? '');
@@ -213,7 +242,9 @@ function FormularioTipo({
       const salvo = tipo ? await api.atualizarTipo(tipo.id, { ...dados, ativo: tipo.ativo }) : await api.criarTipo(dados);
       onSalvo(salvo, !tipo);
     } catch (erro) {
-      if (erro instanceof ErroApi && erro.code === 'NOME_DUPLICADO') {
+      if (ehSemPermissao(erro)) {
+        onSemPermissao(erro.title);
+      } else if (erro instanceof ErroApi && erro.code === 'NOME_DUPLICADO') {
         setErros({ nome: erro.title });
       } else if (erro instanceof ErroApi && erro.code === 'VALIDACAO') {
         setErros({ nome: erro.erroDoCampo('nome'), instrucoes: erro.erroDoCampo('instrucoes') });
@@ -274,10 +305,12 @@ function ConfirmarAlternancia({
   tipo,
   onFechar,
   onConcluido,
+  onSemPermissao,
 }: {
   tipo: TipoDocumento | null;
   onFechar: () => void;
   onConcluido: (tipo: TipoDocumento) => void;
+  onSemPermissao: (mensagem: string) => void;
 }) {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -294,7 +327,8 @@ function ConfirmarAlternancia({
       });
       onConcluido(atualizado);
     } catch (e) {
-      setErro(mensagemDeErro(e));
+      if (ehSemPermissao(e)) onSemPermissao(e.title);
+      else setErro(mensagemDeErro(e));
     } finally {
       setCarregando(false);
     }

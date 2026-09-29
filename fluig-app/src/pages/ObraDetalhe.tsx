@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ErroApi, mensagemDeErro } from '../api/client';
+import { ErroApi, ehSemPermissao, mensagemDeErro } from '../api/client';
 import { api } from '../api/fluig';
 import type { EmpresaNaObra, EmpresaResumo, ObraDetalhe as TObraDetalhe } from '../api/tipos';
 import { useConsulta } from '../api/useConsulta';
+import { useEhAdmin } from '../auth/contexto';
 import { Alerta } from '../components/Alerta';
 import { AvisoPagina } from '../components/AvisoPagina';
+import { AvisoSomenteAdmin } from '../components/AvisoSomenteAdmin';
 import { Botao, BotaoLink } from '../components/Botao';
 import { Campo } from '../components/Campo';
 import { Carregando, EstadoErro, EstadoVazio } from '../components/Estados';
@@ -14,6 +16,7 @@ import { IconeEmpresa, IconeLapis, IconeMais, IconePin, IconeSeta } from '../com
 import { Modal, ModalConfirmacao } from '../components/Modal';
 import { ResumoDocumentos } from '../components/ResumoDocumentos';
 import { SeloAtivo, SeloSituacao } from '../components/Selo';
+import { SomenteAdmin } from '../components/SomenteAdmin';
 import { Tabela } from '../components/Tabela';
 import { TituloPagina } from '../components/TituloPagina';
 import { useAviso } from '../hooks/useAviso';
@@ -29,6 +32,7 @@ export function ObraDetalhe() {
   const [alternando, setAlternando] = useState(false);
   const [vinculando, setVinculando] = useState(false);
   const [desvinculando, setDesvinculando] = useState<EmpresaNaObra | null>(null);
+  const ehAdmin = useEhAdmin();
 
   if (consulta.carregando && !consulta.dados) return <Carregando texto="Carregando obra…" />;
   if (consulta.erro || !consulta.dados) {
@@ -43,20 +47,29 @@ export function ObraDetalhe() {
 
   const obra = consulta.dados;
 
+  /** 403 SEM_PERMISSAO: fecha o modal aberto e mostra a mensagem, mantendo os dados da obra. */
+  function semPermissao(mensagem: string) {
+    setEditando(false);
+    setAlternando(false);
+    setVinculando(false);
+    setDesvinculando(null);
+    mostrarAviso({ tom: 'erro', texto: mensagem });
+  }
+
   return (
     <>
       <TituloPagina
         titulo={obra.nome}
         voltar={{ para: '/obras', rotulo: 'Obras' }}
         acoes={
-          <>
+          <SomenteAdmin>
             <Botao variante="secundario" icone={<IconeLapis tamanho={18} />} onClick={() => setEditando(true)}>
               Editar dados
             </Botao>
             <Botao variante="fantasma" onClick={() => setAlternando(true)}>
               {obra.ativa ? 'Desativar obra' : 'Ativar obra'}
             </Botao>
-          </>
+          </SomenteAdmin>
         }
       >
         <SeloAtivo ativo={obra.ativa} feminino />
@@ -66,6 +79,8 @@ export function ObraDetalhe() {
         <span className="jn-meta">{obra.codigo ? `Código ${obra.codigo}` : 'Sem código'}</span>
         <span className="jn-meta">Cadastrada em {formatarData(obra.criadoEm)}</span>
       </TituloPagina>
+
+      <AvisoSomenteAdmin />
 
       <AvisoPagina aviso={aviso} onFechar={() => mostrarAviso(null)} />
 
@@ -85,20 +100,28 @@ export function ObraDetalhe() {
               {obra.empresas.length === 1 ? '1 empresa vinculada' : `${obra.empresas.length} empresas vinculadas`}
             </p>
           </div>
-          <Botao icone={<IconeMais tamanho={18} />} onClick={() => setVinculando(true)}>
-            Vincular empresa
-          </Botao>
+          <SomenteAdmin>
+            <Botao icone={<IconeMais tamanho={18} />} onClick={() => setVinculando(true)}>
+              Vincular empresa
+            </Botao>
+          </SomenteAdmin>
         </div>
 
         {obra.empresas.length === 0 ? (
           <EstadoVazio
             icone={<IconeEmpresa tamanho={32} />}
             titulo="Nenhuma empresa vinculada a esta obra."
-            texto="Vincule as empresas terceirizadas que trabalham aqui para acompanhar os documentos delas."
+            texto={
+              ehAdmin
+                ? 'Vincule as empresas terceirizadas que trabalham aqui para acompanhar os documentos delas.'
+                : 'Quando um administrador vincular empresas a esta obra, elas aparecem aqui.'
+            }
             acao={
-              <Botao icone={<IconeMais tamanho={18} />} onClick={() => setVinculando(true)}>
-                Vincular empresa
-              </Botao>
+              ehAdmin ? (
+                <Botao icone={<IconeMais tamanho={18} />} onClick={() => setVinculando(true)}>
+                  Vincular empresa
+                </Botao>
+              ) : undefined
             }
           />
         ) : (
@@ -135,14 +158,16 @@ export function ObraDetalhe() {
                       <Link className="jn-link-acao" to={`/empresas/${e.empresaId}`} aria-label={`Ver empresa ${e.razaoSocial}`}>
                         Ver empresa <IconeSeta tamanho={16} />
                       </Link>
-                      <Botao
-                        variante="fantasma"
-                        tamanho="pequeno"
-                        onClick={() => setDesvinculando(e)}
-                        aria-label={`Desvincular ${e.razaoSocial}`}
-                      >
-                        Desvincular
-                      </Botao>
+                      <SomenteAdmin>
+                        <Botao
+                          variante="fantasma"
+                          tamanho="pequeno"
+                          onClick={() => setDesvinculando(e)}
+                          aria-label={`Desvincular ${e.razaoSocial}`}
+                        >
+                          Desvincular
+                        </Botao>
+                      </SomenteAdmin>
                     </span>
                   </td>
                 </tr>
@@ -156,6 +181,7 @@ export function ObraDetalhe() {
         <FormularioObra
           obra={obra}
           onFechar={() => setEditando(false)}
+          onSemPermissao={semPermissao}
           onSalvo={(salva) => {
             setEditando(false);
             consulta.definirDados({ ...obra, ...salva });
@@ -167,6 +193,7 @@ export function ObraDetalhe() {
       <AlternarObra
         obra={alternando ? obra : null}
         onFechar={() => setAlternando(false)}
+        onSemPermissao={semPermissao}
         onConcluido={(ativa) => {
           setAlternando(false);
           consulta.definirDados({ ...obra, ativa });
@@ -178,6 +205,7 @@ export function ObraDetalhe() {
         <ModalVincularEmpresa
           obra={obra}
           onFechar={() => setVinculando(false)}
+          onSemPermissao={semPermissao}
           onVinculada={(empresa) => {
             setVinculando(false);
             consulta.recarregar();
@@ -190,6 +218,7 @@ export function ObraDetalhe() {
         obraId={obra.id}
         empresa={desvinculando}
         onFechar={() => setDesvinculando(null)}
+        onSemPermissao={semPermissao}
         onConcluido={(empresa) => {
           setDesvinculando(null);
           consulta.definirDados({ ...obra, empresas: obra.empresas.filter((x) => x.empresaId !== empresa.empresaId) });
@@ -204,10 +233,12 @@ function AlternarObra({
   obra,
   onFechar,
   onConcluido,
+  onSemPermissao,
 }: {
   obra: TObraDetalhe | null;
   onFechar: () => void;
   onConcluido: (ativa: boolean) => void;
+  onSemPermissao: (mensagem: string) => void;
 }) {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -227,7 +258,8 @@ function AlternarObra({
       });
       onConcluido(salva.ativa);
     } catch (e) {
-      setErro(mensagemDeErro(e));
+      if (ehSemPermissao(e)) onSemPermissao(e.title);
+      else setErro(mensagemDeErro(e));
     } finally {
       setCarregando(false);
     }
@@ -260,11 +292,13 @@ function Desvincular({
   empresa,
   onFechar,
   onConcluido,
+  onSemPermissao,
 }: {
   obraId: string;
   empresa: EmpresaNaObra | null;
   onFechar: () => void;
   onConcluido: (empresa: EmpresaNaObra) => void;
+  onSemPermissao: (mensagem: string) => void;
 }) {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -277,7 +311,8 @@ function Desvincular({
       await api.desvincularEmpresa(obraId, empresa.empresaId);
       onConcluido(empresa);
     } catch (e) {
-      setErro(mensagemDeErro(e));
+      if (ehSemPermissao(e)) onSemPermissao(e.title);
+      else setErro(mensagemDeErro(e));
     } finally {
       setCarregando(false);
     }
@@ -310,10 +345,12 @@ function ModalVincularEmpresa({
   obra,
   onFechar,
   onVinculada,
+  onSemPermissao,
 }: {
   obra: TObraDetalhe;
   onFechar: () => void;
   onVinculada: (empresa: EmpresaResumo) => void;
+  onSemPermissao: (mensagem: string) => void;
 }) {
   const [busca, setBusca] = useState('');
   const [termo, setTermo] = useState('');
@@ -338,8 +375,9 @@ function ModalVincularEmpresa({
       await api.vincularEmpresa(obra.id, empresa.id);
       onVinculada(empresa);
     } catch (e) {
-      setErro(mensagemDeErro(e));
       setVinculandoId(null);
+      if (ehSemPermissao(e)) onSemPermissao(e.title);
+      else setErro(mensagemDeErro(e));
     }
   }
 

@@ -4,6 +4,7 @@ import {
   API,
   adicionarErro,
   booleano,
+  exigirAdmin,
   exigirFluig,
   latencia,
   problema,
@@ -41,7 +42,7 @@ export const handlersTiposDocumento = [
 
   http.post(`${API}/tipos-documento`, async ({ request }) => {
     await latencia();
-    const negado = exigirFluig(request);
+    const negado = exigirFluig(request) ?? exigirAdmin();
     if (negado) return negado;
     const dados = validarTipo((await request.json()) as Record<string, unknown>, false);
     if (dados instanceof HttpResponse) return dados;
@@ -64,7 +65,7 @@ export const handlersTiposDocumento = [
 
   http.put(`${API}/tipos-documento/:tipoId`, async ({ request, params }) => {
     await latencia();
-    const negado = exigirFluig(request);
+    const negado = exigirFluig(request) ?? exigirAdmin();
     if (negado) return negado;
     const tipo = db.tipos.find((t) => t.id === params.tipoId);
     if (!tipo) return problema('NAO_ENCONTRADO');

@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ErroApi, mensagemDeErro } from '../api/client';
+import { ErroApi, ehSemPermissao, mensagemDeErro } from '../api/client';
 import { api } from '../api/fluig';
 import type { Empresa } from '../api/tipos';
 import { useConsulta } from '../api/useConsulta';
+import { useEhAdmin } from '../auth/contexto';
 import { Alerta } from '../components/Alerta';
 import { AvisoPagina } from '../components/AvisoPagina';
+import { AvisoSomenteAdmin } from '../components/AvisoSomenteAdmin';
 import { Botao } from '../components/Botao';
 import { Carregando, EstadoErro } from '../components/Estados';
 import { CamposEmpresa } from '../components/FormularioEmpresa';
@@ -13,10 +15,12 @@ import { useFormularioEmpresa } from '../hooks/useFormularioEmpresa';
 import { IconePin } from '../components/icons';
 import { ModalConfirmacao } from '../components/Modal';
 import { SeloSituacao } from '../components/Selo';
+import { SomenteAdmin } from '../components/SomenteAdmin';
 import { TituloPagina } from '../components/TituloPagina';
 import { useAviso } from '../hooks/useAviso';
 import { formatarCnpj } from '../utils/cnpj';
 import { formatarData } from '../utils/datas';
+import { formatarTelefone } from '../utils/formatos';
 import { SecaoAcessoPortal } from './empresa/SecaoAcessoPortal';
 import { SecaoDocumentos } from './empresa/SecaoDocumentos';
 import './EmpresaDetalhe.css';
@@ -26,6 +30,7 @@ export function EmpresaDetalhe() {
   const consulta = useConsulta((sinal) => api.obterEmpresa(empresaId, sinal), [empresaId]);
   const [aviso, mostrarAviso] = useAviso();
   const [alternando, setAlternando] = useState(false);
+  const ehAdmin = useEhAdmin();
 
   if (consulta.carregando && !consulta.dados) return <Carregando texto="Carregando empresa…" />;
   if (consulta.erro || !consulta.dados) {
@@ -40,15 +45,23 @@ export function EmpresaDetalhe() {
 
   const empresa = consulta.dados;
 
+  /** 403 SEM_PERMISSAO: fecha o modal e mostra a mensagem, mantendo os dados da empresa. */
+  function semPermissao(mensagem: string) {
+    setAlternando(false);
+    mostrarAviso({ tom: 'erro', texto: mensagem });
+  }
+
   return (
     <>
       <TituloPagina
         titulo={empresa.razaoSocial}
         voltar={{ para: '/empresas', rotulo: 'Empresas' }}
         acoes={
-          <Botao variante="fantasma" onClick={() => setAlternando(true)}>
-            {empresa.ativa ? 'Desativar empresa' : 'Ativar empresa'}
-          </Botao>
+          <SomenteAdmin>
+            <Botao variante="fantasma" onClick={() => setAlternando(true)}>
+              {empresa.ativa ? 'Desativar empresa' : 'Ativar empresa'}
+            </Botao>
+          </SomenteAdmin>
         }
       >
         <span className="jn-meta jn-mono">CNPJ {formatarCnpj(empresa.cnpj)}</span>
@@ -56,17 +69,24 @@ export function EmpresaDetalhe() {
         <span className="jn-meta">Cadastrada em {formatarData(empresa.criadoEm)}</span>
       </TituloPagina>
 
+      <AvisoSomenteAdmin />
+
       <AvisoPagina aviso={aviso} onFechar={() => mostrarAviso(null)} />
 
       <div className="jn-grade-detalhe">
-        <DadosEmpresa
-          key={`${empresa.id}-${empresa.cnpjEditavel}`}
-          empresa={empresa}
-          onSalva={(salva) => {
-            consulta.definirDados(salva);
-            mostrarAviso({ tom: 'sucesso', texto: 'Dados da empresa salvos.' });
-          }}
-        />
+        {ehAdmin ? (
+          <DadosEmpresa
+            key={`${empresa.id}-${empresa.cnpjEditavel}`}
+            empresa={empresa}
+            onSemPermissao={semPermissao}
+            onSalva={(salva) => {
+              consulta.definirDados(salva);
+              mostrarAviso({ tom: 'sucesso', texto: 'Dados da empresa salvos.' });
+            }}
+          />
+        ) : (
+          <DadosEmpresaLeitura empresa={empresa} />
+        )}
         <div className="jn-pilha jn-empresa__lateral">
           <SecaoAcessoPortal empresa={empresa} onAlterada={consulta.recarregar} />
           <section className="jn-painel-bloco" aria-labelledby="jn-obras-empresa">
@@ -100,6 +120,7 @@ export function EmpresaDetalhe() {
       <AlternarEmpresa
         empresa={alternando ? empresa : null}
         onFechar={() => setAlternando(false)}
+        onSemPermissao={semPermissao}
         onConcluido={(salva) => {
           setAlternando(false);
           consulta.definirDados(salva);
@@ -113,7 +134,43 @@ export function EmpresaDetalhe() {
   );
 }
 
-function DadosEmpresa({ empresa, onSalva }: { empresa: Empresa; onSalva: (e: Empresa) => void }) {
+/** Dados da empresa para o usuário comum: só leitura, sem formulário (FR-084). */
+function DadosEmpresaLeitura({ empresa }: { empresa: Empresa }) {
+  const naoInformado = <span className="jn-texto-secundario">Não informado</span>;
+  return (
+    <section className="jn-painel-bloco" aria-labelledby="jn-dados-empresa">
+      <div className="jn-painel-bloco__cabecalho">
+        <h2 className="jn-painel-bloco__titulo" id="jn-dados-empresa">
+          Dados da empresa
+        </h2>
+      </div>
+      <dl className="jn-dados">
+        <dt>Razão social</dt>
+        <dd>{empresa.razaoSocial}</dd>
+        <dt>Nome fantasia</dt>
+        <dd>{empresa.nomeFantasia || naoInformado}</dd>
+        <dt>CNPJ</dt>
+        <dd className="jn-mono">{formatarCnpj(empresa.cnpj)}</dd>
+        <dt>E-mail de contato</dt>
+        <dd>{empresa.emailContato}</dd>
+        <dt>Nome do contato</dt>
+        <dd>{empresa.nomeContato || naoInformado}</dd>
+        <dt>Telefone</dt>
+        <dd>{empresa.telefone ? formatarTelefone(empresa.telefone) : naoInformado}</dd>
+      </dl>
+    </section>
+  );
+}
+
+function DadosEmpresa({
+  empresa,
+  onSalva,
+  onSemPermissao,
+}: {
+  empresa: Empresa;
+  onSalva: (e: Empresa) => void;
+  onSemPermissao: (mensagem: string) => void;
+}) {
   const form = useFormularioEmpresa(empresa);
   const [salvando, setSalvando] = useState(false);
 
@@ -127,7 +184,8 @@ function DadosEmpresa({ empresa, onSalva }: { empresa: Empresa; onSalva: (e: Emp
       form.redefinir(salva);
       onSalva(salva);
     } catch (erro) {
-      form.tratarErro(erro);
+      if (ehSemPermissao(erro)) onSemPermissao(erro.title);
+      else form.tratarErro(erro);
     } finally {
       setSalvando(false);
     }
@@ -164,10 +222,12 @@ function AlternarEmpresa({
   empresa,
   onFechar,
   onConcluido,
+  onSemPermissao,
 }: {
   empresa: Empresa | null;
   onFechar: () => void;
   onConcluido: (e: Empresa) => void;
+  onSemPermissao: (mensagem: string) => void;
 }) {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -189,7 +249,8 @@ function AlternarEmpresa({
       });
       onConcluido(salva);
     } catch (e) {
-      setErro(mensagemDeErro(e));
+      if (ehSemPermissao(e)) onSemPermissao(e.title);
+      else setErro(mensagemDeErro(e));
     } finally {
       setCarregando(false);
     }

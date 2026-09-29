@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { ErroApi, mensagemDeErro } from '../api/client';
+import { ErroApi, ehSemPermissao, mensagemDeErro } from '../api/client';
 import { api } from '../api/fluig';
 import type { Obra, Uf } from '../api/tipos';
 import { UFS } from '../utils/formatos';
@@ -15,10 +15,13 @@ export function FormularioObra({
   obra,
   onFechar,
   onSalvo,
+  onSemPermissao,
 }: {
   obra: Obra | null;
   onFechar: () => void;
   onSalvo: (obra: Obra) => void;
+  /** 403 `SEM_PERMISSAO`: a página fecha o modal e mostra a mensagem. */
+  onSemPermissao: (mensagem: string) => void;
 }) {
   const [nome, setNome] = useState(obra?.nome ?? '');
   const [codigo, setCodigo] = useState(obra?.codigo ?? '');
@@ -47,7 +50,9 @@ export function FormularioObra({
         : await api.criarObra(dados);
       onSalvo(salva);
     } catch (erro) {
-      if (erro instanceof ErroApi && erro.code === 'CODIGO_OBRA_DUPLICADO') {
+      if (ehSemPermissao(erro)) {
+        onSemPermissao(erro.title);
+      } else if (erro instanceof ErroApi && erro.code === 'CODIGO_OBRA_DUPLICADO') {
         setErros({ codigo: erro.title });
       } else if (erro instanceof ErroApi && erro.code === 'VALIDACAO') {
         setErros({

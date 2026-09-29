@@ -2,8 +2,12 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, listarTodasObras } from '../api/fluig';
 import type { SituacaoAcesso } from '../api/tipos';
+import { ehSemPermissao } from '../api/client';
 import { useConsulta } from '../api/useConsulta';
+import { useEhAdmin } from '../auth/contexto';
 import { Alerta } from '../components/Alerta';
+import { AvisoPagina } from '../components/AvisoPagina';
+import { AvisoSomenteAdmin } from '../components/AvisoSomenteAdmin';
 import { Botao } from '../components/Botao';
 import { Campo, CampoSelecao } from '../components/Campo';
 import { Carregando, EstadoErro, EstadoVazio } from '../components/Estados';
@@ -16,8 +20,10 @@ import { Paginacao } from '../components/Paginacao';
 import { ResumoDocumentos } from '../components/ResumoDocumentos';
 import { SeloSituacao } from '../components/Selo';
 import { SITUACOES } from '../components/situacoes';
+import { SomenteAdmin } from '../components/SomenteAdmin';
 import { Tabela } from '../components/Tabela';
 import { TituloPagina } from '../components/TituloPagina';
+import { useAviso } from '../hooks/useAviso';
 import { formatarCnpj } from '../utils/cnpj';
 
 const TAMANHO_PAGINA = 20;
@@ -47,6 +53,8 @@ export function Empresas() {
   const pagina = Math.max(1, Number(params.get('pagina') ?? '1') || 1);
   const [rascunho, setRascunho] = useState<FiltrosEmpresas>(filtros);
   const [criando, setCriando] = useState(false);
+  const [aviso, mostrarAviso] = useAviso();
+  const ehAdmin = useEhAdmin();
 
   // Mantém o rascunho alinhado quando a URL muda por fora (ex.: link do painel).
   const chaveUrl = params.toString();
@@ -93,11 +101,15 @@ export function Empresas() {
         titulo="Empresas"
         descricao="Empresas terceirizadas, situação de acesso ao portal e andamento dos documentos."
         acoes={
-          <Botao icone={<IconeMais tamanho={18} />} onClick={() => setCriando(true)}>
-            Nova empresa
-          </Botao>
+          <SomenteAdmin>
+            <Botao icone={<IconeMais tamanho={18} />} onClick={() => setCriando(true)}>
+              Nova empresa
+            </Botao>
+          </SomenteAdmin>
         }
       />
+
+      <AvisoSomenteAdmin />
 
       <Filtros
         titulo="Encontre a empresa"
@@ -155,6 +167,8 @@ export function Empresas() {
         </label>
       </Filtros>
 
+      <AvisoPagina aviso={aviso} onFechar={() => mostrarAviso(null)} />
+
       {consulta.carregando && !consulta.dados ? (
         <Carregando texto="Carregando empresas…" />
       ) : consulta.erro ? (
@@ -166,11 +180,17 @@ export function Empresas() {
           <EstadoVazio
             icone={<IconeEmpresa tamanho={32} />}
             titulo="Nenhuma empresa cadastrada ainda."
-            texto="Cadastre a empresa terceirizada com razão social, CNPJ e e-mail de contato."
+            texto={
+              ehAdmin
+                ? 'Cadastre a empresa terceirizada com razão social, CNPJ e e-mail de contato.'
+                : 'Quando um administrador cadastrar as empresas, elas aparecem aqui.'
+            }
             acao={
-              <Botao icone={<IconeMais tamanho={18} />} onClick={() => setCriando(true)}>
-                Nova empresa
-              </Botao>
+              ehAdmin ? (
+                <Botao icone={<IconeMais tamanho={18} />} onClick={() => setCriando(true)}>
+                  Nova empresa
+                </Botao>
+              ) : undefined
             }
           />
         )
@@ -226,6 +246,10 @@ export function Empresas() {
       {criando ? (
         <NovaEmpresa
           onFechar={() => setCriando(false)}
+          onSemPermissao={(mensagem) => {
+            setCriando(false);
+            mostrarAviso({ tom: 'erro', texto: mensagem });
+          }}
           onCriada={(id) =>
             navigate(`/empresas/${id}`, {
               state: {
@@ -242,7 +266,15 @@ export function Empresas() {
   );
 }
 
-function NovaEmpresa({ onFechar, onCriada }: { onFechar: () => void; onCriada: (id: string) => void }) {
+function NovaEmpresa({
+  onFechar,
+  onCriada,
+  onSemPermissao,
+}: {
+  onFechar: () => void;
+  onCriada: (id: string) => void;
+  onSemPermissao: (mensagem: string) => void;
+}) {
   const form = useFormularioEmpresa(null);
   const [salvando, setSalvando] = useState(false);
 
@@ -255,8 +287,9 @@ function NovaEmpresa({ onFechar, onCriada }: { onFechar: () => void; onCriada: (
       const criada = await api.criarEmpresa(dados);
       onCriada(criada.id);
     } catch (erro) {
-      form.tratarErro(erro);
       setSalvando(false);
+      if (ehSemPermissao(erro)) onSemPermissao(erro.title);
+      else form.tratarErro(erro);
     }
   }
 

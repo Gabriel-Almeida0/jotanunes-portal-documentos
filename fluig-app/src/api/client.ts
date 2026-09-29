@@ -4,6 +4,8 @@
  * - Injeta `Authorization: Bearer <token Fluig>`.
  * - Converte `application/problem+json` em `ErroApi { status, code, title, errors }`.
  * - Em 401 dispara o evento `jn:nao-autenticado` (o AuthFluigProvider mostra "Abra este sistema pelo Fluig.").
+ * - 403 (`SEM_PERMISSAO`: operação só para administradores) é só um `ErroApi` para a tela exibir; a
+ *   sessão continua.
  */
 import { MENSAGEM_SEM_CONEXAO, MENSAGENS_ERRO } from './mensagens';
 import type { CodigoErro, Problema } from './tipos';
@@ -53,6 +55,14 @@ export class ErroApi extends Error {
   erroDoCampo(campo: string): string | undefined {
     return this.errors[campo]?.[0];
   }
+}
+
+/**
+ * `true` para 403 `SEM_PERMISSAO` (operação só de administrador). A tela fecha o modal, mostra o
+ * `title` e mantém os dados — nunca derruba a sessão.
+ */
+export function ehSemPermissao(erro: unknown): erro is ErroApi {
+  return erro instanceof ErroApi && erro.code === 'SEM_PERMISSAO';
 }
 
 /** Converte qualquer erro em mensagem pronta para a tela. */
@@ -107,6 +117,8 @@ function codigoPorStatus(status: number): CodigoErro {
       return 'VALIDACAO';
     case 401:
       return 'NAO_AUTENTICADO';
+    case 403:
+      return 'SEM_PERMISSAO';
     case 404:
       return 'NAO_ENCONTRADO';
     case 429:

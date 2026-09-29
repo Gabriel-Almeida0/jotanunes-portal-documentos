@@ -2,8 +2,8 @@
 
 Interface interna da Jotanunes para o Portal de Documentação de Terceirizadas. Abre **de dentro do
 Fluig** (iframe ou nova aba), sem login próprio: a identidade vem de um token emitido pelo Fluig.
-Aqui a analista cadastra obras, empresas, vínculos e tipos de documento, envia convites e analisa os
-documentos enviados.
+Aqui o administrador cadastra obras, empresas, vínculos e tipos de documento e analisa os documentos
+enviados; qualquer usuário com acesso consulta tudo e envia convites (ver [Perfis](#perfis)).
 
 - Stack: React 18 + Vite 5 + TypeScript (strict), `react-router-dom` 6 (`HashRouter`).
 - Visual: **CSS puro** com os tokens `--jn-*` de [`docs/design.md`](../docs/design.md), tudo escopado
@@ -33,6 +33,31 @@ Copie `.env.example` para `.env.local` (não versionado):
 | `VITE_API_URL` | URL da API. Dev: `http://localhost:5080` |
 | `VITE_USE_MOCKS` | `true` = respostas simuladas (MSW) conforme o contrato, sem backend |
 | `VITE_FLUIG_DEV_TOKEN` | Só em `npm run dev`: token Fluig usado quando a URL não traz `#fluigToken=` |
+| `VITE_MOCK_PERFIL` | Só com `VITE_USE_MOCKS=true`: `admin` (padrão) ou `comum` — perfil do usuário simulado |
+
+## Perfis
+
+O perfil vem do Fluig, na claim `roles` do token (regras em
+[`contracts/fluig-identity.md`](../specs/001-portal-documentos-terceirizadas/contracts/fluig-identity.md)).
+O app lê o campo `admin` de `GET /api/fluig/me`.
+
+| | Administrador (`roles` contém `admin`) | Comum (sem `roles`, ou sem `admin`) |
+|---|---|---|
+| Painel, listas, detalhes, documentos, histórico, abrir/baixar arquivo | Sim | Sim |
+| Enviar/reenviar convite | Sim | Sim |
+| Cadastrar/editar/ativar/desativar obra, empresa e tipo de documento; vincular/desvincular | Sim | Não |
+| Aprovar/rejeitar envio | Sim | Não |
+
+- Para o usuário comum as ações de administrador **somem** (não ficam desabilitadas), os dados da
+  empresa aparecem em modo leitura, o link da fila vira "Ver →" e cada tela mostra uma vez o aviso
+  "Só administradores podem cadastrar, alterar ou analisar. Se você precisa, fale com a TI."
+- Quem decide é a API: operação de administrador feita por usuário comum volta `403 SEM_PERMISSAO`.
+  O app mostra a mensagem na tela, fecha o modal e mantém os dados — a sessão continua (só o `401`
+  leva para "Abra este sistema pelo Fluig.").
+- O perfil vale pelo tempo de vida do token. Mudou o grupo no Fluig? Feche e abra o sistema pelo
+  Fluig de novo.
+- Código: `useEhAdmin()` (`src/auth/contexto.ts`), `<SomenteAdmin>` e `<AvisoSomenteAdmin>`
+  (`src/components/`).
 
 ## Rodar com mocks (sem backend)
 
@@ -43,7 +68,19 @@ VITE_USE_MOCKS=true npm run dev
 ```
 
 Abra http://localhost:5173. Com mocks e sem token, o app usa um token fictício de desenvolvimento e
-entra como **Analista Dev**. Os dados ficam em memória (recarregar a página volta ao estado inicial).
+entra como **Analista Dev** (administrador). Os dados ficam em memória (recarregar a página volta ao
+estado inicial).
+
+Para ver o app como usuário comum (**João Comum**):
+
+```bash
+VITE_USE_MOCKS=true VITE_MOCK_PERFIL=comum npm run dev
+```
+
+Com `VITE_MOCK_PERFIL=comum`, `/me` devolve `admin: false` e as 10 operações `x-requer-admin` do
+contrato respondem `403 SEM_PERMISSAO` (convites e consultas continuam liberados). Nos testes, use
+`definirPerfilMock('comum')` de `src/mocks/dados.ts`; o `src/test/setup.ts` volta para `admin` depois
+de cada teste.
 
 Cenários úteis nos mocks:
 
@@ -57,11 +94,14 @@ Cenários úteis nos mocks:
 ## Rodar com a API real
 
 1. Suba o Postgres e a API conforme o [quickstart](../specs/001-portal-documentos-terceirizadas/quickstart.md).
-2. Gere um token de desenvolvimento na raiz do repositório:
+2. Gere um token de desenvolvimento na raiz do repositório (quickstart §3):
 
    ```bash
-   node scripts/gerar-token-fluig-dev.mjs dev.analista "Analista Dev" analista@jotanunes.com
+   node scripts/gerar-token-fluig-dev.mjs --admin dev.admin "Admin Dev" admin@jotanunes.com   # administrador
+   node scripts/gerar-token-fluig-dev.mjs dev.analista "Analista Dev" analista@jotanunes.com   # usuário comum
    ```
+
+   Com `--admin` o token traz `"roles": ["admin"]`; sem a opção a claim é omitida (usuário comum).
 
 3. Em `fluig-app/.env.local`:
 
@@ -81,7 +121,8 @@ A API precisa liberar a origem `http://localhost:5173` em `Cors__Origins`.
 Contrato completo em [`contracts/fluig-identity.md`](../specs/001-portal-documentos-terceirizadas/contracts/fluig-identity.md).
 
 1. Um widget/página do Fluig gera um JWT HS256 do usuário logado (`iss=fluig`,
-   `aud=jotanunes-docs-api`, `sub`=login, `name`, `email`, validade ≤ 8 h).
+   `aud=jotanunes-docs-api`, `sub`=login, `name`, `email`, validade ≤ 8 h) e, se ele estiver no grupo
+   de administradores do Fluig, `"roles": ["admin"]`.
 2. O widget abre `{URL do fluig-app}/#fluigToken=<jwt>` em iframe ou nova aba.
 3. O app lê o token do fragmento, **apaga o fragmento da URL** (`history.replaceState`), guarda o
    token em memória e em `sessionStorage['jn.fluigToken']` e chama `GET /api/fluig/me`.
@@ -97,13 +138,13 @@ regra de reescrita. Em produção, o servidor que hospeda o app deve enviar
 | Rota | Tela |
 |---|---|
 | `#/` | Painel: indicadores com atalhos para as listas filtradas |
-| `#/obras` | Obras: busca, situação, paginação, cadastro |
-| `#/obras/:obraId` | Obra: dados, ativar/desativar, empresas vinculadas, vincular/desvincular |
-| `#/empresas` | Empresas: busca por nome/CNPJ, filtros por obra, situação de acesso e pendência |
-| `#/empresas/:empresaId` | Empresa: dados editáveis, acesso ao portal e convites, obras, documentos e histórico |
-| `#/tipos-documento` | Tipos de documento: cadastro, edição, ativar/desativar |
+| `#/obras` | Obras: busca, situação, paginação, cadastro (admin) |
+| `#/obras/:obraId` | Obra: dados, empresas vinculadas; editar, ativar/desativar, vincular/desvincular (admin) |
+| `#/empresas` | Empresas: busca por nome/CNPJ, filtros por obra, situação de acesso e pendência; cadastro (admin) |
+| `#/empresas/:empresaId` | Empresa: dados (editáveis pelo admin; leitura para o comum), acesso ao portal e convites, obras, documentos e histórico |
+| `#/tipos-documento` | Tipos de documento: lista; cadastro, edição, ativar/desativar (admin) |
 | `#/analise` | Fila de análise: em análise (mais antigo primeiro) e analisados, com filtros |
-| `#/analise/:envioId` | Análise do envio: abrir/baixar arquivo, aprovar, rejeitar com motivo |
+| `#/analise/:envioId` | Análise do envio: abrir/baixar arquivo; aprovar, rejeitar com motivo (admin) |
 
 ## Estrutura
 
@@ -111,7 +152,7 @@ regra de reescrita. Em produção, o servidor que hospeda o app deve enviar
 src/
 ├── api/          schema.d.ts (gerado), client.ts (fetch + ErroApi), fluig.ts (uma função por rota), useConsulta.ts
 ├── auth/         tokenFluig.ts (fragmento/sessionStorage/dev), AuthFluigProvider.tsx, contexto.ts
-├── components/   Botao, Campo, Selo, TituloPagina, Tabela, Paginacao, Modal, Filtros, Alerta, Estados, Layout, icons/
+├── components/   SomenteAdmin, AvisoSomenteAdmin, Botao, Campo, Selo, TituloPagina, Tabela, Paginacao, Modal, Filtros, Alerta, Estados, Layout, icons/
 ├── hooks/        useAviso, useFormularioEmpresa
 ├── mocks/        MSW: dados.ts (banco em memória), handlers/*, browser.ts, server.ts
 ├── pages/        uma página por rota (+ .css) e seus testes

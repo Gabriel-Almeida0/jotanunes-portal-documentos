@@ -1,12 +1,12 @@
 import { http, HttpResponse } from 'msw';
 import type { Painel } from '../../api/tipos';
-import { USUARIO_MOCK, contagemDocumentos, db, situacaoAcesso } from '../dados';
+import { contagemDocumentos, db, situacaoAcesso, usuarioMock } from '../dados';
 import { API, exigirFluig, latencia } from '../util';
 
 export const handlersSessao = [
   http.get(`${API}/me`, async ({ request }) => {
     await latencia();
-    return exigirFluig(request) ?? HttpResponse.json(USUARIO_MOCK);
+    return exigirFluig(request) ?? HttpResponse.json(usuarioMock());
   }),
 
   http.get(`${API}/painel`, async ({ request }) => {

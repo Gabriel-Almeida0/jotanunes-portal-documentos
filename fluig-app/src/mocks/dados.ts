@@ -89,11 +89,46 @@ export interface EnvioDb {
   motivoRejeicao: string | null;
 }
 
+/** Usuário administrador dos mocks (token Fluig com `roles: ["admin"]`). */
 export const USUARIO_MOCK: UsuarioFluig = {
   login: 'dev.analista',
   nome: 'Analista Dev',
   email: 'analista@jotanunes.com',
+  admin: true,
 };
+
+/** Usuário comum dos mocks (token Fluig sem `roles`): consulta e convida, não cadastra nem analisa. */
+export const USUARIO_MOCK_COMUM: UsuarioFluig = {
+  login: 'joao.comum',
+  nome: 'João Comum',
+  email: 'joao.comum@jotanunes.com',
+  admin: false,
+};
+
+// ───────────────────────────── Perfil do mock (R16) ─────────────────────────────
+
+export type PerfilMock = 'admin' | 'comum';
+
+/** `VITE_MOCK_PERFIL=comum` simula o usuário comum no `npm run dev`; qualquer outro valor = admin. */
+function perfilDoAmbiente(): PerfilMock {
+  return import.meta.env.VITE_MOCK_PERFIL === 'comum' ? 'comum' : 'admin';
+}
+
+let perfilAtual: PerfilMock = perfilDoAmbiente();
+
+/** Troca o perfil do usuário simulado (testes). O `setup.ts` volta para `admin` depois de cada teste. */
+export function definirPerfilMock(perfil: PerfilMock): void {
+  perfilAtual = perfil;
+}
+
+export function perfilMock(): PerfilMock {
+  return perfilAtual;
+}
+
+/** Usuário que o mock de `/api/fluig/me` devolve para o perfil atual. */
+export function usuarioMock(): UsuarioFluig {
+  return perfilAtual === 'comum' ? USUARIO_MOCK_COMUM : USUARIO_MOCK;
+}
 
 const OUTRA_ANALISTA: AutorFluig = { login: 'maria.silva', nome: 'Maria Silva' };
 
