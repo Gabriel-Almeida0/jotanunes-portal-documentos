@@ -1,0 +1,128 @@
+.jn-pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-5);
+  padding-block: var(--jn-space-7) var(--jn-space-8);
+}
+
+.jn-pagina__avisos:empty {
+  display: none;
+}
+
+.jn-pagina__avisos .jn-alerta__texto {
+  width: 100%;
+}
+
+.jn-fechar {
+  margin-top: var(--jn-space-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--jn-gray-800);
+  font: 500 14px/1.4 var(--jn-font);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.jn-pagina__erro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--jn-space-3);
+}
+
+.jn-pagina__orientacao {
+  color: var(--jn-gray-800);
+}
+
+.jn-resumo ul {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--jn-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.jn-resumo__item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--jn-space-2);
+  padding: var(--jn-space-3) var(--jn-space-4);
+  border-radius: var(--jn-radius-control);
+  background: var(--jn-gray-50);
+  border-left: 4px solid var(--jn-gray-400);
+}
+
+.jn-resumo__item--rejeitado {
+  border-left-color: var(--jn-danger-fg);
+}
+
+.jn-resumo__item--pendente_envio {
+  border-left-color: var(--jn-warning-fg);
+}
+
+.jn-resumo__item--em_analise {
+  border-left-color: var(--jn-info-fg);
+}
+
+.jn-resumo__item--aprovado {
+  border-left-color: var(--jn-success-fg);
+}
+
+.jn-resumo__numero {
+  font: var(--jn-text-h2);
+  color: var(--jn-gray-900);
+}
+
+.jn-resumo__rotulo {
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-600);
+}
+
+.jn-vazio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-1);
+  padding: var(--jn-space-5);
+  border-radius: var(--jn-radius-signature);
+  background: var(--jn-success-bg);
+}
+
+.jn-vazio__titulo {
+  font: var(--jn-text-h3);
+  color: var(--jn-success-fg);
+}
+
+.jn-vazio__texto {
+  color: var(--jn-gray-800);
+}
+
+.jn-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: var(--jn-space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.jn-grade > li {
+  display: flex;
+  min-width: 0;
+}
+
+.jn-grade > li > * {
+  flex: 1;
+}
+
+@media (max-width: 760px) {
+  .jn-pagina {
+    padding-block: var(--jn-space-5) var(--jn-space-7);
+    gap: var(--jn-space-4);
+  }
+
+  .jn-resumo ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

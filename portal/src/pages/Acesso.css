@@ -1,0 +1,152 @@
+.jn-acesso {
+  padding-block: var(--jn-space-7) var(--jn-space-8);
+}
+
+.jn-acesso__painel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  max-width: 980px;
+  margin-inline: auto;
+  border: var(--jn-border-card);
+  border-radius: var(--jn-radius-signature);
+  overflow: hidden;
+  background: var(--jn-white);
+}
+
+.jn-acesso__formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-4);
+  padding: var(--jn-space-7) var(--jn-space-7) var(--jn-space-6);
+}
+
+.jn-acesso__barra {
+  display: block;
+  width: 50px;
+  height: 6px;
+  background: var(--jn-red-600);
+}
+
+.jn-acesso__formulario h1 {
+  font: var(--jn-text-display);
+  color: var(--jn-gray-900);
+}
+
+.jn-acesso__intro {
+  color: var(--jn-gray-500);
+}
+
+.jn-acesso__mensagens:empty {
+  display: none;
+}
+
+.jn-acesso__mensagens {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-2);
+}
+
+.jn-acesso__campos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-4);
+}
+
+.jn-acesso__campos .jn-botao {
+  margin-top: var(--jn-space-2);
+}
+
+.jn-acesso__ajuda {
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-500);
+  padding-top: var(--jn-space-4);
+  border-top: 1px solid var(--jn-gray-100);
+}
+
+.jn-acesso__lateral {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-5);
+  padding: var(--jn-space-7) var(--jn-space-6);
+  color: var(--jn-white);
+  background-color: var(--jn-gray-700);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1.2px, transparent 1.2px);
+  background-size: 14px 14px;
+}
+
+.jn-acesso__lateral h2 {
+  font: var(--jn-text-h2);
+  color: var(--jn-white);
+}
+
+.jn-acesso__passos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.jn-acesso__passos li {
+  display: flex;
+  gap: var(--jn-space-4);
+  align-items: flex-start;
+}
+
+.jn-acesso__passos strong {
+  display: block;
+  font: var(--jn-text-h3);
+  font-size: 16px;
+}
+
+.jn-acesso__passos p {
+  font: var(--jn-text-sm);
+  color: #e6e6e6;
+}
+
+.jn-acesso__numero {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--jn-red-600);
+  color: var(--jn-white);
+  font: 600 14px/1 var(--jn-font);
+}
+
+@media (max-width: 860px) {
+  .jn-acesso {
+    padding-block: var(--jn-space-5) var(--jn-space-7);
+  }
+
+  .jn-acesso__painel {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 560px;
+  }
+
+  .jn-acesso__formulario {
+    padding: var(--jn-space-6) var(--jn-space-5);
+  }
+
+  .jn-acesso__lateral {
+    padding: var(--jn-space-6) var(--jn-space-5);
+  }
+}
+
+@media (max-width: 420px) {
+  .jn-acesso__formulario {
+    padding: var(--jn-space-5) var(--jn-space-4);
+  }
+
+  .jn-acesso__formulario h1 {
+    font-size: 26px;
+  }
+
+  .jn-acesso__lateral {
+    padding: var(--jn-space-5) var(--jn-space-4);
+  }
+}

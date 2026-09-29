@@ -1,0 +1,113 @@
+.jn-troca {
+  padding-block: var(--jn-space-7) var(--jn-space-8);
+}
+
+.jn-troca__painel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-4);
+  max-width: 560px;
+  margin-inline: auto;
+  padding: var(--jn-space-7);
+  border: var(--jn-border-card);
+  border-radius: var(--jn-radius-signature);
+  background: var(--jn-white);
+}
+
+.jn-troca__icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--jn-danger-bg);
+  color: var(--jn-red-700);
+}
+
+.jn-troca__barra {
+  display: none;
+}
+
+.jn-troca__painel h1 {
+  font: var(--jn-text-h1);
+}
+
+.jn-troca__intro {
+  color: var(--jn-gray-500);
+}
+
+.jn-troca__intro strong {
+  color: var(--jn-gray-900);
+  font-weight: 600;
+}
+
+.jn-troca__campos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-4);
+  margin-top: var(--jn-space-2);
+}
+
+.jn-troca__campos .jn-botao {
+  margin-top: var(--jn-space-2);
+}
+
+.jn-troca__regras {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--jn-space-1) var(--jn-space-4);
+  margin: var(--jn-space-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.jn-troca__regras li {
+  display: flex;
+  align-items: center;
+  gap: var(--jn-space-2);
+  color: var(--jn-gray-500);
+}
+
+.jn-troca__marca {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--jn-gray-500);
+  border-radius: 50%;
+}
+
+.jn-troca__regra--ok {
+  color: var(--jn-success-fg) !important;
+}
+
+.jn-troca__regra--ok .jn-troca__marca {
+  border-color: var(--jn-success-fg);
+  background: var(--jn-success-fg);
+  color: var(--jn-white);
+}
+
+.jn-troca__regra--ok .jn-troca__marca svg {
+  stroke-width: 3;
+}
+
+@media (max-width: 600px) {
+  .jn-troca {
+    padding-block: var(--jn-space-5) var(--jn-space-7);
+  }
+
+  .jn-troca__painel {
+    padding: var(--jn-space-5) var(--jn-space-4);
+  }
+
+  .jn-troca__painel h1 {
+    font-size: 24px;
+  }
+
+  .jn-troca__regras {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

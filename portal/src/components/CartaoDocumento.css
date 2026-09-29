@@ -1,0 +1,129 @@
+.jn-doc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-4);
+  min-width: 0;
+  padding: var(--jn-space-5);
+  border: var(--jn-border-card);
+  border-radius: var(--jn-radius-card);
+  background: var(--jn-white);
+}
+
+.jn-doc--rejeitado {
+  border-color: var(--jn-danger-fg);
+  box-shadow: inset 4px 0 0 var(--jn-danger-fg);
+}
+
+.jn-doc__topo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--jn-space-3);
+}
+
+.jn-doc__nome {
+  font: var(--jn-text-h3);
+  font-size: 19px;
+  color: var(--jn-gray-900);
+  overflow-wrap: anywhere;
+}
+
+.jn-doc__instrucoes {
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-500);
+}
+
+.jn-doc__motivo {
+  padding: var(--jn-space-3) var(--jn-space-4);
+  border-radius: var(--jn-radius-control);
+  background: var(--jn-danger-bg);
+  color: var(--jn-gray-900);
+  font: var(--jn-text-sm);
+  overflow-wrap: anywhere;
+}
+
+.jn-doc__motivo strong {
+  color: var(--jn-danger-fg);
+  font-weight: 600;
+}
+
+.jn-doc__motivo-dica {
+  margin-top: var(--jn-space-1);
+  color: var(--jn-gray-600);
+}
+
+.jn-doc__envio {
+  display: flex;
+  gap: var(--jn-space-3);
+  padding-top: var(--jn-space-4);
+  border-top: 1px solid var(--jn-gray-100);
+}
+
+.jn-doc__envio-icone {
+  flex: none;
+  color: var(--jn-gray-600);
+  margin-top: 2px;
+}
+
+.jn-doc__envio-dados {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.jn-doc__envio-rotulo {
+  font: var(--jn-text-xs);
+  color: var(--jn-gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.jn-doc__envio-dados .jn-botao--link {
+  font-size: 15px;
+}
+
+.jn-doc__envio-meta {
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-500);
+}
+
+.jn-doc__passo {
+  font: var(--jn-text-sm);
+  color: var(--jn-info-fg);
+}
+
+.jn-doc__rodape {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-4);
+  margin-top: auto;
+}
+
+.jn-doc__historico {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--jn-space-1);
+  align-self: flex-start;
+  padding-block: var(--jn-space-1);
+  font: 600 14px/1.4 var(--jn-font);
+  color: var(--jn-red-700);
+  text-decoration: none;
+}
+
+.jn-doc__historico:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.jn-erro-inline {
+  font: 500 14px/1.4 var(--jn-font);
+  color: var(--jn-danger-fg);
+}
+
+@media (max-width: 420px) {
+  .jn-doc {
+    padding: var(--jn-space-4);
+  }
+}

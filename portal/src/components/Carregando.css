@@ -1,0 +1,18 @@
+.jn-carregando {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--jn-space-3);
+  padding: var(--jn-space-7) var(--jn-space-4);
+  font: var(--jn-text-body);
+  color: var(--jn-gray-500);
+}
+
+.jn-carregando__giro {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--jn-gray-100);
+  border-top-color: var(--jn-red-600);
+  border-radius: 50%;
+  animation: jn-giro 0.8s linear infinite;
+}

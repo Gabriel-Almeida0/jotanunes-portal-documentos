@@ -1,0 +1,37 @@
+.jn-selo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--jn-radius-pill);
+  font: var(--jn-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.jn-selo svg {
+  flex: none;
+  stroke-width: 2.25;
+}
+
+.jn-selo--pendente_envio {
+  color: var(--jn-warning-fg);
+  background: var(--jn-warning-bg);
+}
+
+.jn-selo--em_analise {
+  color: var(--jn-info-fg);
+  background: var(--jn-info-bg);
+}
+
+.jn-selo--aprovado {
+  color: var(--jn-success-fg);
+  background: var(--jn-success-bg);
+}
+
+.jn-selo--rejeitado {
+  color: var(--jn-danger-fg);
+  background: var(--jn-danger-bg);
+}

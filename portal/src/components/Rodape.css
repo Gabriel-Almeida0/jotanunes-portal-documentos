@@ -1,0 +1,31 @@
+.jn-rodape {
+  margin-top: auto;
+  border-top: 1px solid #e4e4e4;
+  background: var(--jn-gray-50);
+}
+
+.jn-rodape__conteudo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--jn-space-3) var(--jn-space-5);
+  padding-block: var(--jn-space-5);
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-500);
+}
+
+.jn-rodape__conteudo img {
+  height: 32px;
+  width: auto;
+}
+
+.jn-rodape__ajuda {
+  flex: 1 1 280px;
+  text-align: right;
+}
+
+@media (max-width: 760px) {
+  .jn-rodape__ajuda {
+    text-align: left;
+  }
+}

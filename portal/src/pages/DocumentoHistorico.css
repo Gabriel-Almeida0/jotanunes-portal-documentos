@@ -1,0 +1,124 @@
+.jn-voltar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--jn-space-2);
+  align-self: flex-start;
+  padding-block: var(--jn-space-1);
+  font: 600 14px/1.4 var(--jn-font);
+  color: var(--jn-red-700);
+  text-decoration: none;
+}
+
+.jn-voltar:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.jn-historico-pagina {
+  max-width: 880px;
+}
+
+.jn-historico__situacao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--jn-space-2);
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-600);
+}
+
+.jn-historico {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-4);
+}
+
+.jn-historico__titulo {
+  font: var(--jn-text-h2);
+}
+
+.jn-historico__vazio {
+  padding: var(--jn-space-5);
+  border: 1px dashed var(--jn-gray-400);
+  border-radius: var(--jn-radius-card);
+  color: var(--jn-gray-500);
+}
+
+.jn-historico__lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.jn-historico__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--jn-space-2);
+  padding: var(--jn-space-4) var(--jn-space-5);
+  border: var(--jn-border-card);
+  border-radius: var(--jn-radius-card);
+  background: var(--jn-white);
+  min-width: 0;
+}
+
+.jn-historico__cabeca {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--jn-space-2) var(--jn-space-3);
+}
+
+.jn-historico__atual {
+  font: var(--jn-text-xs);
+  color: var(--jn-gray-500);
+}
+
+.jn-historico__dados {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--jn-space-1) var(--jn-space-5);
+  margin: 0;
+  font: var(--jn-text-sm);
+}
+
+.jn-historico__dados div {
+  display: flex;
+  gap: var(--jn-space-1);
+}
+
+.jn-historico__dados dt {
+  color: var(--jn-gray-500);
+}
+
+.jn-historico__dados dt::after {
+  content: ':';
+}
+
+.jn-historico__dados dd {
+  margin: 0;
+  color: var(--jn-gray-900);
+}
+
+.jn-historico__motivo {
+  width: 100%;
+  padding: var(--jn-space-3) var(--jn-space-4);
+  border-radius: var(--jn-radius-control);
+  background: var(--jn-danger-bg);
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-900);
+  overflow-wrap: anywhere;
+}
+
+.jn-historico__motivo strong {
+  color: var(--jn-danger-fg);
+}
+
+@media (max-width: 420px) {
+  .jn-historico__item {
+    padding: var(--jn-space-4);
+  }
+}
