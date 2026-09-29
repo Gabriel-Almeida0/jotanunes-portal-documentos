@@ -18,4 +18,9 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Logo da Jotanunes (cabeçalho de jotanunes.com), anexado inline nos e-mails. -->
+    <EmbeddedResource Include="Email\logo-jotanunes.png" LogicalName="Jotanunes.Docs.Infrastructure.Email.logo-jotanunes.png" />
+  </ItemGroup>
+
 </Project>

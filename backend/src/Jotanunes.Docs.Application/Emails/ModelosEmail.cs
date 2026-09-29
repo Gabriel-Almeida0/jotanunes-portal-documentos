@@ -6,6 +6,12 @@ namespace Jotanunes.Docs.Application.Emails;
 /// <summary>Modelos de e-mail (HTML simples com as cores da marca + versão texto).</summary>
 public static class ModelosEmail
 {
+    /// <summary>Content-ID do logo anexado inline pelo adaptador de e-mail (referenciado como <c>cid:</c> no HTML).</summary>
+    public const string LogoContentId = "logo-jotanunes";
+
+    private const string Logo =
+        $"""<img src="cid:{LogoContentId}" alt="Jotanunes Construtora" width="166" height="45" style="display:block;border:0;margin:0 0 24px">""";
+
     private static readonly TimeZoneInfo FusoBrasil = ObterFuso();
 
     public static MensagemEmail Convite(string para, string razaoSocial, string cnpjFormatado, IReadOnlyList<string> obras,
@@ -42,6 +48,7 @@ public static class ModelosEmail
             <!doctype html>
             <html lang="pt-BR"><body style="margin:0;padding:24px;background:#F2F2F2;font-family:Montserrat,Arial,sans-serif;color:#333333">
             <div style="max-width:560px;margin:0 auto;background:#FFFFFF;border-radius:20px 0;padding:32px">
+            {Logo}
             <div style="width:50px;height:6px;background:#DF1A1A;margin-bottom:16px"></div>
             <h1 style="font-size:22px;margin:0 0 16px">Olá, {e(razaoSocial)}!</h1>
             <p style="font-size:16px;line-height:1.5">{e(frase)}</p>
@@ -74,6 +81,7 @@ public static class ModelosEmail
             <!doctype html>
             <html lang="pt-BR"><body style="margin:0;padding:24px;background:#F2F2F2;font-family:Montserrat,Arial,sans-serif;color:#333333">
             <div style="max-width:560px;margin:0 auto;background:#FFFFFF;border-radius:20px 0;padding:32px">
+            {Logo}
             <div style="width:50px;height:6px;background:#DF1A1A;margin-bottom:16px"></div>
             <h1 style="font-size:22px;margin:0 0 16px">Olá, {e(razaoSocial)}!</h1>
             <p style="font-size:16px;line-height:1.5">Analisamos o documento <strong>{e(tipoDocumento)}</strong> e ele precisa ser enviado de novo.</p>
