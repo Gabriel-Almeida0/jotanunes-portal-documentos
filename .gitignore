@@ -16,3 +16,6 @@ coverage/
 # Uploads locais e arquivos de configuração local
 backend/.data/
 *.local
+
+# Credenciais da VPS (nunca commitar)
+vps.env
