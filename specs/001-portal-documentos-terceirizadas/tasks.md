@@ -493,7 +493,7 @@ pequena (orquestrador). `[INFRA]` T145 (E2E) roda por último.
 
 ### INFRA (final)
 
-- [ ] T145 [INFRA] Executar o roteiro E2E de `specs/001-portal-documentos-terceirizadas/quickstart.md` §6 com banco vazio e as áreas integradas (`VITE_USE_MOCKS=false`), com foco nos passos 2–3, 5, 13 e 31–38 (tokens admin e comum; catálogo padrão; reinícios), e registrar divergências para a área responsável; per SC-009, SC-010, US6, US7
+- [X] T145 [INFRA] Executar o roteiro E2E de `specs/001-portal-documentos-terceirizadas/quickstart.md` §6 com banco vazio e as áreas integradas (`VITE_USE_MOCKS=false`), com foco nos passos 2–3, 5, 13 e 31–38 (tokens admin e comum; catálogo padrão; reinícios), e registrar divergências para a área responsável; per SC-009, SC-010, US6, US7
 
 ### Phase 10 — Dependencies & Execution Order
 
