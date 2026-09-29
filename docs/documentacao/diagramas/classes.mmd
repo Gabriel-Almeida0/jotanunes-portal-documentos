@@ -1,0 +1,150 @@
+classDiagram
+  direction LR
+  class Obra {
+    +Guid Id
+    +string Nome
+    +string? Codigo
+    +string Cidade
+    +Uf Uf
+    +bool Ativa
+    +Criar(nome, codigo, cidade, uf, autor, agora)$ Obra
+    +Atualizar(nome, codigo, cidade, uf, ativa, autor, agora)
+  }
+  class ObraEmpresa {
+    +Guid ObraId
+    +Guid EmpresaId
+    +DateTimeOffset VinculadoEm
+    +string VinculadoPorLogin
+  }
+  class Empresa {
+    +Guid Id
+    +string RazaoSocial
+    +string Cnpj
+    +string EmailContato
+    +bool Ativa
+    +string? SenhaHash
+    +bool TrocaSenhaObrigatoria
+    +int VersaoCredencial
+    +int TentativasFalhas
+    +DateTimeOffset? BloqueadoAte
+    +Criar(...)$ Empresa
+    +Atualizar(...)
+    +Desativar(autor, agora)
+    +RegistrarConvite(hashSenhaTemp, agora)
+    +TrocarSenha(novoHash, agora)
+    +RegistrarFalhaLogin(agora) bool
+    +RegistrarLoginSucesso(agora)
+    +ObterSituacaoAcesso(agora) SituacaoAcesso
+  }
+  class Convite {
+    +Guid Id
+    +Guid EmpresaId
+    +string TokenHash
+    +DateTimeOffset ExpiraEm
+    +DateTimeOffset? UsadoEm
+    +DateTimeOffset? SubstituidoEm
+    +Criar(...)$ Convite
+    +Situacao(agora) SituacaoConvite
+    +MarcarSubstituido(agora)
+    +MarcarUsado(agora)
+  }
+  class TipoDocumento {
+    +Guid Id
+    +string Nome
+    +string? Instrucoes
+    +bool Ativo
+    +Criar(nome, instrucoes, autor, agora)$ TipoDocumento
+    +Atualizar(nome, instrucoes, ativo, autor, agora)
+  }
+  class EnvioDocumento {
+    +Guid Id
+    +Guid EmpresaId
+    +Guid TipoDocumentoId
+    +string NomeArquivo
+    +string ContentType
+    +long TamanhoBytes
+    +string Sha256
+    +StatusEnvio Status
+    +string? MotivoRejeicao
+    +Criar(...)$ EnvioDocumento
+    +Aprovar(login, nome, agora)
+    +Rejeitar(login, nome, motivo, agora)
+  }
+  class UsuarioInterno {
+    +Guid Id
+    +string Login
+    +string Nome
+    +string Email
+    +bool Admin
+    +bool Ativo
+    +int VersaoCredencial
+    +Criar(...)$ UsuarioInterno
+    +DefinirAdmin(admin, autor, agora)
+    +Desativar(autor, agora)
+    +Reativar(autor, agora)
+    +TrocarSenha(nova, atual, hash, agora)
+    +RedefinirSenha(hash, autor, agora)
+    +EncerrarSessoes()
+    +Situacao(agora) SituacaoUsuarioInterno
+  }
+  class RegraSituacaoDocumento {
+    <<static>>
+    +De(envios)$ SituacaoDocumento
+    +PodeEnviar(situacao, empresaAtiva, tipoAtivo)$ bool
+  }
+  class PoliticaSenha {
+    <<static>>
+    +Validar(novaSenha, senhaAtual)$
+  }
+  class StatusEnvio {
+    <<enumeration>>
+    EM_ANALISE
+    APROVADO
+    REJEITADO
+  }
+  class EnviarConvite {
+    <<caso de uso>>
+    +ExecutarAsync(empresaId) ConviteDto
+  }
+  class EnviarDocumento {
+    <<caso de uso>>
+    +ExecutarAsync(tipoId, conteudo, nome) EnvioPortalDto
+  }
+  class RejeitarEnvio {
+    <<caso de uso>>
+    +ExecutarAsync(envioId, entrada) EnvioDto
+  }
+  class LoginJotanunes {
+    <<caso de uso>>
+    +ExecutarAsync(entrada) SessaoJotanunesDto
+  }
+  class IEnvioRepositorio {
+    <<interface>>
+    +ExisteVivoAsync(empresaId, tipoId) bool
+    +RegistrarDecisaoAsync(envio) bool
+  }
+  class IEnviadorEmail {
+    <<interface>>
+    +EnviarAsync(mensagem)
+  }
+  class IArmazenamentoArquivos {
+    <<interface>>
+    +SalvarAsync(chave, conteudo)
+    +AbrirLeituraAsync(chave) Stream
+  }
+  Obra "1" -- "0..*" ObraEmpresa
+  Empresa "1" -- "0..*" ObraEmpresa
+  Empresa "1" -- "0..*" Convite
+  Empresa "1" -- "0..*" EnvioDocumento
+  TipoDocumento "1" -- "0..*" EnvioDocumento
+  EnvioDocumento --> StatusEnvio
+  RegraSituacaoDocumento ..> EnvioDocumento
+  UsuarioInterno ..> PoliticaSenha
+  EnviarConvite ..> Empresa
+  EnviarConvite ..> Convite
+  EnviarConvite ..> IEnviadorEmail
+  EnviarDocumento ..> IEnvioRepositorio
+  EnviarDocumento ..> IArmazenamentoArquivos
+  RejeitarEnvio ..> IEnvioRepositorio
+  RejeitarEnvio ..> IEnviadorEmail
+  LoginJotanunes ..> UsuarioInterno

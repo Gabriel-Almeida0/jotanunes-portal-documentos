@@ -1,0 +1,33 @@
+flowchart TB
+  subgraph FE1["«componente» portal (SPA)"]
+    direction TB
+    P1["páginas: Acesso, TrocaSenha,<br/>MeusDocumentos, DocumentoHistorico"]
+    P2["auth: SessaoProvider,<br/>RotaProtegida"]
+    P3["api/client.ts<br/>(tipos gerados do OpenAPI)"]
+    P1 --> P2 --> P3
+  end
+  subgraph FE2["«componente» fluig-app (SPA)"]
+    direction TB
+    F1["páginas: Painel, Obras, Empresas,<br/>TiposDocumento, FilaAnalise,<br/>EnvioAnalise, Usuarios, Login"]
+    F2["auth: AuthFluigProvider,<br/>tokenFluig"]
+    F3["api/client.ts + fluig.ts<br/>(tipos gerados do OpenAPI)"]
+    F1 --> F2 --> F3
+  end
+  CT[["«interface» contrato OpenAPI 3<br/>openapi.yaml"]]
+  P3 -. "usa" .-> CT
+  F3 -. "usa" .-> CT
+  subgraph BE["«componente» API Jotanunes.Docs"]
+    direction TB
+    API["Jotanunes.Docs.Api<br/>Endpoints · Autenticacao · Infra · Comandos"]
+    APP["Jotanunes.Docs.Application<br/>casos de uso · DTOs · portas · e-mails"]
+    DOM["Jotanunes.Docs.Domain<br/>Obras · Empresas · Convites · Envios<br/>TiposDocumento · UsuariosInternos · Auditoria"]
+    INF["Jotanunes.Docs.Infrastructure<br/>Persistencia (EF Core) · Armazenamento<br/>Email (Resend) · Seguranca · Auditoria"]
+    API --> APP --> DOM
+    INF --> APP
+    INF --> DOM
+    API --> INF
+  end
+  CT -. "implementado por" .-> API
+  INF --> PG[("«banco» PostgreSQL")]
+  INF --> DK[("«arquivos» disco local")]
+  INF --> RS["«serviço externo» Resend"]

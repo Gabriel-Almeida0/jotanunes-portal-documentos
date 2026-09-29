@@ -1,0 +1,20 @@
+stateDiagram-v2
+  direction TB
+  [*] --> NAO_CONVIDADA : empresa cadastrada
+  NAO_CONVIDADA --> CONVIDADA : convite enviado
+  CONVIDADA --> ATIVA : primeira troca de senha
+  CONVIDADA --> CONVITE_EXPIRADO : 7 dias sem troca
+  CONVITE_EXPIRADO --> CONVIDADA : reenvio do convite
+  ATIVA --> CONVIDADA : reenvio do convite
+  NAO_CONVIDADA --> DESATIVADA : desativar
+  CONVITE_EXPIRADO --> DESATIVADA : desativar
+  ATIVA --> DESATIVADA : desativar
+  DESATIVADA --> ATIVA : reativar (se já tem senha própria)
+  DESATIVADA --> NAO_CONVIDADA : reativar (nunca convidada)
+  note left of DESATIVADA
+    CONVIDADA também pode ser desativada.
+    Ao reativar, a situação volta a ser
+    derivada dos campos de senha.
+    Bloqueio temporário (5 senhas erradas =
+    15 minutos) não é situação de acesso.
+  end note

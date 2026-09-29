@@ -1,0 +1,42 @@
+sequenceDiagram
+  autonumber
+  actor T as Terceirizada
+  participant PT as Portal
+  participant API as API
+  participant ST as Disco e PostgreSQL
+  participant FA as fluig-app
+  actor A as Administrador
+  participant RS as Resend
+
+  T->>PT: escolhe o arquivo do documento
+  PT->>PT: valida extensão e tamanho (até 10 MB)
+  PT->>API: POST /api/portal/documentos/{tipoId}/envios
+  API->>API: detecta o formato pelos bytes,<br/>confere a integridade, calcula SHA-256
+  API->>ST: já existe envio vivo para (empresa, tipo)?
+  alt já existe
+    API-->>PT: 409 ENVIO_NAO_PERMITIDO
+  else permitido
+    API->>ST: grava o arquivo e o envio EM_ANALISE
+    API-->>PT: 201 "Em análise"
+  end
+  A->>FA: abre a Fila de análise
+  FA->>API: GET /api/fluig/envios?status=EM_ANALISE
+  API-->>FA: envios, mais antigos primeiro
+  A->>FA: abre o envio e o arquivo
+  FA->>API: GET /api/fluig/envios/{id}/arquivo
+  API-->>FA: arquivo (auditoria ARQUIVO_BAIXADO)
+  alt aprovar
+    A->>FA: "Aprovar"
+    FA->>API: POST /api/fluig/envios/{id}/aprovar
+    API->>ST: UPDATE condicional (status = EM_ANALISE)
+    API-->>FA: 200 APROVADO ou 409 ENVIO_JA_ANALISADO
+  else rejeitar
+    A->>FA: "Rejeitar" + motivo (5 a 500 caracteres)
+    FA->>API: POST /api/fluig/envios/{id}/rejeitar
+    API->>ST: UPDATE condicional + auditoria
+    API->>RS: e-mail de rejeição com o motivo
+    Note over API,RS: falha no e-mail não desfaz a decisão
+    API-->>FA: 200 REJEITADO
+    RS-->>T: e-mail "documento rejeitado"
+    T->>PT: envia novo arquivo (novo envio)
+  end

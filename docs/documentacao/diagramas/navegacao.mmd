@@ -1,0 +1,36 @@
+flowchart TB
+  subgraph PORTAL["Portal da terceirizada (protal.jotanunes...)"]
+    direction TB
+    EM(["E-mail de convite<br/>(link + senha temporária)"]) -->|abre o link| P1["P1 · Acesso / Login<br/>CNPJ + senha"]
+    P1 -->|primeiro acesso ou<br/>senha temporária| P2["P2 · Trocar senha<br/>(obrigatória)"]
+    P1 -->|senha já definida| P3["P3 · Meus documentos"]
+    P2 -->|senha criada| P3
+    P3 -->|Ver histórico| P4["P4 · Histórico do documento"]
+    P4 -->|Voltar| P3
+    P3 -->|Sair| P1
+    P4 -->|Sair| P1
+  end
+
+  subgraph AREA["Área Jotanunes (fluig.jotanunes...)"]
+    direction TB
+    ENT{{"Entrada"}} -->|token do Fluig<br/>no endereço| F3
+    ENT -->|sem token e<br/>login próprio ligado| F1["F1 · Login<br/>login + senha"]
+    ENT -->|sem token e<br/>login próprio desligado| F12["F12 · Abra pelo Fluig"]
+    F1 -->|senha provisória| F2["F2 · Trocar senha"]
+    F1 -->|senha definida| F3["F3 · Painel"]
+    F2 --> F3
+    F3 --- MENU(("Menu<br/>lateral"))
+    MENU --> F4["F4 · Obras"]
+    MENU --> F6["F6 · Empresas"]
+    MENU --> F8["F8 · Tipos de documento"]
+    MENU --> F9["F9 · Fila de análise"]
+    MENU -->|só administrador| F11["F11 · Usuários"]
+    MENU -->|só login próprio| F2
+    MENU -->|Sair · só login próprio| F1
+    F4 -->|abrir obra| F5["F5 · Detalhe da obra"]
+    F5 <-->|abrir| F7["F7 · Detalhe da empresa"]
+    F6 -->|abrir empresa| F7
+    F9 -->|abrir envio| F10["F10 · Análise do envio"]
+    F10 -->|abrir empresa| F7
+    F10 -->|aprovar / rejeitar| F9
+  end

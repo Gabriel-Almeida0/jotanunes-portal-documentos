@@ -1,0 +1,34 @@
+flowchart TB
+  subgraph CLI["Camada de apresentação (navegadores)"]
+    direction LR
+    U1["Empresa terceirizada"] --> PT["Portal da terceirizada<br/>React 18 + Vite + TypeScript<br/>(SPA estática)"]
+    U2["Colaborador Jotanunes"] --> FL["Plataforma Fluig (TOTVS)<br/>abre a área com token JWT"]
+    FL --> FA["Área Jotanunes (fluig-app)<br/>React 18 + Vite + TypeScript<br/>(SPA estática)"]
+    U2 -. "ou login próprio" .-> FA
+  end
+
+  NG["nginx · HTTPS (Let's Encrypt)<br/>proxy reverso + arquivos estáticos"]
+  PT -- "HTTPS · JSON · Bearer JWT" --> NG
+  FA -- "HTTPS · JSON · Bearer JWT" --> NG
+
+  subgraph API["API REST · ASP.NET Core 8 · arquitetura hexagonal (portas e adaptadores)"]
+    direction TB
+    A1["Adaptador de entrada · Jotanunes.Docs.Api<br/>endpoints /api/fluig e /api/portal · autenticação JWT · políticas<br/>problem+json · limite de requisições · cabeçalhos de segurança"]
+    A2["Núcleo de aplicação · Jotanunes.Docs.Application<br/>casos de uso + portas (interfaces)"]
+    A3["Núcleo de domínio · Jotanunes.Docs.Domain<br/>entidades, value objects e regras de negócio"]
+    A4["Adaptadores de saída · Jotanunes.Docs.Infrastructure<br/>EF Core/Npgsql · disco local · Resend · BCrypt · emissão de tokens · auditoria"]
+    A1 --> A2 --> A3
+    A4 -. "implementa as portas" .-> A2
+  end
+
+  NG -- "HTTP 127.0.0.1:5080" --> A1
+
+  subgraph EXT["Persistência e serviços externos"]
+    direction LR
+    DB[("PostgreSQL 16<br/>base jotanunes_docs")]
+    FS[("Disco local<br/>arquivos enviados")]
+    RS["Resend<br/>API de e-mail"]
+  end
+  A4 --> DB
+  A4 --> FS
+  A4 -- "HTTPS" --> RS

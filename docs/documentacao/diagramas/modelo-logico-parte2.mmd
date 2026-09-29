@@ -1,0 +1,33 @@
+erDiagram
+  usuarios_internos {
+    uuid id PK
+    varchar login UK "unico lower"
+    varchar nome
+    varchar email
+    boolean admin
+    boolean ativo
+    varchar senha_hash
+    boolean troca_senha_obrigatoria
+    timestamptz senha_provisoria_expira_em
+    int versao_credencial
+    int tentativas_falhas
+    timestamptz bloqueado_ate
+    timestamptz ultimo_acesso_em
+  }
+  auditoria {
+    bigint id PK "identity"
+    timestamptz ocorrido_em
+    varchar ator_tipo
+    varchar ator_id
+    boolean ator_admin
+    varchar acao
+    varchar recurso_tipo
+    varchar recurso_id
+    varchar ip
+  }
+  tentativas_login {
+    char chave PK "HMAC-SHA256"
+    int tentativas_falhas
+    timestamptz bloqueado_ate
+    timestamptz ultima_falha_em
+  }

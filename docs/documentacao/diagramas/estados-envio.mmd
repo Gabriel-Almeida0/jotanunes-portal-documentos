@@ -1,0 +1,19 @@
+stateDiagram-v2
+  direction LR
+  state "Envio de documento (registro)" as ENVIO {
+    [*] --> EM_ANALISE : empresa envia arquivo válido
+    EM_ANALISE --> APROVADO : administrador aprova
+    EM_ANALISE --> REJEITADO : administrador rejeita com motivo
+    APROVADO --> [*]
+    REJEITADO --> [*]
+  }
+  state "Situação do documento (empresa × tipo ativo, derivada)" as SIT {
+    [*] --> PENDENTE_ENVIO : tipo ativo sem envio
+    PENDENTE_ENVIO --> S_EM_ANALISE : envio feito
+    S_EM_ANALISE --> S_APROVADO : envio aprovado
+    S_EM_ANALISE --> S_REJEITADO : envio rejeitado
+    S_REJEITADO --> S_EM_ANALISE : novo envio
+    state "EM_ANALISE" as S_EM_ANALISE
+    state "APROVADO" as S_APROVADO
+    state "REJEITADO" as S_REJEITADO
+  }

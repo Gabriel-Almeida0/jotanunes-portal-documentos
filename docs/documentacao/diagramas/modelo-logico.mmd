@@ -1,0 +1,119 @@
+erDiagram
+  obras ||--o{ obra_empresas : "possui"
+  empresas ||--o{ obra_empresas : "participa"
+  empresas ||--o{ convites : "recebe"
+  empresas ||--o{ envios_documento : "envia"
+  tipos_documento ||--o{ envios_documento : "classifica"
+  obras {
+    uuid id PK
+    varchar nome
+    varchar codigo UK "unico upper, opcional"
+    varchar cidade
+    char uf
+    boolean ativa
+    timestamptz criado_em
+    varchar criado_por_login
+    timestamptz atualizado_em
+    varchar atualizado_por_login
+  }
+  obra_empresas {
+    uuid obra_id PK,FK
+    uuid empresa_id PK,FK
+    timestamptz vinculado_em
+    varchar vinculado_por_login
+  }
+  empresas {
+    uuid id PK
+    varchar razao_social
+    varchar nome_fantasia
+    char cnpj UK
+    varchar email_contato
+    varchar nome_contato
+    varchar telefone
+    boolean ativa
+    varchar senha_hash
+    boolean troca_senha_obrigatoria
+    timestamptz senha_temporaria_expira_em
+    int versao_credencial
+    int tentativas_falhas
+    timestamptz bloqueado_ate
+    timestamptz ultimo_acesso_em
+    timestamptz criado_em
+    varchar criado_por_login
+    timestamptz atualizado_em
+    varchar atualizado_por_login
+  }
+  convites {
+    uuid id PK
+    uuid empresa_id FK
+    varchar email_destino
+    char token_hash UK
+    timestamptz enviado_em
+    varchar enviado_por_login
+    varchar enviado_por_nome
+    timestamptz expira_em
+    timestamptz usado_em
+    timestamptz substituido_em
+  }
+  tipos_documento {
+    uuid id PK
+    varchar nome UK "unico lower"
+    varchar instrucoes
+    boolean ativo
+    timestamptz criado_em
+    varchar criado_por_login
+    timestamptz atualizado_em
+    varchar atualizado_por_login
+  }
+  envios_documento {
+    uuid id PK
+    uuid empresa_id FK
+    uuid tipo_documento_id FK
+    varchar nome_arquivo
+    varchar content_type
+    bigint tamanho_bytes
+    char sha256
+    varchar chave_armazenamento
+    timestamptz enviado_em
+    varchar status
+    timestamptz analisado_em
+    varchar analisado_por_login
+    varchar analisado_por_nome
+    varchar motivo_rejeicao
+  }
+  usuarios_internos {
+    uuid id PK
+    varchar login UK "unico lower"
+    varchar nome
+    varchar email
+    boolean admin
+    boolean ativo
+    varchar senha_hash
+    boolean troca_senha_obrigatoria
+    timestamptz senha_provisoria_expira_em
+    int versao_credencial
+    int tentativas_falhas
+    timestamptz bloqueado_ate
+    timestamptz ultimo_acesso_em
+    timestamptz criado_em
+    varchar criado_por_login
+    timestamptz atualizado_em
+    varchar atualizado_por_login
+  }
+  auditoria {
+    bigint id PK "identity"
+    timestamptz ocorrido_em
+    varchar ator_tipo
+    varchar ator_id
+    boolean ator_admin
+    varchar acao
+    varchar recurso_tipo
+    varchar recurso_id
+    varchar ip
+  }
+  tentativas_login {
+    char chave PK "HMAC-SHA256"
+    int tentativas_falhas
+    timestamptz bloqueado_ate
+    timestamptz ultima_falha_em
+  }

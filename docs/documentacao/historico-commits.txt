@@ -1,0 +1,27 @@
+28/09/2026 23:36 | Insumos do projeto: áudio de requisitos, transcrição, design.md e Spec Kit.
+28/09/2026 23:55 | Especificação do portal de documentos de terceirizadas (Spec Kit).
+29/09/2026 00:18 | Portal da terceirizada: login por CNPJ, troca de senha e envio de documentos.
+29/09/2026 00:23 | App Jotanunes (Fluig): obras, empresas, tipos de documento, convites e análise.
+29/09/2026 00:37 | API .NET 8 hexagonal e infraestrutura local.
+29/09/2026 00:37 | Marca no tasks.md as 115 tarefas concluídas pelos agentes de backend, fluig-app e portal.
+29/09/2026 00:49 | Roteiro E2E integrado executado (T116) e connection string do Postgres configurável.
+29/09/2026 00:53 | Corrige leitura do token Fluig sem recarregar a página e reseta telas de detalhe ao trocar de parâmetro.
+29/09/2026 00:58 | Validação do convite passa a ser POST com o token no corpo.
+29/09/2026 00:58 | Regera os tipos do fluig-app a partir do contrato com a nova rota de validação do convite.
+29/09/2026 01:03 | speckit-converge: 6 tarefas novas (T117–T122) para lacunas encontradas contra spec, plano e constituição.
+29/09/2026 01:07 | fluig-app: histórico de tipos desativados no detalhe da empresa e testes que faltavam (T120, T121).
+29/09/2026 01:17 | Backend: bloqueio de login sem revelar CNPJ, recusa de arquivo corrompido, auditoria do login e log JSON (T117–T119, T122).
+29/09/2026 11:38 | Spec: perfil administrador vindo do Fluig e catálogo padrão de tipos de documento.
+29/09/2026 11:48 | fluig-app: perfis administrador e comum (T136–T143).
+29/09/2026 11:51 | Backend: perfil administrador (política FluigAdmin, 403 SEM_PERMISSAO auditado) e catálogo padrão de 10 tipos (T123–T135, T144).
+29/09/2026 11:58 | Roteiro E2E da fase de perfis e catálogo padrão executado (T145); .env.example orienta aspas no RESEND_FROM.
+29/09/2026 12:12 | Spec: documentos por empresa (várias empresas por obra) validado pelo usuário.
+29/09/2026 12:25 | E-mails com o logo da Jotanunes no topo, anexado inline pelo Resend.
+29/09/2026 12:32 | Ignora vps.env (credenciais de acesso à VPS).
+29/09/2026 12:43 | API respeita X-Forwarded-For/Proto vindos de proxy local (nginx).
+29/09/2026 12:45 | Ignora producao.env (segredos de produção).
+29/09/2026 12:59 | Scripts de deploy na VPS (nativo, systemd + nginx + Certbot) e README de operação.
+29/09/2026 14:00 | Spec: login próprio da área Jotanunes e usuários internos (contrato 1.2.0, constituição 1.2.0).
+29/09/2026 14:21 | fluig-app: login próprio, troca de senha e tela Usuários (T165–T174).
+29/09/2026 14:30 | Backend: login próprio da área Jotanunes, usuários internos e criar-admin (T146–T164, T175); contrato com YAML válido.
+29/09/2026 14:32 | Roteiro E2E do login próprio executado (T176): criar-admin, login, troca obrigatória, usuário comum, 403, revogação por desativação, bloqueio sem enumeração e token do Fluig.

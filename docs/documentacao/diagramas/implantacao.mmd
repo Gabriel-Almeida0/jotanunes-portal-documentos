@@ -1,0 +1,36 @@
+flowchart LR
+  subgraph CLIENTES["«dispositivo» Computadores e celulares dos usuários"]
+    direction TB
+    NV1["«navegador» Terceirizada"]
+    NV2["«navegador» Colaborador Jotanunes"]
+  end
+  subgraph FLUIG["«servidor» Fluig (TOTVS) · integração futura"]
+    FLP["Plataforma Fluig<br/>gera token JWT (HS256)<br/>e abre a área Jotanunes"]
+  end
+  subgraph VPS["«servidor» VPS Ubuntu 24.04 (CloudPanel)"]
+    direction TB
+    NGX["«execução» nginx<br/>portas 80/443 · Certbot<br/>3 sites (portal, área, API)"]
+    subgraph EST["«artefatos» /opt/jotanunes-docs"]
+      direction TB
+      SP["portal/ (build Vite)"]
+      SF["fluig/ (build Vite)"]
+    end
+    SVC["«execução» systemd: jotanunes-docs-api<br/>.NET 8 · Jotanunes.Docs.Api.dll<br/>127.0.0.1:5080 · usuário jotanunes-docs"]
+    CFG["/etc/jotanunes-docs/api.env<br/>(configuração e segredos, 0600)"]
+    PG[("«execução» PostgreSQL 16<br/>base jotanunes_docs")]
+    UP[("/var/lib/jotanunes-docs/uploads<br/>arquivos enviados")]
+    NGX --> SP
+    NGX --> SF
+    NGX -- "proxy HTTP" --> SVC
+    CFG -.-> SVC
+    SVC -- "TCP 5432" --> PG
+    SVC --> UP
+  end
+  RSD["«serviço externo» Resend<br/>api.resend.com"]
+  CAIXA["«dispositivo» Caixa de e-mail<br/>dos destinatários"]
+  NV1 -- "HTTPS 443<br/>protal.jotanunes.squad81.metapark.site" --> NGX
+  NV2 -- "HTTPS 443<br/>fluig.jotanunes.squad81.metapark.site" --> NGX
+  NV2 --> FLP
+  FLP -. "token no fragmento #fluigToken" .-> NV2
+  SVC -- "HTTPS 443" --> RSD
+  RSD --> CAIXA

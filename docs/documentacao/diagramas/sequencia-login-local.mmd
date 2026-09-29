@@ -1,0 +1,32 @@
+sequenceDiagram
+  autonumber
+  actor U as Usuário interno
+  participant FA as fluig-app
+  participant API as API
+  participant DB as PostgreSQL
+  actor ADM as Administrador
+
+  U->>FA: login + senha
+  FA->>API: POST /api/fluig/auth/login
+  API->>DB: busca o usuário pelo login normalizado
+  alt login inexistente
+    API->>API: BCrypt fictício e contador<br/>por HMAC do login
+    API-->>FA: 401 LOGIN_INVALIDO (423 após 5 falhas)
+  else senha errada
+    API->>DB: soma falha (5ª falha bloqueia 15 min)
+    API-->>FA: 401 LOGIN_INVALIDO
+  else senha correta e usuário ativo
+    API->>DB: zera falhas, auditoria LOGIN_SUCESSO
+    API-->>FA: 200 token JWT (uid, ver, troca_senha)
+  end
+  FA->>API: GET /api/fluig/obras (Bearer)
+  API->>API: seletor lê o emissor e usa o esquema LoginLocal
+  API->>DB: usuário ativo e versao_credencial = ver?
+  API-->>FA: 200 dados
+  ADM->>API: PUT /api/fluig/usuarios/{id} (desativar)
+  API->>DB: ativo = false, versão da credencial incrementada
+  U->>FA: clica em qualquer tela
+  FA->>API: requisição com o token antigo
+  API->>DB: versao_credencial diferente de ver
+  API-->>FA: 401 NAO_AUTENTICADO
+  FA-->>U: "Sua sessão expirou. Entre de novo."

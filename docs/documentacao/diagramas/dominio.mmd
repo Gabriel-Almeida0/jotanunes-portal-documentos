@@ -1,0 +1,74 @@
+classDiagram
+  direction TB
+  class Obra {
+    nome
+    codigo
+    cidade
+    uf
+    ativa
+  }
+  class Vinculo["Vínculo obra–empresa"] {
+    vinculadoEm
+    vinculadoPor
+  }
+  class Empresa {
+    razaoSocial
+    nomeFantasia
+    cnpj
+    emailContato
+    ativa
+    senha em hash
+    trocaSenhaObrigatoria
+    versaoCredencial
+    situacaoAcesso – derivada
+  }
+  class Convite {
+    emailDestino
+    enviadoEm
+    expiraEm
+    situacao – derivada
+  }
+  class TipoDocumento["Tipo de documento"] {
+    nome
+    instrucoes
+    ativo
+  }
+  class Envio["Envio de documento"] {
+    nomeArquivo
+    formato
+    tamanho
+    enviadoEm
+    status
+    motivoRejeicao
+  }
+  class Analista["Usuário da área Jotanunes"] {
+    login
+    nome
+    perfil administrador ou comum
+  }
+  class UsuarioFluig["Usuário do Fluig"] {
+    sem cadastro local
+  }
+  class UsuarioInterno["Usuário interno"] {
+    email
+    ativo
+    senha em hash
+    versaoCredencial
+  }
+  class Auditoria["Registro de auditoria"] {
+    ocorridoEm
+    ator
+    acao
+    recurso
+    ip
+  }
+  Obra "1" -- "0..*" Vinculo
+  Vinculo "0..*" -- "1" Empresa
+  Empresa "1" -- "0..*" Convite : recebe
+  Empresa "1" -- "0..*" Envio : envia
+  TipoDocumento "1" -- "0..*" Envio : classifica
+  Analista <|-- UsuarioFluig
+  Analista <|-- UsuarioInterno
+  Analista ..> Envio : aprova ou rejeita
+  Analista ..> Convite : envia
+  Auditoria ..> Analista : registra ações de

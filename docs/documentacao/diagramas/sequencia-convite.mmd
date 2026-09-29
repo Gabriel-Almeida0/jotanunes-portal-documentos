@@ -1,0 +1,37 @@
+sequenceDiagram
+  autonumber
+  actor A as Analista
+  participant FA as fluig-app
+  participant API as API
+  participant DB as PostgreSQL
+  participant RS as Resend
+  participant PT as Portal
+  actor T as Terceirizada
+
+  A->>FA: Empresa → "Enviar convite"
+  FA->>API: POST /api/fluig/empresas/{id}/convites
+  API->>API: gera token do convite<br/>e senha temporária
+  API->>DB: substitui convites válidos anteriores
+  API->>DB: grava convite (hash do token, 7 dias),<br/>senha temporária (BCrypt) e<br/>incrementa a versão da credencial
+  API->>RS: e-mail com link e senha temporária
+  alt falha no e-mail
+    API->>DB: desfaz a transação
+    API-->>FA: 502 EMAIL_FALHOU
+  else e-mail aceito
+    API->>DB: confirma a transação
+    API-->>FA: 201 Convite VALIDO
+  end
+  RS-->>T: e-mail de convite
+  T->>PT: abre o link /acesso?convite=...
+  PT->>PT: retira o token da URL
+  PT->>API: POST /api/portal/convites/validar
+  API-->>PT: 200 CNPJ e razão social
+  T->>PT: CNPJ + senha temporária
+  PT->>API: POST /api/portal/auth/login
+  API-->>PT: 200 token (troca_senha = true)
+  PT-->>T: "Crie uma nova senha para continuar."
+  T->>PT: senha atual + nova senha
+  PT->>API: POST /api/portal/auth/trocar-senha
+  API->>DB: novo hash, convite USADO,<br/>versão da credencial incrementada
+  API-->>PT: 200 novo token (troca_senha = false)
+  PT-->>T: tela "Meus documentos"

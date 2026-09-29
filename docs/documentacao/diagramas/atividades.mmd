@@ -1,0 +1,27 @@
+flowchart TB
+  subgraph R1["Cadastro, convite e primeiro acesso"]
+    direction LR
+    I((Início)) --> A1["<b>Jotanunes</b><br/>cadastra obra e empresa<br/>e vincula a empresa à obra"]
+    A1 --> A3["<b>Jotanunes</b><br/>envia o convite<br/>(link e senha temporária)"]
+    A3 --> D1{"Convite usado<br/>em até 7 dias?"}
+    D1 -- "não: reenvio" --> A3
+    D1 -- sim --> B2["<b>Terceirizada</b><br/>entra com CNPJ e<br/>cria a própria senha"]
+    B2 --> B3["<b>Terceirizada</b><br/>consulta<br/>Meus documentos"]
+    X1(("A")) --> B3
+    B3 --> D2{"Pendente ou<br/>rejeitado?"}
+    D2 -- não --> F((Fim))
+    D2 -- sim --> Y1(("B"))
+  end
+  subgraph R2["Envio e análise de cada documento"]
+    direction LR
+    Y2(("B")) --> B4["<b>Terceirizada</b><br/>envia o arquivo<br/>(PDF, JPG ou PNG, até 10 MB)"]
+    B4 --> D3{"Arquivo<br/>válido?"}
+    D3 -- "não: recusa" --> B4
+    D3 -- "sim: Em análise" --> C1["<b>Jotanunes</b><br/>abre o envio na<br/>Fila de análise"]
+    C1 --> D4{"Documento<br/>conforme?"}
+    D4 -- sim --> C2["<b>Jotanunes</b><br/>aprova"]
+    D4 -- não --> C3["<b>Jotanunes</b><br/>rejeita com motivo;<br/>e-mail à terceirizada"]
+    C2 --> X2(("A"))
+    C3 --> X2
+  end
+  R1 ~~~ R2
