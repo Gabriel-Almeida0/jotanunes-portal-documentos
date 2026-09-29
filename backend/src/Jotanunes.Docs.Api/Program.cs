@@ -8,6 +8,7 @@ using Jotanunes.Docs.Application.Comum;
 using Jotanunes.Docs.Application.TiposDocumento;
 using Jotanunes.Docs.Infrastructure;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Http.Json;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,6 +22,11 @@ builder.Services.AddAutenticacaoDocs();
 builder.Services.AddLimiteRequisicoes();
 builder.Services.Configure<JsonOptions>(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.Configure<RouteHandlerOptions>(o => o.ThrowOnBadRequest = true);
+// Atrás do nginx (mesmo servidor): IP real e esquema vêm de X-Forwarded-*. Só são aceitos quando a conexão
+// chega de um proxy conhecido (padrão: loopback), então um cliente externo não consegue falsificar o IP.
+// Sem isso, limite de requisições e auditoria veriam todo mundo como 127.0.0.1.
+builder.Services.Configure<ForwardedHeadersOptions>(o =>
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
 builder.Services.AddCors();
 builder.Services.AddOptions<CorsOptions>().Configure<IConfiguration>((o, cfg) =>
 {
@@ -48,6 +54,7 @@ if (app.Configuration.GetValue("Catalogo:SemearTiposPadrao", true))
     await escopo.ServiceProvider.GetRequiredService<SemearCatalogoTiposPadrao>().ExecutarAsync();
 }
 
+app.UseForwardedHeaders();
 app.UseMiddleware<CabecalhosSegurancaMiddleware>();
 app.UseMiddleware<TratamentoErrosMiddleware>();
 app.UseStatusCodePages(async ctx =>
