@@ -4,8 +4,9 @@
 (snake_case) | **Contrato**: [`contracts/openapi.yaml`](contracts/openapi.yaml)
 
 Convenções: PK `id uuid` (gerado na aplicação), datas `timestamptz` em UTC, textos `varchar(n)`.
-Colunas de autoria guardam o **login Fluig** (`*_por_login`) e o **nome** (`*_por_nome`) como texto,
-pois os usuários vivem no Fluig (não há tabela de usuários Jotanunes).
+Colunas de autoria guardam o **login** do usuário da área Jotanunes (`*_por_login`) e o **nome**
+(`*_por_nome`) como texto, sem chave estrangeira: o usuário pode vir do Fluig (sem cadastro no
+sistema) ou, desde 2026-09-29, ser um usuário interno do login próprio (§10), ou `sistema`.
 
 ## Diagrama
 
@@ -16,7 +17,8 @@ obras 1───* obra_empresas *───1 empresas 1───* convites
                                    │
 tipos_documento 1───────* envios_documento *───(1 empresa)
 auditoria (independente)
-tentativas_login (independente; chave derivada do CNPJ digitado)
+tentativas_login (independente; chave derivada do CNPJ ou do login digitado)
+usuarios_internos (independente; login próprio da área Jotanunes, §10)
 ```
 
 ---
@@ -190,9 +192,9 @@ podeEnviar = situação ∈ {PENDENTE_ENVIO, REJEITADO} e empresa ativa e tipo a
 |---|---|---|
 | id | bigint identity PK | |
 | ocorrido_em | timestamptz | |
-| ator_tipo | varchar(10) | `FLUIG` \| `EMPRESA` \| `ANONIMO` |
-| ator_id | varchar(100) null | login Fluig, id da empresa ou CNPJ informado (falha de login) |
-| ator_admin | bool null | **novo (2026-09-29)**: só para `ator_tipo = FLUIG` — `true` se o token tinha o papel `admin`, `false` se comum; `null` para `EMPRESA`/`ANONIMO` e para linhas anteriores à mudança |
+| ator_tipo | varchar(10) | `FLUIG` \| `LOCAL` \| `EMPRESA` \| `ANONIMO` \| `SISTEMA` (`LOCAL` e `SISTEMA` desde o login próprio, §10) |
+| ator_id | varchar(100) null | login Fluig, login do usuário interno, id da empresa, CNPJ informado (falha de login do portal), login informado (falha de login próprio, só se tiver o formato de login; senão null) ou `sistema` |
+| ator_admin | bool null | **novo (2026-09-29)**: só para `ator_tipo = FLUIG` ou `LOCAL` — `true` se a sessão tinha o papel `admin`, `false` se comum; `null` para `EMPRESA`/`ANONIMO`/`SISTEMA` e para linhas anteriores à mudança |
 | acao | varchar(40) | ver research R12 (inclui `PERMISSAO_NEGADA`) |
 | recurso_tipo / recurso_id | varchar(40) null / varchar(100) null | |
 | ip | varchar(45) null | |
@@ -202,6 +204,14 @@ Nunca contém senha, token ou conteúdo de arquivo.
 `PERMISSAO_NEGADA` (FR-085): gravada quando um usuário comum chama uma operação de administrador;
 `ator_admin = false`, `recurso_tipo = 'OPERACAO'`, `recurso_id` = `operationId` do contrato (ex.:
 `fluigCriarObra`). Coluna nova via migration `PerfilAdminAuditoria` (nullable, sem backfill).
+
+Login próprio (§10): `LOGIN_SUCESSO`, `LOGIN_FALHA`, `LOGIN_BLOQUEADO`, `SENHA_TROCADA` com
+`recurso_tipo = 'USUARIO_INTERNO'` e `recurso_id` = id do usuário (null quando o login não existe);
+ações novas `USUARIO_CRIADO`, `USUARIO_ATUALIZADO` (nome, e-mail ou papel), `USUARIO_DESATIVADO`,
+`USUARIO_REATIVADO`, `SENHA_REDEFINIDA`, `SESSAO_ENCERRADA` (sair), todas com
+`recurso_tipo = 'USUARIO_INTERNO'`. Quando o caso de uso registra `FLUIG` numa sessão de login próprio,
+o adaptador grava `LOCAL` (a porta `IRegistroAuditoria` não muda). Nenhuma coluna nova (os textos
+cabem em `varchar(10)`/`varchar(40)`).
 
 ## 8. Tentativas de login por CNPJ (`tentativas_login`)
 
@@ -213,7 +223,7 @@ Contador de falhas para CNPJ informado no login que **não** corresponde a uma e
 
 | Campo | Tipo | Regras |
 |---|---|---|
-| chave | char(64) PK | HMAC-SHA256 hex do CNPJ normalizado, com chave derivada de `Auth__Portal__Secret`; o CNPJ digitado não é guardado aqui |
+| chave | char(64) PK | HMAC-SHA256 hex do CNPJ normalizado, com chave derivada de `Auth__Portal__Secret`; ou, para o login próprio (§10), de `"usuario:" + login normalizado` com chave derivada de `Auth__LoginLocal__Secret` e rótulo próprio. O CNPJ/login digitado não é guardado aqui |
 | tentativas_falhas | int | falhas seguidas desde o último bloqueio |
 | bloqueado_ate | timestamptz null | agora + 15 min ao atingir 5 falhas |
 | ultima_falha_em | timestamptz null | |
@@ -223,10 +233,16 @@ automática na v1: linhas com `tentativas_falhas = 0` e `bloqueado_ate` vencido 
 linha" e podem ser apagadas a qualquer momento sem mudar o comportamento. Trocar o segredo do portal
 apenas zera esses contadores.
 
+Login próprio (§10): login digitado que **não** corresponde a um usuário interno usa esta mesma
+tabela com a mesma regra, para que a sequência 401×5 → 423 seja igual à de um login existente
+(FR-104). Usuários internos existentes usam `usuarios_internos.tentativas_falhas`/`bloqueado_ate`.
+
 ## 9. Perfil do usuário Fluig (não persistido)
 
-Não há tabela de usuários nem de papéis. O perfil é lido do token Fluig a cada requisição
-(`contracts/fluig-identity.md`):
+~~Não há tabela de usuários nem de papéis.~~ (2026-09-29: os usuários do Fluig continuam sem
+cadastro; os usuários internos do login próprio estão em §10 e seguem a mesma tabela de permissões
+abaixo, com o papel vindo da coluna `admin`.) O perfil de quem entra pelo Fluig é lido do token Fluig
+a cada requisição (`contracts/fluig-identity.md`):
 
 ```text
 roles contém "admin" (lista, ou texto único "admin") → ADMINISTRADOR
@@ -242,10 +258,80 @@ qualquer outro caso (ausente, vazia, sem "admin", tipo inesperado) → COMUM
 | Criar/editar/ativar/desativar empresa | ✅ | ❌ 403 `SEM_PERMISSAO` |
 | Criar/editar/ativar/desativar tipo de documento | ✅ | ❌ 403 `SEM_PERMISSAO` |
 | Aprovar/rejeitar envio | ✅ | ❌ 403 `SEM_PERMISSAO` |
+| Listar/ver/criar/editar/ativar/desativar usuários internos e redefinir senha (§10) | ✅ | ❌ 403 `SEM_PERMISSAO` |
 
 As colunas de autoria já existentes (`criado_por_login`, `atualizado_por_login`,
 `vinculado_por_login`, `analisado_por_login`) continuam iguais: depois desta mudança, só guardam
 logins de administradores (ou `sistema`, no catálogo padrão).
+
+## 10. Usuário interno (`usuarios_internos`) — login próprio da área Jotanunes (2026-09-29)
+
+Colaborador da Jotanunes que entra na área Jotanunes com login + senha (research R17). Não se liga aos
+usuários do Fluig.
+
+| Campo | Tipo | Regras |
+|---|---|---|
+| id | uuid PK | |
+| login | varchar(100) | obrigatório; `trim` + minúsculas; formato `^[a-z0-9._-]{3,100}$`; **único** (`lower(login)`, índice único); **imutável** |
+| nome | varchar(150) | obrigatório, 3–150, trim |
+| email | varchar(254) | obrigatório, e-mail válido, minúsculas (value object `Email`); não precisa ser único |
+| admin | bool | padrão `false` |
+| ativo | bool | padrão `true` |
+| senha_hash | varchar(100) | BCrypt 12; sempre preenchido (nasce com a senha provisória) |
+| troca_senha_obrigatoria | bool | `true` ao criar e a cada redefinição; `false` após a troca |
+| senha_provisoria_expira_em | timestamptz null | criação/redefinição + 7 dias; null após a troca |
+| versao_credencial | int | começa em 0; +1 ao desativar, reativar, redefinir senha, trocar senha, mudar `admin` e sair (revoga tokens, claim `ver`) |
+| tentativas_falhas | int | zera no sucesso e na redefinição |
+| bloqueado_ate | timestamptz null | agora + 15 min na 5ª falha seguida; zerado na redefinição |
+| ultimo_acesso_em | timestamptz null | |
+| criado_em / criado_por_login | timestamptz / varchar(100) | login de quem cadastrou ou `sistema` (comando de instalação) |
+| atualizado_em / atualizado_por_login | timestamptz null / varchar(100) null | |
+
+Migration `UsuariosInternos` (tabela + índice único `lower(login)` + índice parcial
+`(admin, ativo) WHERE admin AND ativo` para a contagem de administradores).
+
+### Situação do usuário interno (derivada, não persistida)
+
+```text
+ativo = false                                                        → DESATIVADO
+troca_senha_obrigatoria = true e senha_provisoria_expira_em > agora  → AGUARDANDO_PRIMEIRO_ACESSO
+troca_senha_obrigatoria = true e senha_provisoria_expira_em ≤ agora  → SENHA_PROVISORIA_EXPIRADA
+troca_senha_obrigatoria = false                                      → ATIVO
+```
+
+(O bloqueio temporário por tentativas não é uma situação: aparece como `bloqueadoAte` na API.)
+
+### Regras (FR-100–FR-116)
+
+- **Criar** (administrador ou comando de instalação): gera senha provisória (12 caracteres, R3),
+  `troca_senha_obrigatoria = true`, expiração +7 dias; e-mail de acesso (pela tela: gravar → e-mail →
+  commit; falha → nada gravado, `EMAIL_ACESSO_FALHOU`). Login repetido → `LOGIN_DUPLICADO`.
+- **Atualizar** (`nome`, `email`, `admin`, `ativo`): mudar `admin` ou `ativo` incrementa
+  `versao_credencial`. Recusas, nesta ordem: a sessão de login próprio mexendo em si mesma para
+  `ativo = false` ou `admin = false` → `ALTERACAO_PROPRIA_NAO_PERMITIDA`; o resultado deixaria **zero**
+  usuários com `admin = true AND ativo = true` → `ULTIMO_ADMINISTRADOR` (checado sob bloqueio
+  exclusivo, R17).
+- **Redefinir senha**: só usuário ativo (`USUARIO_INATIVO` se não); nova senha provisória, troca
+  obrigatória, +7 dias, zera tentativas/bloqueio, `versao_credencial + 1`, e-mail (mesma ordem da
+  criação).
+- **Trocar senha** (o próprio usuário): exige a senha atual (`SENHA_ATUAL_INCORRETA`) e a política
+  `PoliticaSenha` (`SENHA_FRACA`); `troca_senha_obrigatoria = false`, expiração null,
+  `versao_credencial + 1`, devolve token novo.
+- **Login**: ordem e respostas em research R17; falhas e bloqueio como `empresas` (§2).
+- **Sair**: `versao_credencial + 1`.
+- Nunca é excluído (FR-016). Contagem de administradores ativos ignora o bloqueio temporário.
+
+### Máquina de estados
+
+```text
+ (criar / comando)                 (troca de senha)
+ ───────────────► AGUARDANDO_PRIMEIRO_ACESSO ─────────────► ATIVO
+                        │  ▲ (redefinir senha)                  │
+          (7 dias sem   │  └──────────────────────────────────┘
+           troca)       ▼
+               SENHA_PROVISORIA_EXPIRADA ── (redefinir senha) ──► AGUARDANDO_PRIMEIRO_ACESSO
+ qualquer estado ── (desativar) ──► DESATIVADO ── (reativar) ──► estado derivado dos campos de senha
+```
 
 ## Mapeamento para a API
 
@@ -259,3 +345,5 @@ logins de administradores (ou `sistema`, no catálogo padrão).
 | Envio | `Envio`, `EnvioFila`, `EnvioPortal`, `StatusEnvio`, `Rejeicao` |
 | Situação do documento | `DocumentoSituacao`, `DocumentoSituacaoPortal`, `SituacaoDocumento`, `ContagemDocumentos` |
 | Perfil do usuário Fluig | `UsuarioFluig.admin`; operações com `x-requer-admin: true`; resposta `SemPermissao` |
+| Sessão da área Jotanunes (2026-09-29) | `UsuarioFluig.origem`, `UsuarioFluig.trocaSenhaObrigatoria`, `OrigemSessao`, `LoginJotanunesInput`, `SessaoJotanunes`, `ConfiguracaoAcesso` |
+| Usuário interno (§10) | `UsuarioInterno`, `UsuarioInternoInput`, `UsuarioInternoAtualizacao`, `PaginaUsuariosInternos`, `SituacaoUsuarioInterno` |

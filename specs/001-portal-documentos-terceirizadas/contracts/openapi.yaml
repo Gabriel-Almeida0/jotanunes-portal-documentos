@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: API do Portal de Documentação de Terceirizadas Jotanunes
-  version: 1.1.0
+  version: 1.2.0
   license:
     name: Proprietário — Jotanunes Construtora
   description: |
@@ -9,25 +9,43 @@ info:
     Qualquer mudança começa aqui.
 
     ## Autenticação
-    - `/api/fluig/*` → esquema **fluigAuth**: JWT HS256 emitido pelo Fluig
-      (claims `iss`, `aud`, `sub`=login, `name`, `email`, `iat`, `exp` e, opcional, `roles`).
-      Ver `fluig-identity.md`.
+    - `/api/fluig/*` → esquema **fluigAuth**, que aceita DOIS tokens da área Jotanunes (desde 1.2.0):
+      1. JWT HS256 emitido pelo **Fluig** (claims `iss`, `aud`, `sub`=login, `name`, `email`, `iat`,
+         `exp` e, opcional, `roles`). Ver `fluig-identity.md`.
+      2. JWT HS256 do **login próprio** da área Jotanunes, emitido por `POST /api/fluig/auth/login`
+         (`iss`=`jotanunes-docs`, segredo próprio; mesmas claims `sub`/`name`/`email`/`roles` e mais
+         `uid`, `ver`, `troca_senha`). Revogado na hora quando o usuário interno é desativado, tem a
+         senha trocada/redefinida, tem o papel alterado ou sai (→ 401 `NAO_AUTENTICADO`).
+      As rotas e as regras de perfil são as mesmas para os dois tokens.
+    - Rotas anônimas da área Jotanunes: `GET /api/fluig/auth/configuracao` e
+      `POST /api/fluig/auth/login` (esta com limite de 10 requisições/min por IP).
+    - Login próprio com `troca_senha=true`: somente `GET /api/fluig/me`,
+      `POST /api/fluig/auth/trocar-senha` e `POST /api/fluig/auth/sair` respondem; as demais rotas
+      `/api/fluig/*` devolvem 403 `TROCA_SENHA_OBRIGATORIA` (regra global, vale para toda rota
+      `/api/fluig/*` autenticada; tem precedência sobre `SEM_PERMISSAO`).
+    - Login próprio desligado (`Auth:LoginLocal:Habilitado=false`): `GET /api/fluig/auth/configuracao`
+      devolve `loginLocalHabilitado=false`; login, troca de senha e sair respondem 404
+      `NAO_ENCONTRADO`; tokens do login próprio → 401.
     - `/api/portal/*` → esquema **portalAuth**: JWT HS256 emitido por `POST /api/portal/auth/login`
       (claims `sub`=id da empresa, `cnpj`, `ver`, `troca_senha`).
-    - Um token de um esquema NUNCA é aceito no outro (→ 401 `NAO_AUTENTICADO`).
+    - Um token da área Jotanunes (Fluig ou login próprio) NUNCA é aceito no portal, nem o do portal
+      na área Jotanunes (→ 401 `NAO_AUTENTICADO`).
     - Com `troca_senha=true`, somente `GET /api/portal/me` e `POST /api/portal/auth/trocar-senha`
       respondem; as demais rotas do portal devolvem 403 `TROCA_SENHA_OBRIGATORIA`.
 
     ## Perfis na área Jotanunes (desde 1.1.0)
-    - **Administrador**: token Fluig com `roles` contendo `admin` (ver `fluig-identity.md`).
-      Sem a claim, ou sem `admin` nela, o usuário é **comum**.
+    - **Administrador**: token (Fluig ou login próprio) com `roles` contendo `admin` (ver
+      `fluig-identity.md`). Sem a claim, ou sem `admin` nela, o usuário é **comum**. No login próprio,
+      o papel vem do cadastro do usuário interno.
     - Operações marcadas com `x-requer-admin: true` (cadastrar/editar/ativar/desativar obras,
-      vínculos, empresas e tipos de documento; aprovar/rejeitar envios) exigem administrador.
+      vínculos, empresas e tipos de documento; aprovar/rejeitar envios; desde 1.2.0, TODAS as rotas
+      `/api/fluig/usuarios*`, inclusive as de leitura) exigem administrador.
       Usuário comum → 403 `SEM_PERMISSAO`, verificado ANTES de validar corpo ou procurar o recurso
       (sem efeito de negócio; só a tentativa fica na auditoria). As demais rotas `/api/fluig/*` (consultas, downloads e convites)
       valem para os dois perfis.
-    - O perfil vem só do token atual: vale até o token expirar (máx. 8 h). `GET /api/fluig/me`
-      devolve `admin` para o front esconder as ações.
+    - O perfil vem só do token atual: vale até o token expirar (máx. 8 h) — no login próprio, mudar o
+      papel revoga o token. `GET /api/fluig/me` devolve `admin`, `origem` e `trocaSenhaObrigatoria`
+      para o front esconder as ações e decidir as telas.
 
     ## Convenções
     - JSON em camelCase; enums em MAIÚSCULAS; datas ISO 8601 em UTC.
@@ -42,7 +60,9 @@ servers:
     description: Desenvolvimento local
 tags:
   - { name: 'Sistema', description: 'Saúde da API.' }
-  - { name: 'Fluig - Sessão', description: 'Usuário Fluig atual e painel.' }
+  - { name: 'Fluig - Sessão', description: 'Usuário atual da área Jotanunes e painel.' }
+  - { name: 'Fluig - Acesso', description: 'Login próprio da área Jotanunes (login + senha), troca de senha e saída.' }
+  - { name: 'Fluig - Usuários internos', description: 'Usuários do login próprio (só administradores).' }
   - { name: 'Fluig - Obras', description: 'Cadastro de obras e vínculos com empresas.' }
   - { name: 'Fluig - Empresas', description: 'Cadastro de empresas terceirizadas.' }
   - { name: 'Fluig - Convites', description: 'Convite por e-mail para o portal.' }
@@ -74,7 +94,9 @@ paths:
     get:
       tags: [Fluig - Sessão]
       operationId: fluigObterUsuarioAtual
-      summary: Dados do usuário Fluig identificado pelo token (inclui se é administrador)
+      summary: Dados do usuário da área Jotanunes identificado pelo token (perfil, origem e troca pendente)
+      description: |
+        Responde também com troca de senha pendente (login próprio), para o front mostrar a tela de troca.
       security: [{ fluigAuth: [] }]
       responses:
         '200':
@@ -83,6 +105,115 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/UsuarioFluig' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+
+  /api/fluig/auth/configuracao:
+    get:
+      tags: [Fluig - Acesso]
+      operationId: fluigObterConfiguracaoAcesso
+      summary: Diz se o login próprio da área Jotanunes está ligado (anônimo)
+      description: |
+        Sempre 200, sem autenticação, com `Cache-Control: no-store`. O front chama quando não tem
+        token: `true` → tela de login; `false` → "Abra este sistema pelo Fluig.".
+      security: []
+      responses:
+        '200':
+          description: Configuração de acesso
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConfiguracaoAcesso' }
+
+  /api/fluig/auth/login:
+    post:
+      tags: [Fluig - Acesso]
+      operationId: fluigLogin
+      summary: Login próprio da área Jotanunes (login + senha de usuário interno)
+      description: |
+        Anônimo, com limite de 10 requisições/min por IP (mesma regra do login do portal).
+        Login sem diferenciar maiúsculas (espaços nas pontas removidos).
+        5 falhas seguidas no mesmo login — existente ou não — → bloqueio de 15 min (423 `ACESSO_BLOQUEADO`).
+        `LOGIN_INVALIDO` não revela se o login existe (mesma mensagem e mesma sequência de respostas).
+        Com senha provisória, a sessão volta com `usuario.trocaSenhaObrigatoria=true`.
+        Login próprio desligado → 404 `NAO_ENCONTRADO`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginJotanunesInput' }
+      responses:
+        '200':
+          description: Autenticado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessaoJotanunes' }
+        '400': { $ref: '#/components/responses/Validacao' }
+        '401':
+          description: '`LOGIN_INVALIDO` ou `SENHA_PROVISORIA_EXPIRADA` (senha certa, provisória vencida)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '403':
+          description: '`USUARIO_INATIVO` (senha certa, usuário desativado)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '423':
+          description: '`ACESSO_BLOQUEADO` (extensão `bloqueadoAte` com a data/hora de liberação)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '429': { $ref: '#/components/responses/LimiteRequisicoes' }
+
+  /api/fluig/auth/trocar-senha:
+    post:
+      tags: [Fluig - Acesso]
+      operationId: fluigTrocarSenha
+      summary: Troca a senha do usuário interno (obrigatória no primeiro acesso) e devolve nova sessão
+      description: |
+        Só para sessão de login próprio (token Fluig → 409 `SO_LOGIN_LOCAL`). Permitida com
+        `troca_senha=true`. Exige a senha atual; nova senha com 8–128 caracteres, letra e número,
+        diferente da atual. Incrementa a versão da credencial (tokens anteriores deixam de valer) e
+        devolve novo token com `troca_senha=false`. Login próprio desligado → 404.
+      security: [{ fluigAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TrocaSenhaInput' }
+      responses:
+        '200':
+          description: Senha trocada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessaoJotanunes' }
+        '400':
+          description: '`VALIDACAO`, `SENHA_FRACA` ou `SENHA_ATUAL_INCORRETA`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409':
+          description: '`SO_LOGIN_LOCAL` (sessão aberta pelo Fluig)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  /api/fluig/auth/sair:
+    post:
+      tags: [Fluig - Acesso]
+      operationId: fluigSair
+      summary: Encerra a sessão de login próprio (revoga o token na hora)
+      description: |
+        Incrementa a versão da credencial do usuário interno: o token atual (e outras sessões do mesmo
+        usuário) passam a 401. Com token do Fluig → 204 sem efeito. Permitida com troca de senha
+        pendente. Login próprio desligado → 404.
+      security: [{ fluigAuth: [] }]
+      responses:
+        '204': { description: Sessão encerrada (ou nada a fazer, para token do Fluig) }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
 
   /api/fluig/painel:
     get:
@@ -97,6 +228,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Painel' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
 
   /api/fluig/obras:
     get:
@@ -120,6 +252,7 @@ paths:
               schema: { $ref: '#/components/schemas/PaginaObras' }
         '400': { $ref: '#/components/responses/Validacao' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
     post:
       tags: [Fluig - Obras]
       operationId: fluigCriarObra
@@ -163,6 +296,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ObraDetalhe' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
     put:
       tags: [Fluig - Obras]
@@ -250,6 +384,7 @@ paths:
               schema: { $ref: '#/components/schemas/PaginaEmpresas' }
         '400': { $ref: '#/components/responses/Validacao' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
     post:
       tags: [Fluig - Empresas]
       operationId: fluigCriarEmpresa
@@ -293,6 +428,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Empresa' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
     put:
       tags: [Fluig - Empresas]
@@ -341,6 +477,7 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/Convite' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
     post:
       tags: [Fluig - Convites]
@@ -359,6 +496,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Convite' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
         '409':
           description: '`EMPRESA_INATIVA`'
@@ -388,6 +526,7 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/DocumentoSituacao' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
 
   /api/fluig/empresas/{empresaId}/documentos/{tipoDocumentoId}/envios:
@@ -408,6 +547,7 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/Envio' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
 
   /api/fluig/tipos-documento:
@@ -430,6 +570,7 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/TipoDocumento' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
     post:
       tags: [Fluig - Tipos de documento]
       operationId: fluigCriarTipoDocumento
@@ -473,6 +614,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/TipoDocumento' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
     put:
       tags: [Fluig - Tipos de documento]
@@ -536,6 +678,7 @@ paths:
               schema: { $ref: '#/components/schemas/PaginaEnvios' }
         '400': { $ref: '#/components/responses/Validacao' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
 
   /api/fluig/envios/{envioId}:
     parameters:
@@ -552,6 +695,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/EnvioFila' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
 
   /api/fluig/envios/{envioId}/arquivo:
@@ -565,6 +709,7 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Arquivo' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
 
   /api/fluig/envios/{envioId}/aprovar:
@@ -617,6 +762,157 @@ paths:
         '404': { $ref: '#/components/responses/NaoEncontrado' }
         '409':
           description: '`ENVIO_JA_ANALISADO`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  /api/fluig/usuarios:
+    get:
+      tags: [Fluig - Usuários internos]
+      operationId: fluigListarUsuariosInternos
+      summary: Lista usuários internos (ordenados por nome)
+      security: [{ fluigAuth: [] }]
+      x-requer-admin: true
+      parameters:
+        - name: busca
+          in: query
+          description: Trecho do nome, login ou e-mail (sem diferenciar maiúsculas/acentos).
+          schema: { type: string, maxLength: 100 }
+        - name: ativo
+          in: query
+          description: Filtra por ativo/desativado. Omitido = todos.
+          schema: { type: boolean }
+        - name: admin
+          in: query
+          description: Filtra por perfil (true = administradores). Omitido = todos.
+          schema: { type: boolean }
+        - { $ref: '#/components/parameters/Pagina' }
+        - { $ref: '#/components/parameters/TamanhoPagina' }
+      responses:
+        '200':
+          description: Página de usuários internos
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginaUsuariosInternos' }
+        '400': { $ref: '#/components/responses/Validacao' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
+    post:
+      tags: [Fluig - Usuários internos]
+      operationId: fluigCriarUsuarioInterno
+      summary: Cadastra usuário interno e envia a senha provisória por e-mail
+      description: |
+        Gera senha provisória (12 caracteres, vale 7 dias, troca obrigatória no primeiro acesso) e
+        envia o e-mail de acesso ao `email`. A senha NUNCA volta na resposta. Se o e-mail falhar,
+        nada é gravado (502 `EMAIL_ACESSO_FALHOU`).
+      security: [{ fluigAuth: [] }]
+      x-requer-admin: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UsuarioInternoInput' }
+      responses:
+        '201':
+          description: Usuário criado (situação `AGUARDANDO_PRIMEIRO_ACESSO`)
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsuarioInterno' }
+        '400': { $ref: '#/components/responses/Validacao' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
+        '409':
+          description: '`LOGIN_DUPLICADO`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '502':
+          description: '`EMAIL_ACESSO_FALHOU`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  /api/fluig/usuarios/{usuarioId}:
+    parameters:
+      - { $ref: '#/components/parameters/UsuarioId' }
+    get:
+      tags: [Fluig - Usuários internos]
+      operationId: fluigObterUsuarioInterno
+      summary: Detalhe do usuário interno
+      security: [{ fluigAuth: [] }]
+      x-requer-admin: true
+      responses:
+        '200':
+          description: Usuário interno
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsuarioInterno' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+    put:
+      tags: [Fluig - Usuários internos]
+      operationId: fluigAtualizarUsuarioInterno
+      summary: Atualiza nome, e-mail, perfil e ativação do usuário interno (o login não muda)
+      description: |
+        Mudar `admin` ou `ativo` revoga na hora as sessões do usuário (versão da credencial + 1).
+        Recusas: a sessão de login próprio desativando a si mesma ou tirando o próprio papel →
+        409 `ALTERACAO_PROPRIA_NAO_PERMITIDA`; deixaria o sistema sem nenhum usuário interno
+        administrador ativo → 409 `ULTIMO_ADMINISTRADOR`.
+      security: [{ fluigAuth: [] }]
+      x-requer-admin: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UsuarioInternoAtualizacao' }
+      responses:
+        '200':
+          description: Usuário atualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsuarioInterno' }
+        '400': { $ref: '#/components/responses/Validacao' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409':
+          description: '`ULTIMO_ADMINISTRADOR` ou `ALTERACAO_PROPRIA_NAO_PERMITIDA`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  /api/fluig/usuarios/{usuarioId}/redefinir-senha:
+    parameters:
+      - { $ref: '#/components/parameters/UsuarioId' }
+    post:
+      tags: [Fluig - Usuários internos]
+      operationId: fluigRedefinirSenhaUsuarioInterno
+      summary: Gera nova senha provisória e envia por e-mail
+      description: |
+        Nova senha provisória (7 dias, troca obrigatória), zera tentativas/bloqueio e revoga as
+        sessões do usuário. Usuário desativado → 409 `USUARIO_INATIVO`. Se o e-mail falhar, nada
+        muda (502 `EMAIL_ACESSO_FALHOU`). A senha NUNCA volta na resposta.
+      security: [{ fluigAuth: [] }]
+      x-requer-admin: true
+      responses:
+        '200':
+          description: Senha redefinida (situação `AGUARDANDO_PRIMEIRO_ACESSO`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsuarioInterno' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409':
+          description: '`USUARIO_INATIVO`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '502':
+          description: '`EMAIL_ACESSO_FALHOU`'
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problema' }
@@ -840,9 +1136,14 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: |
-        JWT HS256 emitido pelo Fluig. `iss`=Auth__Fluig__Issuer (padrão `fluig`),
+        Token da área Jotanunes, de uma de duas origens (o emissor `iss` decide qual validação vale):
+        (1) JWT HS256 emitido pelo Fluig. `iss`=Auth__Fluig__Issuer (padrão `fluig`),
         `aud`=Auth__Fluig__Audience (padrão `jotanunes-docs-api`), `sub`=login, `name`, `email`,
         `exp` ≤ 8 h após `iat`; `roles` (opcional, lista de textos) com `admin` = administrador.
+        (2) JWT HS256 do login próprio, emitido por `/api/fluig/auth/login` ou
+        `/api/fluig/auth/trocar-senha`: `iss`=`jotanunes-docs`, `aud`=`jotanunes-docs-api`, segredo
+        `Auth__LoginLocal__Secret`, `sub`=login, `name`, `email`, `roles` (`["admin"]` ou ausente),
+        `uid`, `ver`, `troca_senha`; 8 h; revogável.
         Ver `contracts/fluig-identity.md`.
     portalAuth:
       type: http
@@ -886,6 +1187,11 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    UsuarioId:
+      name: usuarioId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
 
   responses:
     Validacao:
@@ -906,12 +1212,12 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problema' }
     TrocaSenhaObrigatoria:
-      description: '`TROCA_SENHA_OBRIGATORIA` — a empresa precisa trocar a senha antes de continuar'
+      description: '`TROCA_SENHA_OBRIGATORIA` — a empresa (portal) ou o usuário interno (login próprio da área Jotanunes) precisa trocar a senha antes de continuar'
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problema' }
     SemPermissao:
-      description: '`SEM_PERMISSAO` — operação só para administradores; o token Fluig não tem `roles` com `admin`'
+      description: '`SEM_PERMISSAO` — operação só para administradores; o token (Fluig ou login próprio) não tem `roles` com `admin`. Com login próprio e troca de senha pendente, esta rota devolve antes `TROCA_SENHA_OBRIGATORIA` (mesmo status 403)'
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problema' }
@@ -975,12 +1281,20 @@ components:
         - EMAIL_FALHOU
         - LIMITE_REQUISICOES
         - ERRO_INTERNO
+        - LOGIN_INVALIDO
+        - USUARIO_INATIVO
+        - SENHA_PROVISORIA_EXPIRADA
+        - LOGIN_DUPLICADO
+        - ULTIMO_ADMINISTRADOR
+        - ALTERACAO_PROPRIA_NAO_PERMITIDA
+        - EMAIL_ACESSO_FALHOU
+        - SO_LOGIN_LOCAL
       description: |
         | code | status | mensagem padrão (title) |
         |---|---|---|
         | VALIDACAO | 400 | Confira os dados informados. |
         | NAO_AUTENTICADO | 401 | Sua sessão expirou. Entre de novo. |
-        | TROCA_SENHA_OBRIGATORIA | 403 | Crie uma nova senha para continuar. |
+        | TROCA_SENHA_OBRIGATORIA | 403 | Crie uma nova senha para continuar. (portal e login próprio da área Jotanunes) |
         | SEM_PERMISSAO | 403 | Só administradores podem fazer isso. Se você precisa, fale com a TI. |
         | NAO_ENCONTRADO | 404 | Não encontramos o que você procurou. |
         | CNPJ_DUPLICADO | 409 | Já existe uma empresa com este CNPJ. |
@@ -989,7 +1303,7 @@ components:
         | NOME_DUPLICADO | 409 | Já existe um tipo de documento com este nome. |
         | EMPRESA_INATIVA | 409 (Fluig) / 403 (login) | Esta empresa está desativada. |
         | CREDENCIAIS_INVALIDAS | 401 | CNPJ ou senha incorretos. |
-        | ACESSO_BLOQUEADO | 423 | Muitas tentativas. Tente de novo em 15 minutos. |
+        | ACESSO_BLOQUEADO | 423 | Muitas tentativas. Tente de novo em 15 minutos. (portal e login próprio) |
         | CONVITE_INVALIDO | 404 | Este link não é mais válido. |
         | CONVITE_EXPIRADO | 401 | Seu convite expirou. Peça um novo convite à Jotanunes. |
         | SENHA_FRACA | 400 | A senha precisa ter pelo menos 8 caracteres, com letras e números. |
@@ -1002,6 +1316,14 @@ components:
         | EMAIL_FALHOU | 502 | Não conseguimos enviar o convite. Tente de novo em alguns minutos. |
         | LIMITE_REQUISICOES | 429 | Muitas tentativas. Aguarde um pouco. |
         | ERRO_INTERNO | 500 | Algo deu errado do nosso lado. Tente de novo. |
+        | LOGIN_INVALIDO | 401 | Login ou senha incorretos. |
+        | USUARIO_INATIVO | 403 (login) / 409 (redefinir senha) | Este usuário está desativado. Fale com um administrador do sistema. |
+        | SENHA_PROVISORIA_EXPIRADA | 401 | Sua senha provisória expirou. Peça a um administrador para gerar outra. |
+        | LOGIN_DUPLICADO | 409 | Já existe um usuário com este login. |
+        | ULTIMO_ADMINISTRADOR | 409 | O sistema precisa de pelo menos um administrador ativo. |
+        | ALTERACAO_PROPRIA_NAO_PERMITIDA | 409 | Você não pode desativar nem tirar o seu próprio acesso de administrador. Peça a outro administrador. |
+        | EMAIL_ACESSO_FALHOU | 502 | Não conseguimos enviar o e-mail com a senha provisória. Tente de novo em alguns minutos. |
+        | SO_LOGIN_LOCAL | 409 | Esta opção é só para quem entra com login e senha. |
     Problema:
       type: object
       required: [type, title, status, code]
@@ -1056,7 +1378,10 @@ components:
     # ── Fluig: sessão ──
     UsuarioFluig:
       type: object
-      required: [login, nome, email, admin]
+      description: |
+        Usuário atual da área Jotanunes (nome histórico do schema: desde 1.2.0 representa também a
+        sessão do login próprio).
+      required: [login, nome, email, admin, origem, trocaSenhaObrigatoria]
       properties:
         login: { type: string }
         nome: { type: string }
@@ -1064,8 +1389,90 @@ components:
         admin:
           type: boolean
           description: |
-            true quando o token Fluig traz `roles` com `admin`. O front usa para esconder as ações
+            true quando o token traz `roles` com `admin`. O front usa para esconder as ações
             de administrador; a API confere o papel em toda operação `x-requer-admin`.
+        origem: { $ref: '#/components/schemas/OrigemSessao' }
+        trocaSenhaObrigatoria:
+          type: boolean
+          description: Só no login próprio (senha provisória ainda não trocada). Sempre false para o Fluig.
+    OrigemSessao:
+      type: string
+      enum: [FLUIG, LOGIN_LOCAL]
+      description: '`FLUIG` = token emitido pelo Fluig; `LOGIN_LOCAL` = login próprio (mostra "Sair" e "Trocar senha").'
+    ConfiguracaoAcesso:
+      type: object
+      required: [loginLocalHabilitado]
+      properties:
+        loginLocalHabilitado: { type: boolean }
+    LoginJotanunesInput:
+      type: object
+      required: [login, senha]
+      properties:
+        login: { type: string, minLength: 1, maxLength: 100 }
+        senha: { type: string, minLength: 1, maxLength: 128 }
+    SessaoJotanunes:
+      type: object
+      required: [accessToken, expiraEm, usuario]
+      properties:
+        accessToken: { type: string, description: 'JWT fluigAuth do login próprio (iss=jotanunes-docs).' }
+        expiraEm: { type: string, format: date-time }
+        usuario: { $ref: '#/components/schemas/UsuarioFluig' }
+
+    # ── Usuários internos (login próprio) ──
+    SituacaoUsuarioInterno:
+      type: string
+      enum: [AGUARDANDO_PRIMEIRO_ACESSO, SENHA_PROVISORIA_EXPIRADA, ATIVO, DESATIVADO]
+    UsuarioInternoInput:
+      type: object
+      required: [login, nome, email]
+      properties:
+        login:
+          type: string
+          minLength: 3
+          maxLength: 100
+          pattern: '^[A-Za-z0-9._-]{3,100}$'
+          description: Único sem diferenciar maiúsculas; gravado em minúsculas; não pode ser alterado depois.
+        nome: { type: string, minLength: 3, maxLength: 150 }
+        email: { type: string, format: email, maxLength: 254 }
+        admin: { type: boolean, default: false }
+    UsuarioInternoAtualizacao:
+      type: object
+      required: [nome, email, admin, ativo]
+      properties:
+        nome: { type: string, minLength: 3, maxLength: 150 }
+        email: { type: string, format: email, maxLength: 254 }
+        admin: { type: boolean }
+        ativo: { type: boolean }
+    UsuarioInterno:
+      type: object
+      required: [id, login, nome, email, admin, ativo, situacao, criadoEm, criadoPor]
+      properties:
+        id: { type: string, format: uuid }
+        login: { type: string }
+        nome: { type: string }
+        email: { type: string }
+        admin: { type: boolean }
+        ativo: { type: boolean }
+        situacao: { $ref: '#/components/schemas/SituacaoUsuarioInterno' }
+        senhaProvisoriaExpiraEm: { type: string, format: date-time, nullable: true }
+        bloqueadoAte:
+          type: string
+          format: date-time
+          nullable: true
+          description: Preenchido enquanto o login estiver bloqueado por tentativas erradas.
+        ultimoAcessoEm: { type: string, format: date-time, nullable: true }
+        criadoEm: { type: string, format: date-time }
+        criadoPor: { type: string, description: 'Login de quem cadastrou, ou `sistema` (comando de instalação).' }
+        atualizadoEm: { type: string, format: date-time, nullable: true }
+    PaginaUsuariosInternos:
+      allOf:
+        - { $ref: '#/components/schemas/PaginaBase' }
+        - type: object
+          required: [itens]
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/UsuarioInterno' }
     AutorFluig:
       type: object
       required: [login, nome]

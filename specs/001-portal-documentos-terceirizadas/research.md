@@ -28,7 +28,9 @@ este documento resolve os detalhes em aberto.
   **fragmento** da URL (`https://.../fluig-app/#fluigToken=<jwt>`). O fragmento não vai para
   servidores nem logs de acesso. O `fluig-app` lê o fragmento, remove-o com `history.replaceState` e
   guarda o token em memória + `sessionStorage` (chave `jn.fluigToken`). Sem token válido → tela
-  "Abra este sistema pelo Fluig.".
+  "Abra este sistema pelo Fluig.". **Desde 2026-09-29 (R17)**: sem token, com o login próprio
+  ligado, aparece a tela de login; o bloqueio "Abra este sistema pelo Fluig." fica só para o login
+  próprio desligado. A entrada pelo Fluig descrita aqui não muda.
 
   Geração no Fluig (responsabilidade da integração, fora deste repositório): dataset customizado ou
   serviço REST do Fluig que lê o usuário logado (`getValue("WKUser")`/API `users/getCurrent`) e
@@ -208,7 +210,9 @@ este documento resolve os detalhes em aberto.
 ## R11. Proteções de borda
 
 - **Decision**: `Microsoft.AspNetCore.RateLimiting` (nativo): janela fixa de 10 req/min por IP em
-  `POST /api/portal/auth/login` e `POST /api/portal/convites/validar` → `429 LIMITE_REQUISICOES`.
+  `POST /api/portal/auth/login` e `POST /api/portal/convites/validar` → `429 LIMITE_REQUISICOES`
+  (desde 2026-09-29 também em `POST /api/fluig/auth/login`, mesma política e mesmo balde por IP —
+  R17).
   CORS com origens de `Cors__Origins` (dev: `http://localhost:5173,http://localhost:5174`), só
   header `Authorization`/`Content-Type`, sem credenciais. Headers de segurança padrão na API.
 - **Fluig em iframe**: em produção, o servidor que hospedar o `fluig-app` deve enviar
@@ -219,7 +223,10 @@ este documento resolve os detalhes em aberto.
 - **Decision**: porta `IRegistroAuditoria`; tabela `auditoria` gravada na mesma transação do caso de
   uso. Ações: `LOGIN_SUCESSO`, `LOGIN_FALHA`, `LOGIN_BLOQUEADO`, `SENHA_TROCADA`, `CONVITE_ENVIADO`,
   `DOCUMENTO_ENVIADO`, `ARQUIVO_BAIXADO`, `ENVIO_APROVADO`, `ENVIO_REJEITADO` e, desde 2026-09-29,
-  `PERMISSAO_NEGADA` (R16). Coluna nova `ator_admin` (bool null): o adaptador `RegistroAuditoriaEf`
+  `PERMISSAO_NEGADA` (R16) e, com o login próprio (R17), `USUARIO_CRIADO`, `USUARIO_ATUALIZADO`,
+  `USUARIO_DESATIVADO`, `USUARIO_REATIVADO`, `SENHA_REDEFINIDA`, `SESSAO_ENCERRADA` (as ações
+  `LOGIN_*`/`SENHA_TROCADA` são reaproveitadas com `recurso_tipo = USUARIO_INTERNO`); `ator_tipo`
+  ganha `LOCAL` e `SISTEMA`. Coluna nova `ator_admin` (bool null): o adaptador `RegistroAuditoriaEf`
   preenche a partir de `IUsuarioFluigAtual.EhAdmin` quando `ator_tipo = FLUIG` — a porta
   `IRegistroAuditoria` não muda de assinatura, então nenhum caso de uso existente precisa mudar.
   Logs estruturados
@@ -327,3 +334,224 @@ este documento resolve os detalhes em aberto.
   que o papel vem do Fluig); (c) checar no caso de uso (`Application`) — espalha a regra; a política
   na borda com teste que percorre todas as rotas cobre o mesmo risco com menos código.
 
+
+## R17. Login próprio da área Jotanunes e usuários internos (2026-09-29, tarde)
+
+Contexto: decisão do dono do produto (spec, Session 2026-09-29 tarde) — a Jotanunes ainda não tem o
+Fluig; a área Jotanunes ganha login + senha com usuários internos no banco, gestão pela tela
+"Usuários" (só administradores) e primeiro administrador criado na instalação. A entrada pelo Fluig
+continua igual. Constituição 1.2.0 (princípios III, IV e V emendados).
+
+### Token do login próprio — mesmo modelo de autorização
+
+- **Decision**: JWT **HS256** emitido pela API em `POST /api/fluig/auth/login` (e
+  `POST /api/fluig/auth/trocar-senha`), com segredo **próprio** `Auth:LoginLocal:Secret` (≥ 32 bytes,
+  diferente de `Auth:Fluig:Secret` e de `Auth:Portal:Secret`), `iss = jotanunes-docs`,
+  `aud = jotanunes-docs-api`, validade 8 h. Claims:
+
+  | Claim | Valor | Igual ao Fluig? |
+  |---|---|---|
+  | `sub` | login do usuário interno | sim |
+  | `name`, `email` | nome e e-mail do cadastro | sim |
+  | `roles` | `["admin"]` se administrador; **omitida** se comum | sim (mesma regra de `fluig-identity.md`) |
+  | `uid` | id (uuid) do usuário interno | não (só local) |
+  | `ver` | `versao_credencial` do usuário | não (só local; revogação) |
+  | `troca_senha` | `true` / `false` | não (só local) |
+  | `iat`, `exp` | emissão e expiração (8 h) | sim |
+
+  Como `sub`/`name`/`email`/`roles` são as mesmas claims, `UsuarioFluigAtualDeClaims`,
+  `PapeisFluig.EhAdmin`, `PapelAdminHandler` e as políticas `Fluig` e `FluigAdmin` servem aos dois
+  tokens **sem duplicar endpoints**: todas as rotas `/api/fluig/*` continuam as mesmas.
+- **Esquemas**: novo esquema JwtBearer `LoginLocal` (segredo/emissor próprios) e um **esquema
+  seletor** `AreaJotanunes` (`AddPolicyScheme` com `ForwardDefaultSelector`) que lê — sem validar —
+  o `iss` do Bearer: `jotanunes-docs` → `LoginLocal` (se o login próprio estiver ligado); qualquer
+  outro → `Fluig`. Quem valida é sempre o esquema escolhido, com a própria chave e o próprio emissor;
+  o seletor só escolhe. As políticas `Fluig`, `FluigSessao` e `FluigAdmin` passam a usar
+  `AreaJotanunes`. `Auth:Fluig:Issuer` igual a `jotanunes-docs` é configuração inválida (a API não
+  sobe).
+  - Token do portal em `/api/fluig/*`: `iss = jotanunes-docs-portal` → vai para `Fluig` → 401 (como
+    hoje). Token local em `/api/portal/*`: esquema `Portal` recusa emissor/segredo → 401. Token com
+    `iss = jotanunes-docs` assinado com o segredo do Fluig (ou `iss = fluig` com o segredo local) →
+    401. Todos com teste.
+  - Por que seletor e não "dois esquemas na mesma política": com dois esquemas na política, o
+    ASP.NET autentica com os dois e **mescla** as identidades (claims duplicadas, desafio dobrado);
+    com o seletor, exatamente um handler valida cada token, e o caminho do Fluig é literalmente o
+    mesmo handler de hoje.
+- **Revogação imediata**: `OnTokenValidated` do esquema `LoginLocal` exige `uid` (uuid), `ver` (int)
+  e `troca_senha`, carrega o usuário por PK e falha (→ 401 `NAO_AUTENTICADO`) se não existir, estiver
+  inativo, `versao_credencial ≠ ver` ou `login ≠ sub`. `versao_credencial` é incrementada ao
+  **desativar**, **reativar**, **redefinir senha**, **trocar senha**, **dar/tirar o papel de
+  administrador** e **sair**. Mudar só nome/e-mail não incrementa (a sessão segue; o nome novo aparece
+  no próximo login). Custo: 1 consulta por PK por requisição, igual ao portal (R2). Tokens do Fluig
+  não passam por isso (nada muda para eles; papel vale até expirar, R16).
+- **Troca de senha obrigatória**: com `troca_senha = true`, só respondem `GET /api/fluig/me`,
+  `POST /api/fluig/auth/trocar-senha` e `POST /api/fluig/auth/sair`; o resto de `/api/fluig/*` →
+  `403 TROCA_SENHA_OBRIGATORIA`. Implementação: requisito `SenhaLocalDefinidaRequirement` na política
+  `Fluig` (passa para token do Fluig e para token local com `troca_senha = false`); as três rotas de
+  sessão ficam num segundo `MapGroup("/api/fluig")` com a política `FluigSessao` (autenticado, sem o
+  requisito) — políticas de grupo se somam às do endpoint, então elas não podem ficar no grupo
+  principal. No `ResultadoAutorizacaoHandler`, se falharem o requisito de troca e o de admin, vale
+  `TROCA_SENHA_OBRIGATORIA` (sem linha `PERMISSAO_NEGADA`: o usuário ainda nem definiu a senha).
+  `POST /api/fluig/auth/trocar-senha` com token do Fluig → `409 SO_LOGIN_LOCAL` (a senha do Fluig
+  não é gerida aqui).
+- **Sair**: `POST /api/fluig/auth/sair` incrementa `versao_credencial` (a sessão cai na API na hora,
+  não só no navegador) e grava `SESSAO_ENCERRADA`. Efeito colateral aceito: encerra todas as sessões
+  do mesmo usuário (outras abas/computadores). Com token do Fluig → `204` sem efeito (não há o que
+  revogar; o front nem mostra o botão).
+- **Alternatives considered**: (a) reusar o segredo do Fluig com outro `iss` — um vazamento do
+  segredo compartilhado com o Fluig permitiria forjar usuários internos e vice-versa; (b) sessão com
+  cookie httpOnly — exigiria CSRF e mudar o cliente HTTP do `fluig-app` (que já usa Bearer); o
+  ganho contra XSS não compensa numa SPA sem conteúdo de terceiros (mesma avaliação de R2);
+  (c) papel lido do banco a cada requisição em vez da claim — funcionaria, mas o requisito pede as
+  mesmas claims do Fluig e a `ver` já revoga o token quando o papel muda; (d) lista de tokens
+  revogados (`jti`) — mais estado e limpeza, sem ganho sobre `ver`.
+
+### Senhas, bloqueio e anti-enumeração
+
+- **Decision**: reaproveitar o que o portal já tem: `IHasherSenha` (BCrypt 12, verificação fictícia
+  para login inexistente), `IGeradorSegredos.GerarSenhaTemporaria()` (12 caracteres, alfabeto sem
+  ambíguos), `PoliticaSenha` (8–128, letra e número, diferente da atual), 5 falhas → bloqueio de
+  15 min (`Empresa.MaximoFalhasLogin`/`DuracaoBloqueio`, mesmas constantes).
+  - Usuário existente: contadores `tentativas_falhas`/`bloqueado_ate` na própria linha de
+    `usuarios_internos`.
+  - Login inexistente: tabela `tentativas_login` (data-model §8) com chave **HMAC-SHA256** de
+    `"usuario:" + login normalizado`, com chave derivada de `Auth:LoginLocal:Secret` e rótulo próprio
+    (`jotanunes-docs/tentativas-login-local/v1`) — não colide com as chaves de CNPJ e não guarda o
+    login digitado. Mesma sequência 401×5 → 423 de um login existente (FR-104).
+  - Ordem do `LoginJotanunes` (igual ao `LoginPortal`): validação → usuário por login normalizado →
+    (inexistente: bloqueado? 423 : BCrypt fictício + falha + 401) → bloqueado? 423 → senha errada?
+    falha (+ bloqueio na 5ª) + 401 `LOGIN_INVALIDO` → senha certa mas inativo? 403
+    `USUARIO_INATIVO` → senha provisória vencida? 401 `SENHA_PROVISORIA_EXPIRADA` → sucesso (zera
+    falhas, `ultimo_acesso_em`, token). Recusas com senha certa também são auditadas (`LOGIN_FALHA`).
+  - Senha provisória vale **7 dias** (`senha_provisoria_expira_em`), como o convite do portal.
+  - Login normalizado: `trim` + minúsculas; formato `^[a-z0-9._-]{3,100}$` depois de normalizar.
+  - Rate limit: a política anônima existente (10/min por IP, R11) é aplicada também a
+    `POST /api/fluig/auth/login` (mesmo balde por IP das rotas anônimas do portal — um atacante não
+    ganha tentativas alternando portal e área Jotanunes).
+- **Rationale**: nenhuma regra nova de segurança para revisar; o que já foi testado no portal (T117,
+  T119) é repetido para o login.
+
+### E-mail da senha provisória
+
+- **Decision**: `ModelosEmail.AcessoUsuarioInterno(nome, login, senhaProvisoria, urlAreaJotanunes,
+  expiraEm, redefinicao)` com o mesmo layout/logo inline dos outros e-mails: assunto "Jotanunes: seu
+  acesso ao sistema de documentação de terceirizadas" (cadastro) ou "Jotanunes: sua nova senha
+  provisória" (redefinição); corpo com login, senha provisória, link `FluigApp:BaseUrl` (nova
+  configuração), validade de 7 dias e "Você vai criar a sua própria senha no primeiro acesso.".
+  - Pela tela (cadastrar/redefinir): ordem **gravar → enviar e-mail → commit**; falha do e-mail →
+    rollback e `502 EMAIL_ACESSO_FALHOU` (nada criado/alterado), como o convite (R4). Código novo
+    porque o `title` de `EMAIL_FALHOU` fala de "convite".
+  - Pelo comando de instalação: **commit → enviar**; falha do e-mail → aviso no terminal (a senha já
+    está na tela de quem rodou o comando).
+
+### Gestão de usuários internos e regra do último administrador
+
+- **Decision**: rotas `/api/fluig/usuarios` (listar/criar), `/api/fluig/usuarios/{usuarioId}`
+  (obter/atualizar) e `/api/fluig/usuarios/{usuarioId}/redefinir-senha`, **todas** `x-requer-admin`
+  (inclusive os GET: a lista de usuários é dado de controle de acesso). Administradores de qualquer
+  origem (Fluig ou login próprio) gerenciam.
+  - Login imutável; `PUT` recebe `nome`, `email`, `admin`, `ativo` (todos obrigatórios, como os outros
+    `*Atualizacao`).
+  - **Regra do último administrador** (FR-110): (1) sessão de login próprio não pode desativar a si
+    mesma nem tirar o próprio papel (`uid` do token = `usuarioId`) → `409
+    ALTERACAO_PROPRIA_NAO_PERMITIDA`; (2) nenhuma operação pode levar a zero usuários internos
+    administradores ativos → `409 ULTIMO_ADMINISTRADOR`. (2) cobre o caso em que um administrador do
+    Fluig (que não é usuário interno) tenta desativar o único administrador interno. Concorrência:
+    os casos de uso de atualização pegam `IBloqueioExclusivo` (`pg_advisory_xact_lock`, já existe
+    desde R15) com uma chave própria antes de contar administradores — dois administradores
+    desativando um ao outro ao mesmo tempo não zeram o conjunto.
+  - Por que "pelo menos 1 interno" e não "pelo menos 1 em qualquer origem": o sistema não sabe quem é
+    administrador no Fluig; e hoje a Jotanunes não tem Fluig, então perder o último administrador
+    interno trancaria o sistema (só o comando `--forcar` recuperaria).
+  - Redefinir senha de usuário inativo → `409 USUARIO_INATIVO` (reative primeiro). Redefinir a própria
+    senha é permitido (derruba a própria sessão; o front avisa antes).
+- **Alternatives considered**: (a) exclusão física de usuário — contraria FR-016 e perderia a
+  referência das colunas de autoria; (b) papel por lista de papéis na tabela — YAGNI, só existe
+  `admin`.
+
+### Primeiro administrador (bootstrap)
+
+- **Decision**: **comando da própria API**, sem subir o servidor HTTP:
+
+  ```text
+  dotnet Jotanunes.Docs.Api.dll criar-admin --login <login> --nome "<nome>" --email <email> [--forcar]
+  ```
+
+  - `Program.cs` verifica `args[0] == "criar-admin"` depois de montar o container (mesma configuração,
+    mesma validação de configuração, migrations se `Database:MigrateOnStartup=true`) e, em vez de
+    `RunAsync`, executa o caso de uso `CriarAdministradorInicial` num escopo de DI, escreve o resultado
+    no **`Console.Out`/`Console.Error`** (nunca `ILogger`) e termina com código de saída.
+  - Regras: argumentos inválidos ou login próprio desligado → código 1 (uso/explicação no stderr).
+    Sob `IBloqueioExclusivo`: existe usuário interno administrador ativo e **sem** `--forcar` →
+    código 2, nada alterado. Senão: login novo → cria administrador ativo com senha provisória;
+    login existente → vira administrador ativo, nome/e-mail atualizados, nova senha provisória,
+    troca obrigatória, bloqueio zerado, `versao_credencial + 1`. Autoria `sistema`; auditoria
+    `USUARIO_CRIADO` ou `SENHA_REDEFINIDA` com `ator_tipo = SISTEMA`, `ator_id = sistema`.
+  - Saída (stdout): login, "senha provisória: <senha>" (vale 7 dias, troca obrigatória), endereço da
+    área Jotanunes e se o e-mail saiu. Código 0 mesmo se o e-mail falhar (aviso no stderr).
+  - **Constituição III (v1.2.0)**: a senha só vai para o terminal de quem executa o comando, como
+    exceção explícita; nunca `ILogger` (que em produção vai para o journal). O comando **não** roda
+    automaticamente no `deploy/instalar.sh` (precisaria dos dados da pessoa e deixaria a senha na
+    saída de um script automatizado); em produção roda-se à mão pelo wrapper
+    `jotanunes-docs-criar-admin` instalado pelo `instalar.sh`, que usa `systemd-run --pipe --wait`
+    com o mesmo `EnvironmentFile`, usuário e diretório do serviço (a saída vai para o terminal, não
+    para o journal). O `instalar.sh` só lembra, ao final, de rodar o comando se ainda não houver
+    administrador.
+- **Rationale**: reaproveita composição, validação de configuração, adaptadores (BCrypt, Resend,
+  auditoria) e testes; não expõe endpoint anônimo de "primeiro uso" (que seria alvo na internet
+  entre a instalação e o primeiro acesso).
+- **Alternatives considered**: (a) endpoint anônimo "criar primeiro administrador" habilitado só com
+  banco vazio — janela de ataque pública; (b) variáveis de ambiente `ADMIN_LOGIN/ADMIN_SENHA` lidas
+  no startup — senha em arquivo de ambiente e no processo; (c) SQL manual com hash BCrypt — frágil e
+  sem auditoria/e-mail; (d) projeto de console separado — duplicaria a composição.
+
+### Configuração e descoberta pelo front
+
+- **Decision**: `Auth:LoginLocal:Habilitado` (padrão `true`), `Auth:LoginLocal:Secret`,
+  `FluigApp:BaseUrl` (link dos e-mails; em dev `http://localhost:5173`). Validação no startup (T023):
+  com o login ligado, segredo ≥ 32 bytes e diferente dos outros dois, e `FluigApp:BaseUrl` obrigatório
+  fora de Development; `Auth:Fluig:Issuer ≠ jotanunes-docs` sempre.
+  - `GET /api/fluig/auth/configuracao` — **anônimo**, sempre 200, `{ "loginLocalHabilitado": bool }`,
+    `Cache-Control: no-store`. O `fluig-app` só chama quando não tem token: `true` → tela de login;
+    `false` → "Abra este sistema pelo Fluig.". Preferido a "tentar logar e tratar 404" porque a
+    decisão precisa acontecer **antes** de o usuário digitar.
+  - Desligado: `POST /api/fluig/auth/login`, `.../trocar-senha` e `.../sair` → `404 NAO_ENCONTRADO`;
+    o seletor não encaminha mais nada para `LoginLocal` (tokens locais existentes → 401 na hora). As
+    rotas `/api/fluig/usuarios*` continuam (administrador do Fluig pode preparar usuários antes de
+    ligar).
+- **`GET /api/fluig/me`** passa a devolver também `origem` (`FLUIG` | `LOGIN_LOCAL`) e
+  `trocaSenhaObrigatoria` (sempre `false` para o Fluig). O schema continua `UsuarioFluig` (nome
+  histórico, evita regenerar/renomear tipos nos fronts): representa o usuário da área Jotanunes.
+
+### Porta de identidade e auditoria
+
+- `IUsuarioFluigAtual` ganha `bool EhLoginLocal` e `Guid? UsuarioInternoId` (lidos de `iss`/`uid`);
+  os casos de uso existentes não mudam. `RegistroAuditoriaEf` grava `ator_tipo = LOCAL` quando o caso
+  de uso registra `AtorAuditoria.Fluig` numa sessão de login próprio (mesma técnica do `ator_admin`,
+  R16: a assinatura de `IRegistroAuditoria` não muda) e preenche `ator_admin` para `FLUIG` e `LOCAL`.
+  Falha de login com login inexistente: `ator_tipo = ANONIMO`, `ator_id` = login normalizado **só se**
+  casar com o formato de login (senão `null` — evita gravar uma senha digitada no campo errado).
+- Colunas de autoria (`*_por_login`) guardam o login do usuário interno como guardam o do Fluig.
+  Recomendação operacional: cadastrar o usuário interno com o mesmo login que ele terá no Fluig.
+
+### Front (`fluig-app`)
+
+- **Token**: o mesmo `sessionStorage['jn.fluigToken']` guarda o token da sessão, venha do Fluig ou do
+  login próprio (a origem vem de `/me`). Mantido `sessionStorage` (e não `localStorage`): a sessão
+  morre ao fechar a aba, não vaza entre abas/usuários do mesmo computador e é o comportamento que o
+  portal e o Fluig já têm. O token do fragmento (`#fluigToken=`) continua tendo prioridade e substitui
+  uma sessão local na mesma aba.
+- **Fluxo do `AuthFluigProvider`**: fragmento → `sessionStorage` → (dev) `VITE_FLUIG_DEV_TOKEN` → sem
+  token: `GET /api/fluig/auth/configuracao` → `Login` ou `AcessoNegado`. Com sessão: `/me` →
+  `trocaSenhaObrigatoria` ? `TrocaSenha` (bloqueia tudo) : app. 401 no meio da sessão: origem
+  `LOGIN_LOCAL` → tela de login com "Sua sessão expirou. Entre de novo."; origem `FLUIG` →
+  "Abra este sistema pelo Fluig." (como hoje).
+- **Telas**: `Login` (painel com `--jn-radius-signature`, logo, "Login", "Senha", botão pill
+  "Acessar", ajuda "Esqueceu a senha? Peça a um administrador do sistema para gerar uma nova.");
+  `TrocaSenha` (mesmos textos do portal); menu com "Usuários" só para administrador e "Trocar senha"/
+  "Sair" só para `LOGIN_LOCAL`; `Usuarios` (tabela + modais, esconde "Desativar" e o papel na própria
+  linha, confirma "Redefinir senha", mensagens por `code`). Usuário comum em `#/usuarios` vê só o
+  aviso de administrador e nenhuma chamada é feita.
+- **Mocks**: `VITE_MOCK_LOGIN=true` começa sem token (mostra a tela de login) com usuários de exemplo
+  (`admin.mock`/`Admin1234`, `novo.mock`/`Temp1234` com troca obrigatória → `Nova1234`,
+  `comum.mock`/`Comum1234`, `inativo.mock`).

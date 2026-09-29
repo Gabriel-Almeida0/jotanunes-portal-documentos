@@ -26,6 +26,18 @@ consultas, downloads e convites continuam para todos. `GET /api/fluig/me` devolv
 documento quando o catálogo está vazio. Contrato 1.1.0; constituição 1.1.0. Decisões em
 [research.md](research.md) R15 e R16.
 
+**Atualização 2026-09-29, tarde (Phase 11)**: **login próprio da área Jotanunes** — a Jotanunes ainda
+não tem o Fluig. A área Jotanunes ganha login + senha de **usuários internos** (tabela
+`usuarios_internos`), com tela **"Usuários"** só para administradores e **primeiro administrador**
+criado por um comando da API (`criar-admin`). A entrada pelo Fluig não muda. O token do login próprio
+é um JWT HS256 com as **mesmas claims** do Fluig (`sub`, `name`, `email`, `roles`) + `uid`/`ver`/
+`troca_senha`, emissor `jotanunes-docs` e segredo próprio; um esquema seletor escolhe a validação
+pelo `iss`, então as políticas `Fluig`/`FluigAdmin` e todas as rotas existentes servem aos dois
+tokens sem duplicação. Revogação imediata por `versao_credencial` (como o portal). Chave
+`Auth:LoginLocal:Habilitado` (padrão `true`) + `GET /api/fluig/auth/configuracao` anônimo para o
+front. Contrato **1.2.0**; constituição **1.2.0** (III, IV e V emendados). Decisões em
+[research.md](research.md) R17; dados em [data-model.md](data-model.md) §10.
+
 ## Technical Context
 
 **Language/Version**: C# 12 / .NET 8 (backend); TypeScript 5 + React 18 (frontends); Node 22 (tooling)
@@ -54,7 +66,8 @@ variáveis de ambiente; contraste WCAG AA; telas a partir de 360 px; `fluig-app`
 em `.jn-app`
 
 **Scale/Scope**: ~50 obras, ~500 empresas, ~30 tipos de documento, ~20 mil envios/ano; ~10 telas no
-`fluig-app`, ~5 no `portal`, 34 operações na API (10 delas só para administrador, desde 1.1.0)
+`fluig-app`, ~5 no `portal`, 43 operações na API (15 delas só para administrador: 10 desde 1.1.0 +
+5 de usuários internos desde 1.2.0; 2 anônimas da área Jotanunes: configuração e login)
 
 ## Constitution Check
 
@@ -64,13 +77,28 @@ em `.jn-app`
 |---|---|---|
 | I. Hexagonal | 4 projetos (`Domain`, `Application`, `Infrastructure`, `Api`); portas em `Application` para repositórios, e-mail, arquivos, hash, identidade, auditoria, relógio (`TimeProvider`) | ✅ |
 | II. Contrato como fonte de verdade | `contracts/openapi.yaml` completo (34 operações, erros com `code`, segurança por rota); fronts geram tipos e mocks dele; teste de contrato no backend | ✅ |
-| III. Segurança/LGPD | esquemas `Fluig` e `Portal` separados + testes cruzados; filtro por `empresaId` do token; BCrypt 12; token de convite só como hash; download só por endpoint; auditoria; segredos em env; e-mail no log só em Development (exceção explícita da constituição v1.0.1); **(v1.1.0)** operações de administrador com política `FluigAdmin` no servidor, papel vindo só do token Fluig, 403 `SEM_PERMISSAO` sem efeito de negócio (só a tentativa `PERMISSAO_NEGADA` é auditada) | ✅ |
-| IV. Testes | xUnit unitário/integração/autorização/contrato; Vitest + Testing Library nos fronts; **(v1.1.0)** teste que percorre todas as rotas de escrita `/api/fluig/*` com token comum (403) e admin (sucesso) | ✅ |
-| V. Visual sem framework CSS | CSS puro com tokens `--jn-*` de `docs/design.md`; `.jn-app` no `fluig-app`; ícones SVG inline | ✅ |
+| III. Segurança/LGPD | esquemas da área Jotanunes (`Fluig` + `LoginLocal`, escolhidos pelo seletor `AreaJotanunes`, 1.2.0) e `Portal` separados + testes cruzados; token local revogável por `ver` (1.2.0); filtro por `empresaId` do token; BCrypt 12; token de convite só como hash; download só por endpoint; auditoria; segredos em env; e-mail no log só em Development (exceção explícita da constituição v1.0.1); **(v1.1.0)** operações de administrador com política `FluigAdmin` no servidor, papel vindo só do token Fluig, 403 `SEM_PERMISSAO` sem efeito de negócio (só a tentativa `PERMISSAO_NEGADA` é auditada) | ✅ |
+| IV. Testes | xUnit unitário/integração/autorização/contrato; Vitest + Testing Library nos fronts; **(v1.1.0)** teste que percorre todas as rotas de escrita `/api/fluig/*` com token comum (403) e admin (sucesso); **(v1.2.0)** o mesmo teste com token Fluig e token do login próprio, com listas explícitas de rotas anônimas/de sessão | ✅ |
+| V. Visual sem framework CSS | CSS puro com tokens `--jn-*` de `docs/design.md`; `.jn-app` no `fluig-app`; ícones SVG inline; **(v1.2.0)** logo só no painel da tela de login do `fluig-app` | ✅ |
 | VI. Simplicidade | monolito modular; adaptadores de dev sem credenciais (e-mail no log, disco local, token de dev); `docker compose up` só com Postgres | ✅ |
 
 **Re-check pós-design (Fase 1)**: ✅ sem violações. `data-model.md` não introduz tabelas além das
 necessárias; contrato cobre todas as FRs; nenhuma dependência nova fora das listadas.
+
+**Re-check 2026-09-29, tarde (login próprio + usuários internos, constituição 1.2.0)**: ✅ sem
+violações, com as emendas da 1.2.0 feitas **antes** deste plano (Sync Impact Report da constituição).
+I: novas portas `IUsuarioInternoRepositorio` e `IEmissorTokenJotanunes` na `Application`, adaptadores
+na `Infrastructure`, esquemas/seletor/políticas só na `Api`; o comando `criar-admin` chama um caso de
+uso. II: contrato 1.2.0 atualizado antes da implementação (rotas, schemas, 8 códigos novos,
+`x-requer-admin` nas 5 rotas de usuários). III: token local com segredo/emissor próprios e revogação
+por `ver` (regra nova da 1.2.0); BCrypt 12; bloqueio e anti-enumeração iguais ao portal; senha
+provisória nunca na tela nem no log (única exceção: stdout do `criar-admin`, prevista na 1.2.0); papel
+do cadastro, conferido a cada requisição; 403 `SEM_PERMISSAO` antes de qualquer efeito, com auditoria.
+IV: `PerfilAdminTests` passa a rodar com as duas origens de identidade e classifica rotas anônimas e
+de sessão em listas explícitas (regra da 1.2.0); testes de revogação, anti-enumeração, bootstrap e
+Fluig inalterado. V: tela de login com logo no painel (exceção da 1.2.0), resto sem cabeçalho de
+marca, CSS próprio. VI: nenhuma dependência nova (JwtBearer, BCrypt e Resend já existem); tabela única
+nova; o comando reaproveita a composição da API.
 
 **Re-check 2026-09-29 (perfis + catálogo padrão, constituição 1.1.0)**: ✅ sem violações. Nenhuma
 tabela nova (só a coluna `auditoria.ator_admin`); nenhuma dependência nova; o papel continua atrás da
@@ -117,13 +145,17 @@ backend/                         # [BACKEND]
 │   │   ├── Empresas/            # Empresa, Cnpj (VO), SituacaoAcesso, PoliticaSenha
 │   │   ├── Convites/            # Convite, SituacaoConvite
 │   │   ├── TiposDocumento/      # TipoDocumento
-│   │   └── Envios/              # EnvioDocumento, StatusEnvio, SituacaoDocumento, FormatoArquivo
+│   │   ├── Envios/              # EnvioDocumento, StatusEnvio, SituacaoDocumento, FormatoArquivo
+│   │   └── UsuariosInternos/    # UsuarioInterno, SituacaoUsuarioInterno, LoginUsuario (VO) — R17
 │   ├── Jotanunes.Docs.Application/
 │   │   ├── Portas/              # IRepositórios, IEnviadorEmail, IArmazenamentoArquivos,
 │   │   │                        # IHasherSenha, IGeradorSegredos, IUsuarioFluigAtual (+EhAdmin),
 │   │   │                        # IEmpresaPortalAtual, IEmissorTokenPortal, IRegistroAuditoria,
-│   │   │                        # IContextoRequisicao, IUnidadeTrabalho
+│   │   │                        # IContextoRequisicao, IUnidadeTrabalho, IBloqueioExclusivo,
+│   │   │                        # IUsuarioInternoRepositorio, IEmissorTokenJotanunes (R17)
 │   │   ├── Obras/ Empresas/ Convites/ TiposDocumento/ Envios/ Portal/ Painel/  # casos de uso + DTOs
+│   │   ├── AcessoJotanunes/     # LoginJotanunes, TrocarSenhaJotanunes, SairJotanunes (R17)
+│   │   ├── UsuariosInternos/    # Listar/Obter/Criar/Atualizar/RedefinirSenha, CriarAdministradorInicial
 │   │   │                        # TiposDocumento/CatalogoTiposPadrao.cs + SemearCatalogoTiposPadrao (R15)
 │   │   ├── Emails/              # ModelosEmail (convite, rejeição)
 │   │   └── Erros/               # ErroAplicacao com CodigoErro
@@ -131,13 +163,16 @@ backend/                         # [BACKEND]
 │   │   ├── Persistencia/        # DocsDbContext, configurações, repositórios, Migrations/
 │   │   ├── Email/               # ResendEnviadorEmail, LogEnviadorEmail
 │   │   ├── Armazenamento/       # ArmazenamentoDiscoLocal, DetectorFormato
-│   │   ├── Seguranca/           # BCryptHasherSenha, GeradorSegredos, EmissorTokenPortal
+│   │   ├── Seguranca/           # BCryptHasherSenha, GeradorSegredos, EmissorTokenPortal,
+│   │   │                        # EmissorTokenJotanunes (+ OpcoesLoginLocal)
 │   │   └── Auditoria/
 │   └── Jotanunes.Docs.Api/
 │       ├── Program.cs           # composição, CORS, rate limit, ProblemDetails
-│       ├── Autenticacao/        # esquemas Fluig e Portal, políticas (Fluig, FluigAdmin, Portal,
-│       │                        # PortalCompleto), PapelAdminRequirement, adaptadores de claims
-│       ├── Endpoints/Fluig/     # grupos /api/fluig/*
+│       ├── Autenticacao/        # esquemas Fluig, LoginLocal e Portal + seletor AreaJotanunes; políticas
+│       │                        # (Fluig, FluigSessao, FluigAdmin, Portal, PortalCompleto),
+│       │                        # PapelAdminRequirement, SenhaLocalDefinidaRequirement, adaptadores
+│       ├── Comandos/            # ComandoCriarAdmin (criar-admin, stdout/stderr, código de saída)
+│       ├── Endpoints/Fluig/     # grupos /api/fluig/* (+ AcessoJotanunesEndpoints, UsuariosInternosEndpoints)
 │       ├── Endpoints/Portal/    # grupos /api/portal/*
 │       └── appsettings*.json    # sem segredos
 └── tests/
@@ -151,12 +186,15 @@ fluig-app/                       # [FLUIG] React + Vite + TS, HashRouter, estilo
     ├── main.tsx  App.tsx
     ├── api/                     # schema.d.ts (gerado), client.ts, hooks por recurso
     ├── auth/                    # leitura do token (fragmento/sessionStorage/dev), guarda,
-    │                            # useEhAdmin + SomenteAdmin/AvisoSomenteAdmin (perfil, R16)
+    │                            # useEhAdmin + SomenteAdmin/AvisoSomenteAdmin (perfil, R16),
+    │                            # useSessao (origem, entrar, sair) — R17
+    ├── assets/                  # logo-jotanunes.png (só na tela de login, R17)
     ├── mocks/                   # handlers MSW conforme contrato + browser.ts/server.ts
     ├── styles/                  # tokens.css, base.css
     ├── components/              # Botao, Campo, Tabela, Selo, TituloPagina, Modal, Paginacao, icons/
     ├── pages/                   # Painel, Obras, ObraDetalhe, Empresas, EmpresaDetalhe,
-    │                            # TiposDocumento, FilaAnalise, EnvioAnalise, AcessoNegado
+    │                            # TiposDocumento, FilaAnalise, EnvioAnalise, AcessoNegado,
+    │                            # Login, TrocaSenha, Usuarios (R17)
     └── test/                    # setup.ts
     (testes *.test.tsx ao lado dos componentes/páginas)
 
@@ -204,6 +242,40 @@ partir de `docs/design.md` §10, para que nenhuma área precise editar arquivos 
 
 `OnTokenValidated` do esquema `Portal` confere `ver` e `ativa` no banco (revogação imediata).
 
+**Desde a Phase 11 (R17)** a área Jotanunes tem dois esquemas atrás do seletor `AreaJotanunes`
+(`AddPolicyScheme` + `ForwardDefaultSelector` pelo `iss` do Bearer):
+
+| Grupo / rota | Esquema efetivo | Política | Observação |
+|---|---|---|---|
+| `GET /api/fluig/auth/configuracao` | — | anônimo | sempre 200 `{loginLocalHabilitado}` |
+| `POST /api/fluig/auth/login` | — | anônimo + rate limit (política anônima existente) | 404 se o login próprio estiver desligado |
+| `GET /api/fluig/me`, `POST /api/fluig/auth/trocar-senha`, `POST /api/fluig/auth/sair` | `AreaJotanunes` → `Fluig` ou `LoginLocal` | `FluigSessao` (segundo `MapGroup("/api/fluig")`) | aceita troca de senha pendente |
+| demais `/api/fluig/*` | `AreaJotanunes` | `Fluig` (+ `SenhaLocalDefinidaRequirement`) | troca pendente → 403 `TROCA_SENHA_OBRIGATORIA` |
+| `/api/fluig/*` com `x-requer-admin` (15, inclui `/api/fluig/usuarios*`) | `AreaJotanunes` | `Fluig` + `FluigAdmin` | mesmo `PapelAdminRequirement` para os dois tokens |
+
+`OnTokenValidated` do esquema `LoginLocal` confere `uid`, `ver`, `ativo` e `login = sub` no banco
+(revogação imediata). O seletor só manda para `LoginLocal` quando `iss = jotanunes-docs` **e**
+`Auth:LoginLocal:Habilitado = true`. `IUsuarioFluigAtual` ganha `EhLoginLocal`/`UsuarioInternoId`;
+`ResultadoAutorizacaoHandler`: falha de `SenhaLocalDefinidaRequirement` tem precedência →
+`TROCA_SENHA_OBRIGATORIA` (sem `PERMISSAO_NEGADA`); falha só de `PapelAdminRequirement` →
+`SEM_PERMISSAO` + auditoria (como hoje).
+
+### Login próprio e usuários internos (R17)
+
+- **Casos de uso** (`Application/AcessoJotanunes`, `Application/UsuariosInternos`): `LoginJotanunes`
+  (mesma ordem e regras do `LoginPortal`, `tentativas_login` com chave de login), `TrocarSenhaJotanunes`,
+  `SairJotanunes`, `ObterConfiguracaoAcesso`, `ListarUsuariosInternos`, `ObterUsuarioInterno`,
+  `CriarUsuarioInterno` e `RedefinirSenhaUsuarioInterno` (gravar → e-mail → commit; falha →
+  `EMAIL_ACESSO_FALHOU`), `AtualizarUsuarioInterno` (sob `IBloqueioExclusivo`: próprio →
+  `ALTERACAO_PROPRIA_NAO_PERMITIDA`; zero admins → `ULTIMO_ADMINISTRADOR`) e
+  `CriarAdministradorInicial` (comando). E-mail: `ModelosEmail.AcessoUsuarioInterno`.
+- **Comando `criar-admin`**: em `Program.cs`, depois de `builder.Build()` e da validação de
+  configuração/migrations, `if (args is ["criar-admin", ..])` → `ComandoCriarAdmin.ExecutarAsync(app.Services,
+  args, Console.Out, Console.Error)` e `return codigo;` (não chama `RunAsync`). Escrita só em
+  `TextWriter` (testável), nunca `ILogger`.
+- **Auditoria**: `RegistroAuditoriaEf` grava `LOCAL` quando `IUsuarioFluigAtual.EhLoginLocal` e o caso
+  de uso passou `FLUIG`; `SISTEMA` no comando; ações novas em data-model §7.
+
 O `ResultadoAutorizacaoHandler` passa a olhar o requisito que falhou: `PapelAdminRequirement` →
 `SEM_PERMISSAO`; `TrocaSenhaConcluidaRequirement` → `TROCA_SENHA_OBRIGATORIA` (hoje todo 403 vira
 `TROCA_SENHA_OBRIGATORIA`). O papel **não** é revogado no meio do token (vale até expirar, R16).
@@ -219,7 +291,7 @@ padrão.
 
 - Cliente HTTP único por app (`src/api/client.ts`): injeta `Authorization`, converte
   `application/problem+json` em erro tipado com `code`, trata 401 (fluig-app → tela "Abra pelo
-  Fluig"; portal → volta ao login) e 403 `TROCA_SENHA_OBRIGATORIA` (portal → tela de troca).
+  Fluig" na sessão do Fluig ou tela de login na sessão de login próprio, R17; portal → volta ao login) e 403 `TROCA_SENHA_OBRIGATORIA` (portal → tela de troca).
 - Componentes próprios pequenos (botão primário/secundário, campo com rótulo, selo de situação com
   texto, tabela, paginação, modal de confirmação, título com barra vermelha 50×6 px).
 - `fluig-app`: sem cabeçalho de marca; navegação lateral clara com item ativo em `#BD1E1B` + barra
@@ -227,6 +299,12 @@ padrão.
 - `portal`: cabeçalho `#F2F2F2` com logo, razão social e "Sair"; painel de login com
   `radius-signature`; cards grandes por documento; upload por botão (input file) com validação de
   formato/tamanho no cliente antes de enviar (a validação do servidor continua valendo).
+- **Login próprio no `fluig-app` (R17)**: `AuthFluigProvider` ganha os estados `login` (tela
+  `Login`), `trocaSenha` (tela `TrocaSenha`, bloqueia o app) e guarda `origem`; sem token consulta
+  `GET /api/fluig/auth/configuracao`; 401 com origem `LOGIN_LOCAL` volta ao login com "Sua sessão
+  expirou. Entre de novo.". Menu: "Usuários" só para administrador; "Trocar senha" e "Sair" só para
+  `LOGIN_LOCAL`. Página `Usuarios` (tabela + modais, própria linha sem "Desativar"/troca de papel).
+  Token continua em memória + `sessionStorage['jn.fluigToken']` (R17). Mocks com `VITE_MOCK_LOGIN`.
 - **Perfil no `fluig-app` (2026-09-29)**: `AuthFluigProvider` guarda `admin` de `/api/fluig/me`;
   `useEhAdmin()` e `<SomenteAdmin>` escondem botões e formulários de administrador; `<AvisoSomenteAdmin>`
   mostra uma vez por tela "Só administradores podem cadastrar, alterar ou analisar. Se você precisa,
@@ -246,6 +324,11 @@ padrão.
 | `Cors__Origins` | API | `http://localhost:5173,http://localhost:5174` |
 | `Database__MigrateOnStartup` | API | `true` |
 | `Catalogo__SemearTiposPadrao` | API | `true` (testes: `false`, exceto os do catálogo) |
+| `Auth__LoginLocal__Habilitado` | API | `true` (padrão); `false` desliga o login próprio (R17) |
+| `Auth__LoginLocal__Secret` | API | valor de `AUTH_LOGIN_LOCAL_SECRET` (32+ bytes, diferente dos outros dois) |
+| `FluigApp__BaseUrl` | API | `http://localhost:5173` (link dos e-mails de acesso) |
+| `AUTH_LOGIN_LOCAL_SECRET` | `.env` raiz / `producao.env` | 32+ bytes aleatórios |
+| `VITE_MOCK_LOGIN` | fluig-app | `true` = mocks começam sem token (tela de login) |
 | `FLUIG_JWT_SECRET` | `.env` raiz (script de token) | 32+ bytes aleatórios |
 | `VITE_API_URL` | fronts | `http://localhost:5080` |
 | `VITE_USE_MOCKS` | fronts | `false` (ou `true` sem backend) |
@@ -262,6 +345,11 @@ padrão.
 - **Phase 10 (2 agentes)**: agente **BACKEND+INFRA** (`backend/`, `scripts/`) e agente **FLUIG**
   (`fluig-app/`), em paralelo a partir do contrato 1.1.0 já atualizado; o `portal/` só regenera
   tipos (sem mudança de comportamento).
+- **Phase 11 (2 agentes)**: agente **BACKEND+INFRA** (`backend/`, `scripts/`, `deploy/`, `README.md`,
+  `.env.example`) e agente **FLUIG** (`fluig-app/`), em paralelo a partir do contrato 1.2.0 já
+  atualizado; o `portal/` só regenera tipos e acrescenta os códigos novos ao mapa de mensagens
+  (orquestrador). **Antes de publicar**: o orquestrador acrescenta `AUTH_LOGIN_LOCAL_SECRET` ao
+  `producao.env` (fora do git) e, depois do deploy, roda `jotanunes-docs-criar-admin` na VPS.
 
 ## Complexity Tracking
 

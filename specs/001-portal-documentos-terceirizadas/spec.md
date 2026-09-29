@@ -4,8 +4,9 @@
 
 **Created**: 2026-09-28
 
-**Status**: Draft (implementado até T122; atualização de 2026-09-29: perfis de acesso e catálogo
-padrão de tipos de documento — US6, US7, FR-080–FR-093)
+**Status**: Draft (implementado até T145; atualizações de 2026-09-29: perfis de acesso e catálogo
+padrão de tipos de documento — US6, US7, FR-080–FR-093; **login próprio da área Jotanunes e usuários
+internos — US8, US9, US10, FR-100–FR-116**)
 
 **Input**: User description: "A Jotanunes (construtora) precisa acionar as empresas terceirizadas contratadas para que enviem documentos, e analisar esses documentos. Dois sistemas: (1) lado Jotanunes, aberto de dentro do Fluig, sem login próprio, para cadastrar obras, empresas (com e-mail de contato), vincular empresas às obras, cadastrar tipos de documento (os mesmos para todas as empresas), disparar e-mail de convite com link para o portal e analisar os documentos (aprovar/rejeitar com motivo); (2) portal da empresa terceirizada, com login por CNPJ + senha, onde a empresa vê os documentos exigidos, anexa arquivos, acompanha o status e reenvia os rejeitados." (fonte: `docs/transcricao.txt`)
 
@@ -14,8 +15,9 @@ padrão de tipos de documento — US6, US7, FR-080–FR-093)
 Hoje a Jotanunes pede os documentos das empresas terceirizadas de forma manual. A plataforma
 organiza esse ciclo em duas partes:
 
-- **Área Jotanunes** (aberta de dentro do Fluig): a equipe cadastra obras, empresas e tipos de
-  documento, vincula empresas às obras, convida a empresa por e-mail e analisa o que chega.
+- **Área Jotanunes** (aberta de dentro do Fluig **ou**, desde 2026-09-29, com login e senha
+  próprios): a equipe cadastra obras, empresas e tipos de documento, vincula empresas às obras,
+  convida a empresa por e-mail e analisa o que chega.
 - **Portal da terceirizada**: a empresa entra com CNPJ e senha, vê o que falta, envia os arquivos e
   acompanha a análise.
 
@@ -23,8 +25,9 @@ organiza esse ciclo em duas partes:
 
 | Ator | Quem é | Como acessa |
 |---|---|---|
-| **Analista Jotanunes** (usuário comum) | Colaborador da Jotanunes com acesso ao sistema no Fluig | Pelo Fluig, que já identifica o usuário e controla quem pode abrir o sistema. Consulta tudo e envia/reenvia convites |
-| **Administrador Jotanunes** | Analista que, além disso, está no grupo de administradores do Fluig | Pelo Fluig; o papel chega no token de identidade. Além do que o usuário comum faz, cadastra/edita/ativa/desativa obras, vínculos, empresas e tipos de documento e analisa (aprova/rejeita) os documentos |
+| **Analista Jotanunes** (usuário comum) | Colaborador da Jotanunes com acesso ao sistema | Pelo Fluig (que identifica o usuário e controla quem abre o sistema) **ou** pelo login próprio da área Jotanunes, como usuário interno cadastrado (desde 2026-09-29). Consulta tudo e envia/reenvia convites |
+| **Administrador Jotanunes** | Analista com o papel de administrador | Pelo Fluig (papel no token de identidade) ou pelo login próprio (papel marcado no cadastro do usuário interno). Além do que o usuário comum faz, cadastra/edita/ativa/desativa obras, vínculos, empresas e tipos de documento, analisa (aprova/rejeita) os documentos e gerencia os usuários internos (tela "Usuários") |
+| **Responsável pela instalação** | Quem instala o sistema no servidor (TI/orquestrador) | Linha de comando do servidor: cria o primeiro administrador interno (US10) |
 | **Empresa terceirizada** | Empresa contratada para uma ou mais obras (um acesso por CNPJ) | Portal próprio, com CNPJ + senha |
 
 ### Glossário
@@ -39,9 +42,17 @@ organiza esse ciclo em duas partes:
 - **Situação do documento**: estado de um tipo de documento para uma empresa: *Pendente de envio*,
   *Em análise*, *Aprovado* ou *Rejeitado*.
 - **Convite**: e-mail enviado à empresa com o link do portal e as instruções de primeiro acesso.
-- **Perfil**: papel do usuário Jotanunes na área Jotanunes: *administrador* ou *comum*. Vem do Fluig
-  (claim `roles` do token de identidade, ver `contracts/fluig-identity.md`); sem o papel, o usuário
-  é comum.
+- **Perfil**: papel do usuário Jotanunes na área Jotanunes: *administrador* ou *comum*. Na entrada
+  pelo Fluig, vem do Fluig (claim `roles` do token de identidade, ver `contracts/fluig-identity.md`);
+  na entrada pelo login próprio, vem do cadastro do usuário interno. Sem o papel, o usuário é comum.
+- **Usuário interno**: colaborador da Jotanunes cadastrado no próprio sistema (nome, e-mail, login,
+  se é administrador), que entra na área Jotanunes com login e senha (desde 2026-09-29).
+- **Login próprio**: entrada na área Jotanunes com login + senha de usuário interno, sem o Fluig.
+  Convive com a entrada pelo Fluig; pode ser desligado por configuração.
+- **Senha provisória**: senha de 12 caracteres gerada pelo sistema e enviada por e-mail ao usuário
+  interno no cadastro e em cada redefinição; vale 7 dias e precisa ser trocada no primeiro acesso.
+- **Primeiro administrador**: usuário interno administrador criado na instalação por um comando do
+  servidor (US10), para que alguém consiga entrar e cadastrar os demais.
 - **Ação de administrador**: cadastrar, editar, ativar ou desativar obras (incluindo vincular e
   desvincular empresas), empresas e tipos de documento, e aprovar ou rejeitar envios.
 - **Catálogo padrão**: os 10 tipos de documento que o sistema cria sozinho numa instalação nova
@@ -104,11 +115,35 @@ organiza esse ciclo em duas partes:
   documentos são **por empresa** (um envio vale para todas as obras da empresa). **VALIDADA** (fecha
   a 2ª pergunta da sessão anterior).
 
+### Session 2026-09-29 (tarde) — login próprio da área Jotanunes
+
+> Respostas dadas pelo usuário (dono do produto). São fonte de verdade e não devem ser reabertas.
+> Motivo: a Jotanunes ainda **não** tem acesso ao Fluig.
+
+- Q: Abrir a área Jotanunes pelo Fluig continua obrigatório? → A: **Não.** A área Jotanunes ganha
+  **login próprio (login + senha) além do Fluig**; os dois convivem. Sem token do Fluig, aparece a
+  tela de login (não mais o bloqueio "Abra este sistema pelo Fluig."). A entrada pelo Fluig continua
+  funcionando quando existir. **VALIDADA** — substitui "sem login próprio" (FR-001 antigo, US1-AC1/AC2).
+- Q: Onde ficam os usuários do login próprio e quem os gerencia? → A: **No banco do sistema**, com a
+  tela **"Usuários"** na área Jotanunes, **só para administradores**: listar, cadastrar (nome, e-mail,
+  login, se é administrador), editar, ativar/desativar e redefinir senha. **VALIDADA** — substitui
+  "Não há tela no sistema para gerenciar administradores" (Assumptions).
+- Q: Como nasce o primeiro administrador? → A: É criado **na instalação** (bootstrap), pelo
+  responsável pelo servidor. **VALIDADA**.
+- Decisões técnicas derivadas (desenho em `research.md` R17; não mudam o que foi validado):
+  senha provisória gerada pelo sistema e enviada por e-mail, com troca obrigatória no primeiro acesso
+  e as mesmas regras de senha, bloqueio e anti-enumeração do portal; o papel de administrador do
+  usuário interno vem do cadastro e vale **na hora** (mudar o papel, desativar, redefinir ou trocar a
+  senha e sair derrubam as sessões do usuário — diferente do Fluig, em que o papel vale até o token
+  expirar); nunca fica sem administrador interno ativo e ninguém desativa nem tira o próprio papel;
+  o login próprio pode ser desligado por configuração (aí só o Fluig abre o sistema).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Cadastros da Jotanunes: tipos de documento, obras, empresas e vínculos (Priority: P1)
 
-A analista Jotanunes abre o sistema pelo Fluig, sem nova tela de login. Ela cadastra os tipos de
+A analista Jotanunes abre o sistema pelo Fluig, sem nova tela de login (ou, desde 2026-09-29, entra
+com o login próprio — US8). Ela cadastra os tipos de
 documento que a Jotanunes exige, cadastra as obras, cadastra as empresas terceirizadas (razão
 social, CNPJ e e-mail de contato) e indica quais empresas atuam em cada obra.
 
@@ -127,9 +162,12 @@ possível cadastrar 2 tipos de documento, 1 obra, 2 empresas, vincular as duas �
 
 1. **Given** um usuário identificado pelo Fluig, **When** ele abre o sistema, **Then** vê a tela
    inicial com o nome dele, sem pedido de login.
-2. **Given** alguém tentando abrir o sistema sem identidade Fluig válida (ausente, expirada ou
+2. ~~**Given** alguém tentando abrir o sistema sem identidade Fluig válida (ausente, expirada ou
    adulterada), **When** a tela carrega, **Then** nenhum dado é exibido e aparece a mensagem
-   "Abra este sistema pelo Fluig.".
+   "Abra este sistema pelo Fluig.".~~ (substituído em 2026-09-29, ver US8-AC1) **Given** alguém
+   abrindo o sistema sem identidade válida (ausente, expirada ou adulterada), **When** a tela carrega,
+   **Then** nenhum dado é exibido e aparece a tela de login próprio (US8); com o login próprio
+   desligado por configuração, aparece a mensagem "Abra este sistema pelo Fluig.".
 3. **Given** a tela de empresas, **When** a analista cadastra uma empresa com CNPJ válido, razão
    social e e-mail, **Then** a empresa aparece na lista com acesso "Não convidada".
 4. **Given** uma empresa já cadastrada com o CNPJ 12.345.678/0001-95, **When** a analista tenta
@@ -289,6 +327,11 @@ altera e não aprova/rejeita.
 **Why this priority**: é controle de acesso (segurança) sobre funções que já existem; sem ele,
 qualquer pessoa com acesso ao sistema altera o catálogo e decide análises.
 
+**Login próprio (desde 2026-09-29)**: os mesmos dois perfis valem para os usuários internos (US8/US9),
+com o papel vindo do cadastro; as permissões e o 403 `SEM_PERMISSAO` são idênticos. Diferença: para o
+usuário interno, dar ou tirar o papel vale na hora (a sessão cai, FR-106), em vez de esperar o token
+expirar (AC7 abaixo vale para a entrada pelo Fluig).
+
 **Independent Test**: com um token Fluig de usuário comum, abrir todas as telas e ver os dados, sem
 nenhum botão de cadastrar, editar, ativar/desativar, vincular/desvincular, aprovar ou rejeitar;
 chamar cada uma dessas operações direto na API e receber 403 `SEM_PERMISSAO`; enviar um convite com
@@ -354,6 +397,138 @@ Com um banco que já tem 1 tipo (ativo ou inativo), subir a API e continuar com 
 5. **Given** empresas ativas numa instalação nova, **When** o catálogo padrão é criado, **Then** os
    10 tipos aparecem como "Pendente de envio" para elas (FR-015).
 
+### User Story 8 - Entrar na área Jotanunes com login e senha próprios (Priority: P1)
+
+A Jotanunes ainda não tem o Fluig. A colaboradora recebe por e-mail o login e uma senha provisória,
+abre o endereço da área Jotanunes, entra com login e senha, cria a própria senha e usa o sistema
+normalmente, com o perfil (administradora ou comum) do cadastro. Quando terminar, clica em "Sair".
+Quem entra pelo Fluig continua entrando como antes, sem ver a tela de login.
+
+**Why this priority**: sem isso a Jotanunes não consegue usar a área Jotanunes hoje; é a porta de
+entrada enquanto o Fluig não estiver disponível.
+
+**Independent Test**: com um usuário interno cadastrado (US9 ou US10), abrir a área Jotanunes sem
+token, entrar com o login e a senha provisória do e-mail, trocar a senha, ver o painel com o nome,
+sair e confirmar que a sessão antiga não vale mais; depois abrir com um token Fluig e entrar direto,
+sem tela de login e sem "Sair".
+
+**Acceptance Scenarios**:
+
+1. **Given** o login próprio ligado e nenhum token (nem do Fluig, nem de sessão anterior), **When** a
+   área Jotanunes carrega, **Then** aparece a tela de login ("Login" e "Senha", botão "Acessar"),
+   com o logo da Jotanunes no painel de acesso, e nenhum dado.
+2. **Given** um usuário interno ativo com senha provisória válida, **When** ele entra com login e
+   senha provisória, **Then** a tela "Crie uma nova senha para continuar." aparece e nenhuma outra
+   tela nem dado é acessível até a troca (inclusive digitando endereços).
+3. **Given** a troca feita com uma senha que segue a regra (≥ 8, letra e número, diferente da
+   atual), **When** ele confirma, **Then** entra no painel com o nome dele e o menu do perfil do
+   cadastro; a senha provisória deixa de funcionar.
+4. **Given** login inexistente ou senha errada, **When** ele tenta entrar, **Then** vê a mesma
+   mensagem "Login ou senha incorretos." nos dois casos.
+5. **Given** 5 tentativas erradas seguidas para o mesmo login (existente ou não), **When** ele tenta a
+   6ª, **Then** o acesso fica bloqueado por 15 minutos com a mensagem de bloqueio e o horário de
+   liberação, igual para login existente e inexistente.
+6. **Given** um usuário interno desativado, **When** ele entra com a senha certa, **Then** o acesso é
+   recusado com "Este usuário está desativado. Fale com um administrador do sistema.".
+7. **Given** uma senha provisória com mais de 7 dias sem primeiro acesso, **When** ele tenta entrar
+   com ela, **Then** o acesso é recusado com "Sua senha provisória expirou. Peça a um administrador
+   para gerar outra.".
+8. **Given** uma sessão de login próprio, **When** ele clica em "Sair", **Then** volta para a tela de
+   login e aquela sessão deixa de valer na API na hora.
+9. **Given** uma sessão aberta pelo Fluig, **When** o menu aparece, **Then** não há "Sair" nem
+   "Trocar senha" (quem controla a sessão é o Fluig) e tudo funciona como antes (US1–US6).
+10. **Given** o login próprio desligado por configuração, **When** alguém abre a área Jotanunes sem
+    token, **Then** vê "Abra este sistema pelo Fluig." e a API recusa qualquer tentativa de login.
+11. **Given** uma sessão de login próprio, **When** o usuário quer mudar a senha por vontade própria,
+    **Then** usa "Trocar senha" no menu, informando a senha atual e a nova.
+
+---
+
+### User Story 9 - Administrador gerencia os usuários internos (Priority: P1)
+
+O administrador abre "Usuários", vê quem tem acesso pelo login próprio, cadastra um colega (nome,
+e-mail, login e se é administrador) — o colega recebe o e-mail com a senha provisória —, corrige
+dados, dá ou tira o papel de administrador, desativa quem saiu da empresa e redefine a senha de quem
+esqueceu. O usuário comum não vê a tela e a API o recusa.
+
+**Why this priority**: sem a gestão, só o primeiro administrador entraria; e desativar quem sai da
+empresa é controle de acesso (segurança, LGPD).
+
+**Independent Test**: como administrador, cadastrar um usuário comum, pegar a senha provisória no
+e-mail (registro de e-mails em teste), entrar com ele e confirmar que não vê "Usuários" e recebe
+`SEM_PERMISSAO` ao chamar a API de usuários; desativar esse usuário e ver a sessão dele cair na
+próxima ação; redefinir a senha e receber novo e-mail.
+
+**Acceptance Scenarios**:
+
+1. **Given** um administrador (pelo login próprio ou pelo Fluig), **When** abre "Usuários", **Then**
+   vê a lista com nome, login, e-mail, perfil (Administrador/Comum), situação em texto (Aguardando
+   primeiro acesso, Senha provisória expirada, Ativo, Desativado) e último acesso, com busca por
+   nome/login/e-mail e filtros por situação ativa/desativada e perfil.
+2. **Given** o formulário "Novo usuário", **When** o administrador informa nome, e-mail, login e o
+   perfil e salva, **Then** o usuário aparece como "Aguardando primeiro acesso", um e-mail é enviado
+   ao usuário com o login, a senha provisória, o endereço da área Jotanunes e o prazo de 7 dias, e a
+   senha provisória **não** aparece na tela.
+3. **Given** um login já usado (sem diferenciar maiúsculas), **When** o administrador tenta
+   cadastrar outro igual, **Then** o sistema recusa com "Já existe um usuário com este login.".
+4. **Given** falha no serviço de e-mail ao cadastrar ou redefinir, **When** o administrador salva,
+   **Then** vê "Não conseguimos enviar o e-mail com a senha provisória. Tente de novo em alguns
+   minutos." e nada é criado nem alterado.
+5. **Given** um usuário interno, **When** o administrador edita nome e e-mail, **Then** os dados
+   mudam; o login não pode ser alterado.
+6. **Given** um usuário comum com sessão aberta, **When** o administrador o torna administrador (ou
+   tira o papel de um administrador), **Then** a sessão atual desse usuário deixa de valer na próxima
+   ação e, ao entrar de novo, ele tem o novo perfil.
+7. **Given** um usuário com sessão aberta, **When** o administrador o desativa, **Then** a próxima
+   ação desse usuário é recusada e ele volta para a tela de login; ele não consegue entrar de novo.
+8. **Given** um usuário ativo, **When** o administrador clica em "Redefinir senha" e confirma,
+   **Then** o usuário recebe por e-mail uma nova senha provisória (7 dias, troca obrigatória), a
+   senha anterior e as sessões abertas deixam de valer, e o bloqueio por tentativas é zerado.
+9. **Given** o administrador na própria linha da lista, **When** tenta se desativar ou tirar o próprio
+   papel de administrador, **Then** a opção não aparece e a API recusa com "Você não pode desativar
+   nem tirar o seu próprio acesso de administrador. Peça a outro administrador.".
+10. **Given** um único administrador interno ativo, **When** alguém (por exemplo, um administrador
+    que entrou pelo Fluig) tenta desativá-lo ou tirar o papel dele, **Then** o sistema recusa com "O
+    sistema precisa de pelo menos um administrador ativo.".
+11. **Given** um usuário comum (pelo login próprio ou pelo Fluig), **When** abre o menu, **Then** não
+    vê "Usuários"; abrindo o endereço da tela, vê só o aviso de que é restrita a administradores; e
+    chamando a API de usuários recebe 403 `SEM_PERMISSAO`, sem nenhum dado.
+12. **Given** as ações desta história, **When** acontecem, **Then** ficam na auditoria (quem, quando,
+    qual usuário, o que mudou em termos de ação), sem senha.
+
+---
+
+### User Story 10 - Primeiro administrador criado na instalação (Priority: P1)
+
+Numa instalação nova não existe nenhum usuário interno. O responsável pelo servidor roda um comando
+com o login, o nome e o e-mail do primeiro administrador; o sistema cria o usuário com senha
+provisória, envia o e-mail de acesso e mostra a senha provisória só no terminal de quem rodou o
+comando (para o caso de o e-mail não chegar).
+
+**Why this priority**: sem um primeiro administrador, ninguém entra pelo login próprio para
+cadastrar os outros.
+
+**Independent Test**: com banco sem usuários internos, rodar o comando; conferir o e-mail recebido e a
+senha no terminal; entrar com ela na área Jotanunes e trocar a senha; rodar o comando de novo e ver a
+recusa sem alterar nada; conferir que a senha não aparece no log da aplicação.
+
+**Acceptance Scenarios**:
+
+1. **Given** nenhum administrador interno ativo, **When** o responsável roda o comando com login,
+   nome e e-mail, **Then** o usuário é criado como administrador, "Aguardando primeiro acesso", o
+   e-mail de acesso é enviado e a senha provisória aparece só no terminal.
+2. **Given** já existe um administrador interno ativo, **When** o comando roda sem a opção de forçar,
+   **Then** nada é criado nem alterado e o terminal explica que já existe administrador.
+3. **Given** a opção de forçar (recuperação: todos os administradores esqueceram a senha ou saíram),
+   **When** o comando roda com um login existente, **Then** esse usuário vira administrador ativo com
+   nova senha provisória e as sessões anteriores dele deixam de valer; com login novo, é criado.
+4. **Given** o e-mail falhar durante o comando, **When** ele termina, **Then** o usuário continua
+   criado, a senha provisória está no terminal e há um aviso de que o e-mail não saiu.
+5. **Given** qualquer execução do comando, **When** o log da aplicação é consultado, **Then** a senha
+   provisória não aparece nele; a criação fica na auditoria como feita pelo sistema.
+6. **Given** o login próprio desligado por configuração, **When** o comando roda, **Then** recusa e
+   explica que o login próprio está desligado.
+
 ### Edge Cases
 
 - CNPJ digitado com ou sem máscara é tratado como o mesmo CNPJ; CNPJ com dígitos verificadores
@@ -383,11 +558,34 @@ Com um banco que já tem 1 tipo (ativo ou inativo), subir a API e continuar com 
 - Usuário comum chamando operação de administrador com dados inválidos ou recurso inexistente:
   recebe 403 `SEM_PERMISSAO` (a permissão é verificada antes da validação e da busca do recurso).
 - Usuário comum abrindo por endereço uma tela de edição: vê a tela em modo leitura.
-- Sem nenhum administrador configurado no Fluig: o sistema funciona só para consulta e convites
-  até a TI configurar o grupo (ver `contracts/fluig-identity.md`).
+- Sem nenhum administrador configurado no Fluig: quem entra pelo Fluig só consulta e convida até a
+  TI configurar o grupo (ver `contracts/fluig-identity.md`); administradores internos do login
+  próprio (US9/US10) continuam podendo fazer tudo.
 - Catálogo padrão com várias instâncias da API subindo juntas: no máximo uma cria os tipos; as
   outras não duplicam nem falham ao subir.
 - Catálogo padrão num banco com tipos só inativos: não cria nada (o catálogo não está vazio).
+- Login próprio: login digitado com maiúsculas ou espaços nas pontas é tratado como o mesmo login
+  (sem diferenciar maiúsculas; espaços removidos).
+- Token do login próprio usado no portal (ou token do portal na área Jotanunes): recusado, como hoje
+  entre Fluig e portal.
+- Aba com sessão de login próprio aberta e, na mesma aba, a entrada pelo Fluig com token no endereço:
+  vale o token do Fluig (o mais recente) e a sessão passa a ser do Fluig (sem "Sair").
+- Sessão de login próprio com troca de senha pendente chamando qualquer rota de dados: recusada com
+  "Crie uma nova senha para continuar."; só os dados do próprio usuário, a troca e "Sair" respondem.
+- Usuário interno com o mesmo login de um usuário do Fluig: as colunas de autoria guardam o login;
+  recomenda-se cadastrar o usuário interno com o mesmo login que ele terá no Fluig. A auditoria
+  distingue a origem (Fluig ou login próprio).
+- Administrador que entrou pelo Fluig gerencia usuários internos normalmente; a regra "não desativar
+  a si mesmo" vale para a sessão de login próprio (o usuário do Fluig não é um usuário interno).
+- Dois administradores desativando um ao outro ao mesmo tempo, sendo os dois únicos: no máximo um
+  consegue; o outro recebe "O sistema precisa de pelo menos um administrador ativo.".
+- Login próprio desligado depois de haver sessões abertas: as sessões de login próprio deixam de valer
+  na hora; os usuários internos continuam cadastrados e a tela "Usuários" continua acessível para
+  administradores que entrem pelo Fluig.
+- Nome ou e-mail do usuário alterados com sessão aberta: a sessão continua; o nome novo aparece no
+  próximo login.
+- Senha provisória nunca aparece na área Jotanunes nem no log; só no e-mail e, no comando de
+  instalação, no terminal.
 
 ## Requirements *(mandatory)*
 
@@ -395,11 +593,15 @@ Com um banco que já tem 1 tipo (ativo ou inativo), subir a API e continuar com 
 
 **Acesso e identidade**
 
-- **FR-001**: A área Jotanunes DEVE ser acessível somente com uma identidade de usuário emitida pelo
+- **FR-001**: ~~A área Jotanunes DEVE ser acessível somente com uma identidade de usuário emitida pelo
   Fluig (login, nome, e-mail e, opcionalmente, o papel de administrador), sem tela de login própria;
-  o controle de quem pode abrir o sistema e de quem é administrador é do Fluig (FR-080).
+  o controle de quem pode abrir o sistema e de quem é administrador é do Fluig (FR-080).~~
+  (substituído em 2026-09-29) A área Jotanunes DEVE ser acessível com uma identidade emitida pelo
+  Fluig (login, nome, e-mail e, opcionalmente, o papel de administrador — FR-080) **ou** com o login
+  próprio de um usuário interno (FR-100–FR-116); na entrada pelo Fluig, quem abre o sistema e quem é
+  administrador continua decidido pelo Fluig.
 - **FR-002**: O sistema DEVE recusar pedidos da área Jotanunes com identidade ausente, expirada,
-  adulterada ou emitida para o portal.
+  adulterada, revogada ou emitida para o portal.
 - **FR-003**: O portal DEVE autenticar a empresa por CNPJ + senha e recusar credenciais da área
   Jotanunes.
 - **FR-004**: O sistema DEVE gerar uma senha temporária aleatória (12 caracteres) a cada convite,
@@ -413,7 +615,7 @@ Com um banco que já tem 1 tipo (ativo ou inativo), subir a API e continuar com 
 - **FR-007**: A senha criada pela empresa DEVE ter no mínimo 8 caracteres, com pelo menos uma letra e
   um número, e ser diferente da senha do convite.
 - **FR-008**: A sessão da empresa DEVE expirar após 8 horas; a identidade Fluig vale pelo tempo
-  definido pelo Fluig (máximo 8 horas).
+  definido pelo Fluig (máximo 8 horas); a sessão do login próprio da área Jotanunes expira em 8 horas.
 
 **Cadastros (área Jotanunes)**
 
@@ -523,6 +725,7 @@ Com um banco que já tem 1 tipo (ativo ou inativo), subir a API e continuar com 
   data/hora.
 - **FR-086**: O perfil DEVE ser lido do token da requisição atual e valer enquanto o token for
   válido (máx. 8 h, FR-008); a API DEVE informar o perfil ao front (`GET /api/fluig/me` → `admin`).
+  Para o login próprio, o token deixa de ser válido quando o papel muda (FR-106).
 
 **Catálogo padrão de tipos de documento**
 
@@ -536,12 +739,73 @@ Com um banco que já tem 1 tipo (ativo ou inativo), subir a API e continuar com 
 - **FR-093**: A criação do catálogo padrão DEVE ficar registrada como feita pelo sistema (autor
   `sistema`), sem depender de usuário Fluig.
 
+**Login próprio e usuários internos (área Jotanunes, desde 2026-09-29)**
+
+- **FR-100**: A área Jotanunes DEVE oferecer duas entradas que convivem: pelo Fluig (inalterada,
+  FR-001, FR-080) e pelo login próprio (login + senha de usuário interno). O login próprio DEVE vir
+  ligado por padrão e poder ser desligado por configuração; desligado, a tela de login não aparece
+  (sem token: "Abra este sistema pelo Fluig."), a API recusa login, troca de senha e sessões de login
+  próprio, e a entrada pelo Fluig segue igual.
+- **FR-101**: Sem identidade válida e com o login próprio ligado, a área Jotanunes DEVE mostrar a tela
+  de login (campos "Login" e "Senha", botão "Acessar", logo no painel de acesso), sem nenhum dado.
+- **FR-102**: O sistema DEVE gerar uma senha provisória aleatória de 12 caracteres ao cadastrar um
+  usuário interno e a cada redefinição de senha, enviá-la por e-mail ao usuário (com o login, o
+  endereço da área Jotanunes e o prazo), e exigir a troca no primeiro acesso; até a troca, o usuário
+  não acessa nenhuma outra função. A senha provisória vale 7 dias, nunca é exibida na área Jotanunes
+  e nunca vai para logs.
+- **FR-103**: A senha criada pelo usuário interno DEVE seguir a mesma regra da empresa (FR-007: 8 a
+  128 caracteres, ao menos uma letra e um número, diferente da atual) e ser guardada só de forma
+  irreversível (FR-005).
+- **FR-104**: O sistema DEVE bloquear por 15 minutos o login após 5 tentativas seguidas de senha
+  errada para o mesmo login, **inclusive login inexistente**, e responder login inexistente e senha
+  errada com a mesma mensagem e a mesma sequência de respostas (não revelar se o login existe); a
+  rota de login DEVE ter o mesmo limite de requisições por IP do portal.
+- **FR-105**: A sessão do login próprio DEVE durar no máximo 8 horas. O usuário DEVE poder sair
+  ("Sair") e trocar a senha por vontade própria ("Trocar senha"); essas opções só aparecem em sessão
+  de login próprio (a sessão do Fluig é controlada pelo Fluig).
+- **FR-106**: As sessões de um usuário interno DEVEM deixar de valer na hora (na próxima requisição)
+  quando ele é desativado, tem a senha redefinida ou trocada, tem o papel de administrador dado ou
+  retirado, ou clica em "Sair". Mudar só nome ou e-mail não derruba sessões.
+- **FR-107**: O perfil do usuário interno (administrador ou comum) DEVE vir do cadastro e seguir
+  exatamente as mesmas permissões da entrada pelo Fluig (FR-081–FR-085), inclusive o 403
+  `SEM_PERMISSAO` antes de qualquer efeito.
+- **FR-108**: Somente administradores (de qualquer origem) DEVEM poder listar, ver, cadastrar,
+  editar, ativar/desativar e redefinir a senha de usuários internos, na tela "Usuários", que só
+  aparece no menu para administradores. Cadastro: nome (3–150), e-mail válido, login e se é
+  administrador. Nada é apagado: usuários são desativados (FR-016).
+- **FR-109**: O login do usuário interno DEVE ser único sem diferenciar maiúsculas, ter de 3 a 100
+  caracteres (letras sem acento, números, ponto, hífen e sublinhado) e não pode ser alterado depois
+  do cadastro.
+- **FR-110**: O sistema DEVE manter sempre pelo menos um usuário interno administrador ativo: recusar
+  desativar ou tirar o papel do último administrador interno ativo; e ninguém pode desativar a si
+  mesmo nem tirar o próprio papel de administrador (vale para a sessão de login próprio).
+- **FR-111**: A instalação DEVE ter um comando no servidor que cria o primeiro administrador interno
+  (login, nome, e-mail): recusa sem alterar nada se já houver administrador interno ativo, salvo com
+  a opção de forçar (recuperação), que cria o usuário ou transforma o login existente em
+  administrador ativo com nova senha provisória. O comando envia o e-mail de acesso e mostra a senha
+  provisória só no terminal de quem o executa; nunca a grava em log.
+- **FR-112**: Se o e-mail com a senha provisória falhar no cadastro ou na redefinição pela tela, nada
+  DEVE ser criado nem alterado e o administrador vê a mensagem de falha; no comando de instalação, o
+  usuário é mantido e o terminal avisa que o e-mail não saiu.
+- **FR-113**: A auditoria DEVE registrar, para o login próprio: login com sucesso, falha e bloqueio,
+  troca de senha, saída; e, para a gestão de usuários: criação, edição, desativação, reativação e
+  redefinição de senha — com quem fez, quando, qual usuário, a origem da identidade (Fluig, login
+  próprio ou sistema) e se era administrador, sem senhas nem tokens.
+- **FR-114**: A API DEVE informar à área Jotanunes, sem autenticação, se o login próprio está ligado,
+  e, para o usuário atual, a origem da sessão (Fluig ou login próprio) e se há troca de senha
+  pendente.
+- **FR-115**: O token do login próprio NÃO DEVE valer no portal, e nenhum token do portal ou do Fluig
+  adulterado DEVE ser aceito como login próprio (extensão de FR-002/FR-003).
+- **FR-116**: Sem senha esquecida self-service também na área Jotanunes: quem esquece a senha pede a
+  um administrador a redefinição (FR-102).
+
 **Interface**
 
 - **FR-070**: As duas interfaces DEVEM seguir o guia visual `docs/design.md` (cores, tipografia
   Montserrat, forma-assinatura, tom de voz) e atingir contraste WCAG AA.
 - **FR-071**: A área Jotanunes NÃO DEVE ter cabeçalho de marca próprio (é exibida dentro do Fluig);
-  o portal DEVE ter cabeçalho com logo, nome da empresa logada e "Sair".
+  a tela de login próprio (antes da sessão) pode ter o logo no painel de acesso; o portal DEVE ter
+  cabeçalho com logo, nome da empresa logada e "Sair".
 - **FR-072**: Toda situação DEVE ser exibida com texto, nunca só por cor.
 - **FR-073**: As duas interfaces DEVEM funcionar em telas a partir de 360 px de largura (o portal
   pode ser usado no celular).
@@ -563,10 +827,15 @@ Com um banco que já tem 1 tipo (ativo ou inativo), subir a API e continuar com 
   decisão.
 - **Situação do documento** (derivada): para cada empresa × tipo ativo, a situação do envio mais
   recente, ou "Pendente de envio" se não houver envio.
-- **Registro de auditoria**: ação, ator (usuário Fluig ou empresa), se o usuário Fluig era
-  administrador, recurso, data/hora, IP.
+- **Registro de auditoria**: ação, ator (usuário Fluig, usuário interno pelo login próprio, empresa,
+  anônimo ou sistema), se o usuário da área Jotanunes era administrador, recurso, data/hora, IP.
 - **Perfil do usuário Fluig** (não persistido): administrador ou comum, lido do token a cada
-  requisição; não há tabela de usuários nem de papéis no sistema.
+  requisição. ~~não há tabela de usuários nem de papéis no sistema.~~ (substituído em 2026-09-29:
+  usuários do Fluig continuam sem cadastro no sistema; os usuários internos, abaixo, têm cadastro.)
+- **Usuário interno** (desde 2026-09-29): nome, e-mail, login (único, imutável), se é administrador,
+  ativo/inativo, dados de acesso (senha protegida, se precisa trocar a senha, validade da senha
+  provisória, versão da credencial para derrubar sessões, tentativas falhas, bloqueio, último
+  acesso), quem cadastrou e quando.
 
 ## Success Criteria *(mandatory)*
 
@@ -591,6 +860,20 @@ Com um banco que já tem 1 tipo (ativo ou inativo), subir a API e continuar com 
   escrita da área Jotanunes (uma rota de escrita nova sem classificação faz o teste falhar).
 - **SC-010**: Numa instalação nova, a tela de tipos de documento mostra os 10 tipos padrão sem
   nenhum cadastro manual; após 3 reinícios seguidos, continuam exatamente 10.
+- **SC-011**: Um colaborador cadastrado por um administrador recebe o e-mail, entra, troca a senha e
+  chega ao painel em menos de 3 minutos.
+- **SC-012**: 100% das operações de administrador (incluindo as de usuários internos) respondem
+  `SEM_PERMISSAO` para usuário comum e têm sucesso para administrador, nas duas origens de identidade
+  (Fluig e login próprio), verificado por teste automático que percorre todas as rotas da área
+  Jotanunes.
+- **SC-013**: Em 100% dos casos testados (desativar, redefinir senha, trocar senha, mudar o papel,
+  sair), a próxima requisição com a sessão anterior do usuário interno é recusada.
+- **SC-014**: Para um login inexistente e para um login existente com senha errada, as mensagens e a
+  sequência de respostas (5 recusas e depois bloqueio) são idênticas, verificado por teste.
+- **SC-015**: Numa instalação nova, o primeiro administrador entra na área Jotanunes em menos de 5
+  minutos depois de o responsável rodar o comando de instalação.
+- **SC-016**: A entrada pelo Fluig continua funcionando sem nenhuma mudança para quem a usa (mesmos
+  testes de US1–US6 passando com token Fluig).
 
 ## Assumptions
 
@@ -599,10 +882,17 @@ Com um banco que já tem 1 tipo (ativo ou inativo), subir a API e continuar com 
   ~~Todos os usuários que o Fluig deixa entrar têm as mesmas permissões~~ (substituída em
   2026-09-29): há dois perfis, administrador e comum; a TI inclui o papel `admin` no token a partir
   de um grupo do Fluig (`contracts/fluig-identity.md`).
-- Não há tela no sistema para gerenciar administradores: quem é administrador é decidido só no
-  Fluig.
+- ~~Não há tela no sistema para gerenciar administradores: quem é administrador é decidido só no
+  Fluig.~~ (substituída em 2026-09-29, Session "login próprio") Na entrada pelo Fluig, quem é
+  administrador continua decidido só no Fluig; para os usuários internos do login próprio, a tela
+  "Usuários" (só administradores) define quem é administrador.
+- A Jotanunes não tem acesso ao Fluig no momento (2026-09-29); o login próprio é a entrada principal
+  até lá, e a entrada pelo Fluig continua pronta para quando existir.
+- Usuários internos e usuários do Fluig não são unificados: um colaborador pode ter os dois acessos,
+  e o sistema não liga um ao outro (a auditoria registra a origem).
 - Um acesso ao portal por empresa (CNPJ); não há vários usuários por empresa na v1.
-- Não há recuperação de senha self-service na v1: a empresa pede à Jotanunes, que reenvia o convite.
+- Não há recuperação de senha self-service na v1: a empresa pede à Jotanunes, que reenvia o convite;
+  o usuário interno pede a um administrador, que redefine a senha (FR-116).
 - Validade/vencimento de documentos (ex.: certidões que vencem) está fora do escopo da v1.
 - Os arquivos são guardados enquanto a empresa existir; política de descarte será definida com o
   jurídico da Jotanunes.

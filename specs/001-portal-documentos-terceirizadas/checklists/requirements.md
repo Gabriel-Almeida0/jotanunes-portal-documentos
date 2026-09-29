@@ -37,3 +37,11 @@
 - Menções a "Fluig" e "CNPJ" são termos de negócio do cliente, não detalhes de implementação.
 - Após `/speckit-clarify` (2026-09-28): os 3 marcadores foram resolvidos como decisões assumidas
   (seção Clarifications da spec). Checklist: 15/16 → 16/16.
+- Atualização 2026-09-29 (tarde, login próprio da área Jotanunes — US8, US9, US10, FR-100–FR-116,
+  SC-011–SC-016): revalidado item a item — 16/16. As três decisões do dono do produto (login próprio
+  além do Fluig; usuários internos no banco com tela "Usuários" só para administradores; primeiro
+  administrador criado na instalação) estão marcadas **VALIDADA** na Clarifications; os pontos de
+  desenho (prazo de 7 dias da senha provisória, revogação imediata, regra do último administrador,
+  chave de desligar) são decisões técnicas derivadas com desenho em `research.md` R17. Nenhum
+  marcador [NEEDS CLARIFICATION]. Textos antigos substituídos ficaram riscados (~~…~~) com a data,
+  sem apagar o registro (constituição, "Fluxo de Desenvolvimento").
