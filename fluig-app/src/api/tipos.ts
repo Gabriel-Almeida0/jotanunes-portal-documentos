@@ -17,6 +17,11 @@ export type SituacaoDocumento = S['SituacaoDocumento'];
 export type FormatoArquivo = S['FormatoArquivo'];
 
 export type UsuarioFluig = S['UsuarioFluig'];
+export type OrigemSessao = S['OrigemSessao'];
+export type ConfiguracaoAcesso = S['ConfiguracaoAcesso'];
+export type LoginJotanunesInput = S['LoginJotanunesInput'];
+export type SessaoJotanunes = S['SessaoJotanunes'];
+export type TrocaSenhaInput = S['TrocaSenhaInput'];
 export type AutorFluig = S['AutorFluig'];
 export type Painel = S['Painel'];
 
@@ -50,7 +55,14 @@ export type PaginaEnvios = S['PaginaEnvios'];
 export type Rejeicao = S['Rejeicao'];
 export type DocumentoSituacao = S['DocumentoSituacao'];
 
+export type SituacaoUsuarioInterno = S['SituacaoUsuarioInterno'];
+export type UsuarioInterno = S['UsuarioInterno'];
+export type UsuarioInternoInput = S['UsuarioInternoInput'];
+export type UsuarioInternoAtualizacao = S['UsuarioInternoAtualizacao'];
+export type PaginaUsuariosInternos = S['PaginaUsuariosInternos'];
+
 export type ConsultaObras = NonNullable<paths['/api/fluig/obras']['get']['parameters']['query']>;
 export type ConsultaEmpresas = NonNullable<paths['/api/fluig/empresas']['get']['parameters']['query']>;
 export type ConsultaTipos = NonNullable<paths['/api/fluig/tipos-documento']['get']['parameters']['query']>;
 export type ConsultaEnvios = NonNullable<paths['/api/fluig/envios']['get']['parameters']['query']>;
+export type ConsultaUsuarios = NonNullable<paths['/api/fluig/usuarios']['get']['parameters']['query']>;

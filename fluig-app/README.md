@@ -1,7 +1,9 @@
 # fluig-app — Área Jotanunes
 
-Interface interna da Jotanunes para o Portal de Documentação de Terceirizadas. Abre **de dentro do
-Fluig** (iframe ou nova aba), sem login próprio: a identidade vem de um token emitido pelo Fluig.
+Interface interna da Jotanunes para o Portal de Documentação de Terceirizadas. Tem **duas entradas**
+que convivem (ver [Dois modos de entrada](#dois-modos-de-entrada)): **de dentro do Fluig** (iframe ou
+nova aba, com um token emitido pelo Fluig) e **login próprio** (login + senha de usuário interno,
+enquanto a Jotanunes não tem o Fluig).
 Aqui o administrador cadastra obras, empresas, vínculos e tipos de documento e analisa os documentos
 enviados; qualquer usuário com acesso consulta tudo e envia convites (ver [Perfis](#perfis)).
 
@@ -34,10 +36,39 @@ Copie `.env.example` para `.env.local` (não versionado):
 | `VITE_USE_MOCKS` | `true` = respostas simuladas (MSW) conforme o contrato, sem backend |
 | `VITE_FLUIG_DEV_TOKEN` | Só em `npm run dev`: token Fluig usado quando a URL não traz `#fluigToken=` |
 | `VITE_MOCK_PERFIL` | Só com `VITE_USE_MOCKS=true`: `admin` (padrão) ou `comum` — perfil do usuário simulado |
+| `VITE_MOCK_LOGIN` | Só com `VITE_USE_MOCKS=true`: `true` = começa **sem** token e mostra a tela de login próprio |
+
+## Dois modos de entrada
+
+Regras completas em
+[`contracts/fluig-identity.md`](../specs/001-portal-documentos-terceirizadas/contracts/fluig-identity.md)
+(research R17). As rotas `/api/fluig/*` e as regras de perfil são as mesmas nas duas.
+
+| | Pelo Fluig | Login próprio |
+|---|---|---|
+| Como chega o token | `#fluigToken=<jwt>` na URL (o app apaga da barra de endereço) | tela de login (`POST /api/fluig/auth/login`) |
+| Quem é administrador | grupo do Fluig (`roles: ["admin"]`) | cadastro do usuário na tela "Usuários" |
+| "Trocar senha" e "Sair" no menu | não aparecem | aparecem (rodapé do menu lateral) |
+| Sessão caiu (401) | "Abra este sistema pelo Fluig." | tela de login com "Sua sessão expirou. Entre de novo." |
+
+Ordem de decisão ao abrir: token no fragmento (Fluig, tem prioridade e substitui uma sessão de login
+próprio na mesma aba) → `sessionStorage['jn.fluigToken']` (qualquer origem) → (dev) token de
+desenvolvimento → sem token, `GET /api/fluig/auth/configuracao`: login próprio ligado → tela de login;
+desligado → "Abra este sistema pelo Fluig.". A origem da sessão vem de `GET /api/fluig/me` (`origem`).
+
+- **Primeiro acesso**: com senha provisória (`trocaSenhaObrigatoria`), só a tela "Crie uma nova senha
+  para continuar." aparece (nenhuma rota do app monta, nem digitando o endereço). A senha nova segue a
+  regra do portal: 8 a 128 caracteres, letras e números, diferente da atual.
+- **Senha esquecida**: não há autoatendimento; um administrador usa "Redefinir senha" na tela
+  "Usuários" e a pessoa recebe uma nova senha provisória por e-mail.
+- **Primeiro administrador** de uma instalação nova: comando `criar-admin` da API
+  ([quickstart](../specs/001-portal-documentos-terceirizadas/quickstart.md) e
+  `contracts/fluig-identity.md`, "Primeiro administrador").
 
 ## Perfis
 
-O perfil vem do Fluig, na claim `roles` do token (regras em
+Na entrada pelo Fluig, o perfil vem da claim `roles` do token; no login próprio, do cadastro do
+usuário interno (regras em
 [`contracts/fluig-identity.md`](../specs/001-portal-documentos-terceirizadas/contracts/fluig-identity.md)).
 O app lê o campo `admin` de `GET /api/fluig/me`.
 
@@ -47,6 +78,7 @@ O app lê o campo `admin` de `GET /api/fluig/me`.
 | Enviar/reenviar convite | Sim | Sim |
 | Cadastrar/editar/ativar/desativar obra, empresa e tipo de documento; vincular/desvincular | Sim | Não |
 | Aprovar/rejeitar envio | Sim | Não |
+| Tela "Usuários" (usuários do login próprio) | Sim | Não (o menu não mostra; `#/usuarios` mostra só o aviso, sem chamar a API) |
 
 - Para o usuário comum as ações de administrador **somem** (não ficam desabilitadas), os dados da
   empresa aparecem em modo leitura, o link da fila vira "Ver →" e cada tela mostra uma vez o aviso
@@ -55,7 +87,8 @@ O app lê o campo `admin` de `GET /api/fluig/me`.
   O app mostra a mensagem na tela, fecha o modal e mantém os dados — a sessão continua (só o `401`
   leva para "Abra este sistema pelo Fluig.").
 - O perfil vale pelo tempo de vida do token. Mudou o grupo no Fluig? Feche e abra o sistema pelo
-  Fluig de novo.
+  Fluig de novo. No login próprio, mudar o perfil derruba a sessão na hora (a pessoa entra de novo já
+  com o perfil novo).
 - Código: `useEhAdmin()` (`src/auth/contexto.ts`), `<SomenteAdmin>` e `<AvisoSomenteAdmin>`
   (`src/components/`).
 
@@ -81,6 +114,33 @@ Com `VITE_MOCK_PERFIL=comum`, `/me` devolve `admin: false` e as 10 operações `
 contrato respondem `403 SEM_PERMISSAO` (convites e consultas continuam liberados). Nos testes, use
 `definirPerfilMock('comum')` de `src/mocks/dados.ts`; o `src/test/setup.ts` volta para `admin` depois
 de cada teste.
+
+### Login próprio com mocks
+
+```bash
+VITE_USE_MOCKS=true VITE_MOCK_LOGIN=true npm run dev
+```
+
+O app abre na tela de login. Usuários do mock (os mesmos do quickstart §5):
+
+| Login | Senha | Resultado |
+|---|---|---|
+| `admin.mock` | `Admin1234` | administrador (vê "Usuários") |
+| `comum.mock` | `Comum1234` | usuário comum |
+| `novo.mock` | `Temp1234` | senha provisória → "Crie uma nova senha para continuar." (ex.: `Nova1234`) |
+| `inativo.mock` | qualquer senha certa (`Inativo1234`) | "Este usuário está desativado. Fale com um administrador do sistema." |
+| `expirado.mock` | `Temp1234` | "Sua senha provisória expirou. Peça a um administrador para gerar outra." |
+
+Senha errada 5 vezes seguidas no mesmo login (existente ou não) bloqueia a 6ª tentativa por 15
+minutos. Usuários cadastrados na tela "Usuários" do mock recebem a senha provisória `Temp1234`; um
+e-mail do domínio `falha.test` simula a falha do e-mail de acesso (`EMAIL_ACESSO_FALHOU`). Os dados
+ficam em memória: depois de recarregar a página, um token de sessão emitido depois de uma troca de
+senha deixa de valer e o app volta ao login.
+
+Nos testes: `definirSessaoMock({ origem: 'LOGIN_LOCAL' })` faz o token genérico dos testes virar a
+sessão de `admin.mock` (ou `comum.mock`, com `perfil: 'comum'`); `definirLoginLocalMock(false)`
+simula o login próprio desligado. O `setup.ts` volta ao padrão (administrador pelo Fluig, login
+próprio ligado) depois de cada teste.
 
 Cenários úteis nos mocks:
 
@@ -125,9 +185,11 @@ Contrato completo em [`contracts/fluig-identity.md`](../specs/001-portal-documen
    de administradores do Fluig, `"roles": ["admin"]`.
 2. O widget abre `{URL do fluig-app}/#fluigToken=<jwt>` em iframe ou nova aba.
 3. O app lê o token do fragmento, **apaga o fragmento da URL** (`history.replaceState`), guarda o
-   token em memória e em `sessionStorage['jn.fluigToken']` e chama `GET /api/fluig/me`.
-4. Sem token, ou com token recusado (401), aparece só "Abra este sistema pelo Fluig." — nenhum dado
-   é carregado.
+   token em memória e em `sessionStorage['jn.fluigToken']` e chama `GET /api/fluig/me`. O Fluig pode
+   renovar o token trocando só o fragmento, com o app aberto (a tela e a rota continuam).
+4. Token do Fluig recusado (401) → só "Abra este sistema pelo Fluig." — nenhum dado é carregado. Sem
+   token nenhum, aparece a tela de login próprio (ou a mesma mensagem, se o login próprio estiver
+   desligado na API).
 
 O build usa `base: './'` e `HashRouter`, então `dist/` pode ser servido em qualquer caminho, sem
 regra de reescrita. Em produção, o servidor que hospeda o app deve enviar
@@ -145,20 +207,26 @@ regra de reescrita. Em produção, o servidor que hospeda o app deve enviar
 | `#/tipos-documento` | Tipos de documento: lista; cadastro, edição, ativar/desativar (admin) |
 | `#/analise` | Fila de análise: em análise (mais antigo primeiro) e analisados, com filtros |
 | `#/analise/:envioId` | Análise do envio: abrir/baixar arquivo; aprovar, rejeitar com motivo (admin) |
+| `#/usuarios` | Usuários (só admin): lista com busca e filtros; cadastrar, editar, desativar/reativar, redefinir senha. Na própria linha (login próprio) não há "Desativar" e o perfil é só leitura |
+| `#/trocar-senha` | Trocar senha (só login próprio; com sessão do Fluig volta ao painel) |
+
+Antes da sessão (fora das rotas): tela de login (`pages/Login.tsx`, o único lugar com o logo, dentro
+do painel de acesso) e troca obrigatória de senha (`pages/TrocaSenha.tsx`, modo obrigatório).
 
 ## Estrutura
 
 ```text
 src/
 ├── api/          schema.d.ts (gerado), client.ts (fetch + ErroApi), fluig.ts (uma função por rota), useConsulta.ts
-├── auth/         tokenFluig.ts (fragmento/sessionStorage/dev), AuthFluigProvider.tsx, contexto.ts
+├── assets/       logo-jotanunes.png (só na tela de login)
+├── auth/         tokenFluig.ts (fragmento/sessionStorage/dev), AuthFluigProvider.tsx (login/negado/trocaSenha/ok), contexto.ts (useUsuarioFluig, useEhAdmin, useSessao)
 ├── components/   SomenteAdmin, AvisoSomenteAdmin, Botao, Campo, Selo, TituloPagina, Tabela, Paginacao, Modal, Filtros, Alerta, Estados, Layout, icons/
 ├── hooks/        useAviso, useFormularioEmpresa
 ├── mocks/        MSW: dados.ts (banco em memória), handlers/*, browser.ts, server.ts
 ├── pages/        uma página por rota (+ .css) e seus testes
 ├── styles/       tokens.css (docs/design.md §10 em .jn-app), base.css, paginas.css
-├── test/         setup.ts (jest-dom + servidor MSW), renderizar.tsx
-└── utils/        cnpj.ts (numérico e alfanumérico), datas.ts (America/Sao_Paulo), formatos.ts
+├── test/         setup.ts (jest-dom + servidor MSW), renderizar.tsx (rota com usuário pronto), renderizarApp.tsx (app completo com o provider)
+└── utils/        cnpj.ts (numérico e alfanumérico), datas.ts (America/Sao_Paulo), senha.ts (política de senha), formatos.ts
 ```
 
 Mensagens de erro exibidas ao usuário vêm do `title` do `application/problem+json` da API (tabela

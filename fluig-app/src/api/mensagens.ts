@@ -30,6 +30,16 @@ export const MENSAGENS_ERRO: Record<CodigoErro, string> = {
   EMAIL_FALHOU: 'Não conseguimos enviar o convite. Tente de novo em alguns minutos.',
   LIMITE_REQUISICOES: 'Muitas tentativas. Aguarde um pouco.',
   ERRO_INTERNO: 'Algo deu errado do nosso lado. Tente de novo.',
+  LOGIN_INVALIDO: 'Login ou senha incorretos.',
+  USUARIO_INATIVO: 'Este usuário está desativado. Fale com um administrador do sistema.',
+  SENHA_PROVISORIA_EXPIRADA: 'Sua senha provisória expirou. Peça a um administrador para gerar outra.',
+  LOGIN_DUPLICADO: 'Já existe um usuário com este login.',
+  ULTIMO_ADMINISTRADOR: 'O sistema precisa de pelo menos um administrador ativo.',
+  ALTERACAO_PROPRIA_NAO_PERMITIDA:
+    'Você não pode desativar nem tirar o seu próprio acesso de administrador. Peça a outro administrador.',
+  EMAIL_ACESSO_FALHOU:
+    'Não conseguimos enviar o e-mail com a senha provisória. Tente de novo em alguns minutos.',
+  SO_LOGIN_LOCAL: 'Esta opção é só para quem entra com login e senha.',
 };
 
 export const STATUS_ERRO: Record<CodigoErro, number> = {
@@ -57,6 +67,15 @@ export const STATUS_ERRO: Record<CodigoErro, number> = {
   EMAIL_FALHOU: 502,
   LIMITE_REQUISICOES: 429,
   ERRO_INTERNO: 500,
+  LOGIN_INVALIDO: 401,
+  /** 403 no login; a redefinição de senha de usuário desativado responde 409 (ver o handler). */
+  USUARIO_INATIVO: 403,
+  SENHA_PROVISORIA_EXPIRADA: 401,
+  LOGIN_DUPLICADO: 409,
+  ULTIMO_ADMINISTRADOR: 409,
+  ALTERACAO_PROPRIA_NAO_PERMITIDA: 409,
+  EMAIL_ACESSO_FALHOU: 502,
+  SO_LOGIN_LOCAL: 409,
 };
 
 export const MENSAGEM_SEM_CONEXAO =

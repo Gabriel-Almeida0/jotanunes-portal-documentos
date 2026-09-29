@@ -2,7 +2,11 @@
  * Leitura do token Fluig (contracts/fluig-identity.md):
  * 1. fragmento `#fluigToken=<jwt>` (removido da URL com history.replaceState);
  * 2. `sessionStorage['jn.fluigToken']`;
- * 3. só em desenvolvimento: `VITE_FLUIG_DEV_TOKEN` (ou um token fictício quando `VITE_USE_MOCKS=true`).
+ * 3. só em desenvolvimento: `VITE_FLUIG_DEV_TOKEN` (ou um token fictício quando `VITE_USE_MOCKS=true`);
+ *    com `VITE_MOCK_LOGIN=true` não há token de desenvolvimento (o app mostra a tela de login próprio).
+ *
+ * O mesmo `sessionStorage['jn.fluigToken']` guarda o token da sessão, venha do Fluig ou do login
+ * próprio (research R17); a origem vem de `GET /api/fluig/me`.
  *
  * Depois da carga, o Fluig pode entregar um token novo (ou renovar o atual) trocando só o fragmento
  * no mesmo iframe; o AuthFluigProvider escuta `hashchange`/`popstate` e usa `lerTokenDoFragmento`.
@@ -84,17 +88,29 @@ export function lerTokenDoFragmento(rotaReserva?: string | null): string | null 
 
 function tokenDeDesenvolvimento(): string | null {
   if (!import.meta.env.DEV) return null;
+  if (import.meta.env.VITE_MOCK_LOGIN === 'true') return null;
   const dev = (import.meta.env.VITE_FLUIG_DEV_TOKEN as string | undefined)?.trim();
   if (dev) return dev;
   if (import.meta.env.VITE_USE_MOCKS === 'true') return 'token-dev-mocks';
   return null;
 }
 
-export function obterTokenInicial(): string | null {
+export interface TokenInicial {
+  token: string | null;
+  /** `true` quando o token veio no fragmento (`#fluigToken=`): é do Fluig. */
+  doFragmento: boolean;
+}
+
+/** Token da carga da página: fragmento (Fluig) → `sessionStorage` → token de desenvolvimento. */
+export function lerTokenInicial(): TokenInicial {
   const doFragmento = lerTokenDoFragmento();
   if (doFragmento) {
     guardarToken(doFragmento);
-    return doFragmento;
+    return { token: doFragmento, doFragmento: true };
   }
-  return lerSessao() ?? tokenDeDesenvolvimento();
+  return { token: lerSessao() ?? tokenDeDesenvolvimento(), doFragmento: false };
+}
+
+export function obterTokenInicial(): string | null {
+  return lerTokenInicial().token;
 }

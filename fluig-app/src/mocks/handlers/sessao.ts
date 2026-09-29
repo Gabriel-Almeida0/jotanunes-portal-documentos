@@ -1,12 +1,14 @@
 import { http, HttpResponse } from 'msw';
 import type { Painel } from '../../api/tipos';
-import { contagemDocumentos, db, situacaoAcesso, usuarioMock } from '../dados';
-import { API, exigirFluig, latencia } from '../util';
+import { contagemDocumentos, db, situacaoAcesso } from '../dados';
+import { API, exigirFluig, latencia, problema, sessaoDe } from '../util';
 
 export const handlersSessao = [
   http.get(`${API}/me`, async ({ request }) => {
     await latencia();
-    return exigirFluig(request) ?? HttpResponse.json(usuarioMock());
+    // `/me` responde também com a troca de senha pendente (é por ele que o app descobre a troca).
+    const sessao = sessaoDe(request);
+    return sessao ? HttpResponse.json(sessao.usuario) : problema('NAO_AUTENTICADO');
   }),
 
   http.get(`${API}/painel`, async ({ request }) => {

@@ -7,12 +7,15 @@ import type {
   ConsultaEnvios,
   ConsultaObras,
   ConsultaTipos,
+  ConsultaUsuarios,
+  ConfiguracaoAcesso,
   Convite,
   DocumentoSituacao,
   Empresa,
   EmpresaAtualizacao,
   EmpresaInput,
   Envio,
+  LoginJotanunesInput,
   EnvioFila,
   Obra,
   ObraAtualizacao,
@@ -21,11 +24,17 @@ import type {
   PaginaEmpresas,
   PaginaEnvios,
   PaginaObras,
+  PaginaUsuariosInternos,
   Painel,
+  SessaoJotanunes,
   TipoDocumento,
   TipoDocumentoAtualizacao,
   TipoDocumentoInput,
+  TrocaSenhaInput,
   UsuarioFluig,
+  UsuarioInterno,
+  UsuarioInternoAtualizacao,
+  UsuarioInternoInput,
 } from './tipos';
 
 const id = encodeURIComponent;
@@ -34,6 +43,28 @@ export const api = {
   // Sessão
   me: (sinal?: AbortSignal) => requisicao<UsuarioFluig>('GET', '/api/fluig/me', { sinal }),
   painel: (sinal?: AbortSignal) => requisicao<Painel>('GET', '/api/fluig/painel', { sinal }),
+
+  // Acesso (login próprio da área Jotanunes). `configuracaoAcesso` e `login` são anônimas: não
+  // enviam o token e o 401 do login (credencial errada) não derruba sessão nenhuma.
+  configuracaoAcesso: (sinal?: AbortSignal) =>
+    requisicao<ConfiguracaoAcesso>('GET', '/api/fluig/auth/configuracao', { sinal, anonimo: true }),
+  login: (dados: LoginJotanunesInput) =>
+    requisicao<SessaoJotanunes>('POST', '/api/fluig/auth/login', { corpo: dados, anonimo: true }),
+  trocarSenha: (dados: TrocaSenhaInput) =>
+    requisicao<SessaoJotanunes>('POST', '/api/fluig/auth/trocar-senha', { corpo: dados }),
+  sair: () => requisicao<void>('POST', '/api/fluig/auth/sair'),
+
+  // Usuários internos (só administrador)
+  listarUsuarios: (consulta: ConsultaUsuarios = {}, sinal?: AbortSignal) =>
+    requisicao<PaginaUsuariosInternos>('GET', '/api/fluig/usuarios', { consulta, sinal }),
+  obterUsuario: (usuarioId: string, sinal?: AbortSignal) =>
+    requisicao<UsuarioInterno>('GET', `/api/fluig/usuarios/${id(usuarioId)}`, { sinal }),
+  criarUsuario: (dados: UsuarioInternoInput) =>
+    requisicao<UsuarioInterno>('POST', '/api/fluig/usuarios', { corpo: dados }),
+  atualizarUsuario: (usuarioId: string, dados: UsuarioInternoAtualizacao) =>
+    requisicao<UsuarioInterno>('PUT', `/api/fluig/usuarios/${id(usuarioId)}`, { corpo: dados }),
+  redefinirSenhaUsuario: (usuarioId: string) =>
+    requisicao<UsuarioInterno>('POST', `/api/fluig/usuarios/${id(usuarioId)}/redefinir-senha`),
 
   // Obras
   listarObras: (consulta: ConsultaObras = {}, sinal?: AbortSignal) =>

@@ -3,7 +3,10 @@
  * - Base: `VITE_API_URL`.
  * - Injeta `Authorization: Bearer <token Fluig>`.
  * - Converte `application/problem+json` em `ErroApi { status, code, title, errors }`.
- * - Em 401 dispara o evento `jn:nao-autenticado` (o AuthFluigProvider mostra "Abra este sistema pelo Fluig.").
+ * - Em 401 dispara o evento `jn:nao-autenticado` (o AuthFluigProvider volta para a tela de login, na
+ *   sessão de login próprio, ou mostra "Abra este sistema pelo Fluig.", na sessão do Fluig). Rotas
+ *   anônimas (`anonimo: true`: configuração de acesso e login) não enviam o token nem disparam o
+ *   evento — o 401 do login é credencial errada, não sessão vencida.
  * - 403 (`SEM_PERMISSAO`: operação só para administradores) é só um `ErroApi` para a tela exibir; a
  *   sessão continua.
  */
@@ -33,6 +36,8 @@ export class ErroApi extends Error {
   readonly title: string;
   readonly errors: Record<string, string[]>;
   readonly detail?: string | null;
+  /** Só em `ACESSO_BLOQUEADO`: data/hora (ISO) em que o login é liberado. */
+  readonly bloqueadoAte?: string | null;
 
   constructor(dados: {
     status: number;
@@ -40,6 +45,7 @@ export class ErroApi extends Error {
     title?: string;
     errors?: Record<string, string[]> | null;
     detail?: string | null;
+    bloqueadoAte?: string | null;
   }) {
     const title = dados.title || MENSAGENS_ERRO[dados.code] || MENSAGENS_ERRO.ERRO_INTERNO;
     super(title);
@@ -49,6 +55,7 @@ export class ErroApi extends Error {
     this.title = title;
     this.errors = dados.errors ?? {};
     this.detail = dados.detail;
+    this.bloqueadoAte = dados.bloqueadoAte ?? null;
   }
 
   /** Primeira mensagem do campo (para exibir abaixo do input). */
@@ -85,10 +92,10 @@ export function montarUrl(caminho: string, consulta?: Consulta): string {
   return `${urlBaseApi()}${caminho}${qs ? `?${qs}` : ''}`;
 }
 
-function cabecalhos(extra?: HeadersInit): Headers {
-  const h = new Headers(extra);
+function cabecalhos(anonimo = false): Headers {
+  const h = new Headers();
   h.set('Accept', 'application/json, application/problem+json');
-  if (tokenFluig) h.set('Authorization', `Bearer ${tokenFluig}`);
+  if (tokenFluig && !anonimo) h.set('Authorization', `Bearer ${tokenFluig}`);
   return h;
 }
 
@@ -108,6 +115,7 @@ async function erroDaResposta(resposta: Response): Promise<ErroApi> {
     title: corpo?.title,
     errors: corpo?.errors ?? null,
     detail: corpo?.detail ?? null,
+    bloqueadoAte: corpo?.bloqueadoAte ?? null,
   });
 }
 
@@ -128,7 +136,7 @@ function codigoPorStatus(status: number): CodigoErro {
   }
 }
 
-async function executar(url: string, init: RequestInit): Promise<Response> {
+async function executar(url: string, init: RequestInit, anonimo = false): Promise<Response> {
   let resposta: Response;
   try {
     resposta = await fetch(url, init);
@@ -137,7 +145,7 @@ async function executar(url: string, init: RequestInit): Promise<Response> {
   }
   if (!resposta.ok) {
     const erro = await erroDaResposta(resposta);
-    if (resposta.status === 401) {
+    if (resposta.status === 401 && !anonimo) {
       window.dispatchEvent(new CustomEvent(EVENTO_NAO_AUTENTICADO));
     }
     throw erro;
@@ -149,6 +157,8 @@ export interface OpcoesRequisicao {
   consulta?: Consulta;
   corpo?: unknown;
   sinal?: AbortSignal;
+  /** Rota anônima: sem `Authorization` e sem o evento `jn:nao-autenticado` no 401. */
+  anonimo?: boolean;
 }
 
 /** Requisição JSON. Devolve `undefined` em 204. */
@@ -157,12 +167,12 @@ export async function requisicao<T>(
   caminho: string,
   opcoes: OpcoesRequisicao = {},
 ): Promise<T> {
-  const init: RequestInit = { method: metodo, headers: cabecalhos(), signal: opcoes.sinal };
+  const init: RequestInit = { method: metodo, headers: cabecalhos(opcoes.anonimo), signal: opcoes.sinal };
   if (opcoes.corpo !== undefined) {
     (init.headers as Headers).set('Content-Type', 'application/json');
     init.body = JSON.stringify(opcoes.corpo);
   }
-  const resposta = await executar(montarUrl(caminho, opcoes.consulta), init);
+  const resposta = await executar(montarUrl(caminho, opcoes.consulta), init, opcoes.anonimo);
   if (resposta.status === 204) return undefined as T;
   const texto = await resposta.text();
   return (texto ? JSON.parse(texto) : undefined) as T;

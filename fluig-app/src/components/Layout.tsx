@@ -1,7 +1,18 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { useUsuarioFluig } from '../auth/contexto';
-import { IconeDocumento, IconeEmpresa, IconeFila, IconeMenu, IconeObra, IconePainel, IconeUsuario } from './icons';
+import { useSessao, useUsuarioFluig } from '../auth/contexto';
+import {
+  IconeChave,
+  IconeDocumento,
+  IconeEmpresa,
+  IconeFila,
+  IconeMenu,
+  IconeObra,
+  IconePainel,
+  IconeSair,
+  IconeUsuario,
+  IconeUsuarios,
+} from './icons';
 import './Layout.css';
 
 const ITENS = [
@@ -12,12 +23,21 @@ const ITENS = [
   { para: '/analise', rotulo: 'Fila de análise', Icone: IconeFila, fim: false },
 ];
 
+/** Só para administrador (de qualquer origem): gestão dos usuários do login próprio (US9). */
+const ITEM_USUARIOS = { para: '/usuarios', rotulo: 'Usuários', Icone: IconeUsuarios, fim: false };
+
 /**
  * Layout da área Jotanunes: menu lateral claro, SEM cabeçalho de marca (o app abre dentro do Fluig,
  * que já tem o dele). Em telas estreitas o menu vira uma barra com botão "Menu".
+ * "Usuários" só aparece para administrador; "Trocar senha" e "Sair" só na sessão de login próprio
+ * (a sessão do Fluig é controlada pelo Fluig — FR-105).
  */
 export function Layout({ children }: { children: ReactNode }) {
   const usuario = useUsuarioFluig();
+  const { sair } = useSessao();
+  const [saindo, setSaindo] = useState(false);
+  const itens = usuario.admin ? [...ITENS, ITEM_USUARIOS] : ITENS;
+  const loginLocal = usuario.origem === 'LOGIN_LOCAL';
   const location = useLocation();
   const [menuAberto, setMenuAberto] = useState(false);
   const conteudo = useRef<HTMLElement>(null);
@@ -65,7 +85,7 @@ export function Layout({ children }: { children: ReactNode }) {
           aria-label="Menu principal"
         >
           <ul>
-            {ITENS.map(({ para, rotulo, Icone, fim }) => (
+            {itens.map(({ para, rotulo, Icone, fim }) => (
               <li key={para}>
                 <NavLink to={para} end={fim} className="jn-layout__item">
                   <Icone tamanho={20} />
@@ -74,6 +94,31 @@ export function Layout({ children }: { children: ReactNode }) {
               </li>
             ))}
           </ul>
+          {loginLocal ? (
+            <ul className="jn-layout__rodape">
+              <li>
+                <NavLink to="/trocar-senha" className="jn-layout__item">
+                  <IconeChave tamanho={20} />
+                  <span>Trocar senha</span>
+                </NavLink>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className="jn-layout__item jn-layout__sair"
+                  disabled={saindo}
+                  aria-busy={saindo || undefined}
+                  onClick={() => {
+                    setSaindo(true);
+                    void sair().finally(() => setSaindo(false));
+                  }}
+                >
+                  <IconeSair tamanho={20} />
+                  <span>{saindo ? 'Saindo…' : 'Sair'}</span>
+                </button>
+              </li>
+            </ul>
+          ) : null}
         </nav>
       </aside>
       <main id="jn-conteudo" ref={conteudo} className="jn-layout__conteudo" tabIndex={-1}>

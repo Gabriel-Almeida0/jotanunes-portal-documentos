@@ -10,6 +10,8 @@ import { ObraDetalhe } from './pages/ObraDetalhe';
 import { Obras } from './pages/Obras';
 import { Painel } from './pages/Painel';
 import { TiposDocumento } from './pages/TiposDocumento';
+import { TrocaSenha } from './pages/TrocaSenha';
+import { Usuarios } from './pages/Usuarios';
 
 export const FUTURO_ROUTER = { v7_startTransition: true, v7_relativeSplatPath: true } as const;
 
@@ -38,6 +40,8 @@ export function RotasApp() {
           <Route path="/tipos-documento" element={<TiposDocumento />} />
           <Route path="/analise" element={<FilaAnalise />} />
           <Route path="/analise/:envioId" element={<PorParametro nome="envioId"><EnvioAnalise /></PorParametro>} />
+          <Route path="/usuarios" element={<Usuarios />} />
+          <Route path="/trocar-senha" element={<TrocaSenha modo="voluntario" />} />
           <Route path="*" element={<NaoEncontrada />} />
         </Routes>
       </Layout>

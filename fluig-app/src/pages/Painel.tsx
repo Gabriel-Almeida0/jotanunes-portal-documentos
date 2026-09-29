@@ -1,8 +1,10 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/fluig';
 import { useConsulta } from '../api/useConsulta';
-import { useUsuarioFluig } from '../auth/contexto';
+import { useSessao, useUsuarioFluig } from '../auth/contexto';
+import { AvisoPagina } from '../components/AvisoPagina';
+import { useAviso } from '../hooks/useAviso';
 import { AvisoSomenteAdmin } from '../components/AvisoSomenteAdmin';
 import { Carregando, EstadoErro } from '../components/Estados';
 import { IconeAlerta, IconeEmail, IconeEmpresa, IconeFila, IconeObra, IconeSeta } from '../components/icons';
@@ -40,7 +42,15 @@ function CartaoIndicador({ icone, numero, texto, links, destaque }: CartaoProps)
 
 export function Painel() {
   const usuario = useUsuarioFluig();
+  const { consumirRecado } = useSessao();
+  const [aviso, mostrarAviso] = useAviso();
   const consulta = useConsulta((sinal) => api.painel(sinal), []);
+
+  // Recado deixado pela sessão (ex.: "Senha alterada." depois da troca de senha).
+  useEffect(() => {
+    const recado = consumirRecado();
+    if (recado) mostrarAviso({ tom: 'sucesso', texto: recado });
+  }, [consumirRecado, mostrarAviso]);
   const primeiroNome = usuario.nome.split(' ')[0];
   const p = consulta.dados;
 
@@ -50,6 +60,8 @@ export function Painel() {
         titulo="Painel"
         descricao={`Olá, ${primeiroNome}! Veja o que precisa da sua atenção nos documentos das terceirizadas.`}
       />
+
+      <AvisoPagina aviso={aviso} onFechar={() => mostrarAviso(null)} />
 
       <AvisoSomenteAdmin />
 

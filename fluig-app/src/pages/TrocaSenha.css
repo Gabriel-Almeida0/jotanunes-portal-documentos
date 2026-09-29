@@ -1,0 +1,126 @@
+/* Troca de senha do login próprio (obrigatória e voluntária). */
+
+.jn-app.jn-troca {
+  min-height: 100vh;
+}
+
+.jn-app .jn-troca__painel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-4);
+  width: 100%;
+  max-width: 500px;
+  padding: var(--jn-space-6) var(--jn-space-6) var(--jn-space-5);
+  background: var(--jn-white);
+  border: var(--jn-border-card);
+  border-radius: var(--jn-radius-signature);
+  box-shadow: var(--jn-shadow-sm);
+}
+
+.jn-app .jn-troca__icone {
+  display: inline-grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--jn-danger-bg);
+  color: var(--jn-red-700);
+}
+
+.jn-app .jn-troca__barra {
+  display: block;
+  width: 50px;
+  height: 6px;
+  background: var(--jn-red-600);
+}
+
+.jn-app .jn-troca__titulo {
+  font: var(--jn-text-h1);
+  color: var(--jn-gray-900);
+}
+
+.jn-app .jn-troca__intro {
+  color: var(--jn-gray-500);
+}
+
+.jn-app .jn-troca__bloco {
+  max-width: 560px;
+}
+
+.jn-app .jn-troca__campos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-4);
+}
+
+.jn-app .jn-troca__regras {
+  padding: var(--jn-space-3) var(--jn-space-4);
+  background: var(--jn-gray-50);
+  border-radius: var(--jn-radius-control);
+  font: var(--jn-text-sm);
+}
+
+.jn-app .jn-troca__regras-titulo {
+  margin-bottom: var(--jn-space-2);
+  color: var(--jn-gray-800);
+  font-weight: 500;
+}
+
+.jn-app .jn-troca__regras ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.jn-app .jn-troca__regras li {
+  display: flex;
+  align-items: center;
+  gap: var(--jn-space-2);
+  color: var(--jn-gray-600);
+}
+
+.jn-app .jn-troca__marca {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--jn-gray-400);
+  border-radius: 50%;
+  background: var(--jn-white);
+}
+
+.jn-app .jn-troca__regra--ok {
+  color: var(--jn-success-fg);
+}
+
+.jn-app .jn-troca__regra--ok .jn-troca__marca {
+  border-color: var(--jn-success-fg);
+  background: var(--jn-success-bg);
+  color: var(--jn-success-fg);
+}
+
+.jn-app .jn-troca__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--jn-space-3);
+  margin-top: var(--jn-space-2);
+}
+
+@media (max-width: 480px) {
+  .jn-app .jn-troca__painel {
+    padding: var(--jn-space-5) var(--jn-space-4);
+  }
+
+  .jn-app .jn-troca__acoes {
+    flex-direction: column-reverse;
+  }
+
+  .jn-app .jn-troca__acoes .jn-botao {
+    width: 100%;
+  }
+}

@@ -82,8 +82,38 @@
 }
 
 .jn-app .jn-layout__nav {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   padding: var(--jn-space-2) 0 var(--jn-space-5);
   overflow-y: auto;
+}
+
+.jn-app .jn-layout__nav ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* "Trocar senha" e "Sair" (só login próprio): no rodapé do menu lateral. */
+.jn-app .jn-layout__nav .jn-layout__rodape {
+  margin-top: auto;
+  padding-top: var(--jn-space-2);
+  border-top: 1px solid var(--jn-divider);
+}
+
+.jn-app .jn-layout__sair {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.jn-app .jn-layout__sair:disabled {
+  cursor: progress;
+  opacity: 0.7;
 }
 
 .jn-app .jn-layout__item {
@@ -179,7 +209,11 @@
   }
 
   .jn-app .jn-layout__nav--aberto {
-    display: block;
+    display: flex;
+  }
+
+  .jn-app .jn-layout__nav .jn-layout__rodape {
+    margin-top: 0;
   }
 
   .jn-app .jn-layout__container {

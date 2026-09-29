@@ -1,0 +1,76 @@
+/* Tela de login próprio (R17). Único lugar do fluig-app com o logo: dentro do painel de acesso. */
+
+.jn-app.jn-login {
+  min-height: 100vh;
+}
+
+.jn-app .jn-login__painel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-4);
+  width: 100%;
+  max-width: 460px;
+  padding: var(--jn-space-7) var(--jn-space-6) var(--jn-space-6);
+  background: var(--jn-white);
+  border: var(--jn-border-card);
+  border-radius: var(--jn-radius-signature);
+  box-shadow: var(--jn-shadow-sm);
+}
+
+.jn-app .jn-login__logo {
+  display: block;
+  width: 166px;
+  max-width: 100%;
+  height: auto;
+}
+
+.jn-app .jn-login__barra {
+  display: block;
+  width: 50px;
+  height: 6px;
+  margin-top: var(--jn-space-2);
+  background: var(--jn-red-600);
+}
+
+.jn-app .jn-login__titulo {
+  font: var(--jn-text-display);
+  color: var(--jn-gray-900);
+}
+
+.jn-app .jn-login__intro {
+  color: var(--jn-gray-500);
+}
+
+.jn-app .jn-login__campos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-4);
+}
+
+/* Botão pill de destaque ("Acessar", docs/design.md §7). */
+.jn-app .jn-botao.jn-login__acessar {
+  width: 100%;
+  min-height: 48px;
+  margin-top: var(--jn-space-2);
+  padding: 12px 24px;
+  border-radius: var(--jn-radius-pill);
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.jn-app .jn-login__ajuda {
+  padding-top: var(--jn-space-4);
+  border-top: 1px solid var(--jn-gray-100);
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-500);
+}
+
+@media (max-width: 480px) {
+  .jn-app .jn-login__painel {
+    padding: var(--jn-space-6) var(--jn-space-4) var(--jn-space-5);
+  }
+
+  .jn-app .jn-login__titulo {
+    font-size: 26px;
+  }
+}

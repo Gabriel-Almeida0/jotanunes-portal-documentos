@@ -40,3 +40,9 @@ export function tempoDecorrido(valor: string | Date | null | undefined, agora: D
   if (dias <= 0) return 'hoje';
   return dias === 1 ? 'há 1 dia' : `há ${dias} dias`;
 }
+
+/** `23:30` no fuso de São Paulo (ex.: horário em que um login bloqueado é liberado). */
+export function formatarHora(valor: string | Date | null | undefined): string {
+  const d = paraData(valor);
+  return d ? fmtHora.format(d) : '—';
+}

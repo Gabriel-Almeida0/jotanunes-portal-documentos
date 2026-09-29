@@ -79,7 +79,7 @@ export const handlersObras = [
 
   http.post(`${API}/obras`, async ({ request }) => {
     await latencia();
-    const negado = exigirFluig(request) ?? exigirAdmin();
+    const negado = exigirFluig(request) ?? exigirAdmin(request);
     if (negado) return negado;
     const dados = validarObra((await request.json()) as Record<string, unknown>, false);
     if (dados instanceof HttpResponse) return dados;
@@ -102,7 +102,7 @@ export const handlersObras = [
 
   http.put(`${API}/obras/:obraId`, async ({ request, params }) => {
     await latencia();
-    const negado = exigirFluig(request) ?? exigirAdmin();
+    const negado = exigirFluig(request) ?? exigirAdmin(request);
     if (negado) return negado;
     const obra = db.obras.find((o) => o.id === params.obraId);
     if (!obra) return problema('NAO_ENCONTRADO');
@@ -115,7 +115,7 @@ export const handlersObras = [
 
   http.put(`${API}/obras/:obraId/empresas/:empresaId`, async ({ request, params }) => {
     await latencia();
-    const negado = exigirFluig(request) ?? exigirAdmin();
+    const negado = exigirFluig(request) ?? exigirAdmin(request);
     if (negado) return negado;
     const obra = db.obras.find((o) => o.id === params.obraId);
     const empresa = db.empresas.find((e) => e.id === params.empresaId);
@@ -128,7 +128,7 @@ export const handlersObras = [
 
   http.delete(`${API}/obras/:obraId/empresas/:empresaId`, async ({ request, params }) => {
     await latencia();
-    const negado = exigirFluig(request) ?? exigirAdmin();
+    const negado = exigirFluig(request) ?? exigirAdmin(request);
     if (negado) return negado;
     const i = db.vinculos.findIndex((v) => v.obraId === params.obraId && v.empresaId === params.empresaId);
     if (i < 0) return problema('NAO_ENCONTRADO');

@@ -69,7 +69,7 @@ export const handlersAnalise = [
 
   http.post(`${API}/envios/:envioId/aprovar`, async ({ request, params }) => {
     await latencia();
-    const negado = exigirFluig(request) ?? exigirAdmin();
+    const negado = exigirFluig(request) ?? exigirAdmin(request);
     if (negado) return negado;
     const envio = db.envios.find((e) => e.id === params.envioId);
     if (!envio) return problema('NAO_ENCONTRADO');
@@ -85,7 +85,7 @@ export const handlersAnalise = [
 
   http.post(`${API}/envios/:envioId/rejeitar`, async ({ request, params }) => {
     await latencia();
-    const negado = exigirFluig(request) ?? exigirAdmin();
+    const negado = exigirFluig(request) ?? exigirAdmin(request);
     if (negado) return negado;
     const envio = db.envios.find((e) => e.id === params.envioId);
     if (!envio) return problema('NAO_ENCONTRADO');

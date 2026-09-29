@@ -1,0 +1,106 @@
+/* Tela "Usuários" (US9) e formulário de usuário interno. */
+
+.jn-app .jn-usuarios__voce {
+  display: inline-block;
+  margin-left: var(--jn-space-2);
+  padding: 1px 8px;
+  border-radius: var(--jn-radius-pill);
+  background: var(--jn-gray-100);
+  color: var(--jn-gray-800);
+  font: var(--jn-text-xs);
+  vertical-align: middle;
+}
+
+.jn-app .jn-tabela .jn-usuarios__login {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+.jn-app .jn-tabela .jn-usuarios__email {
+  overflow-wrap: anywhere;
+}
+
+/* Ações empilhadas: a tabela cabe no container sem esconder os botões. */
+.jn-app .jn-usuarios__tabela .jn-acoes-linha {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--jn-space-1);
+}
+
+.jn-app .jn-usuarios__tabela .jn-usuarios__acesso {
+  min-width: 96px;
+}
+
+.jn-app .jn-usuarios__alerta-proprio {
+  margin-top: var(--jn-space-3);
+  padding: var(--jn-space-3) var(--jn-space-4);
+  border-left: 3px solid var(--jn-warning-fg);
+  background: var(--jn-warning-bg);
+  color: var(--jn-gray-900);
+}
+
+/* Formulário (modal) */
+
+.jn-app .jn-usuario-form__login {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.jn-app .jn-usuario-form__rotulo {
+  font: 500 15px/1.35 var(--jn-font);
+  color: var(--jn-gray-800);
+}
+
+.jn-app .jn-usuario-form__valor {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  color: var(--jn-gray-900);
+}
+
+.jn-app .jn-usuario-form__nota {
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-500);
+}
+
+/* Caixa de seleção com rótulo ao lado e ajuda abaixo. */
+.jn-app .jn-caixa {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--jn-space-3);
+  row-gap: var(--jn-space-1);
+}
+
+.jn-app .jn-caixa__controle {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--jn-red-700);
+  cursor: pointer;
+}
+
+.jn-app .jn-caixa__controle:focus-visible {
+  outline: 2px solid var(--jn-navy-800);
+  outline-offset: 2px;
+}
+
+.jn-app .jn-caixa__controle:disabled {
+  cursor: not-allowed;
+}
+
+.jn-app .jn-caixa__rotulo {
+  font: 500 15px/1.35 var(--jn-font);
+  color: var(--jn-gray-800);
+  cursor: pointer;
+}
+
+.jn-app .jn-caixa__controle:disabled + .jn-caixa__rotulo {
+  color: var(--jn-gray-500);
+  cursor: not-allowed;
+}
+
+.jn-app .jn-caixa__ajuda {
+  grid-column: 2;
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-500);
+}

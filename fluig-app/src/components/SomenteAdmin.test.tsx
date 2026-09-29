@@ -5,8 +5,9 @@ import { ContextoUsuarioFluig, useEhAdmin } from '../auth/contexto';
 import { AvisoSomenteAdmin } from './AvisoSomenteAdmin';
 import { SomenteAdmin } from './SomenteAdmin';
 
-const ADMIN: UsuarioFluig = { login: 'maria', nome: 'Maria', email: 'maria@jotanunes.com', admin: true };
-const COMUM: UsuarioFluig = { login: 'joao', nome: 'João', email: 'joao@jotanunes.com', admin: false };
+const SESSAO = { origem: 'FLUIG', trocaSenhaObrigatoria: false } as const;
+const ADMIN: UsuarioFluig = { login: 'maria', nome: 'Maria', email: 'maria@jotanunes.com', admin: true, ...SESSAO };
+const COMUM: UsuarioFluig = { login: 'joao', nome: 'João', email: 'joao@jotanunes.com', admin: false, ...SESSAO };
 const TEXTO = 'Só administradores podem cadastrar, alterar ou analisar. Se você precisa, fale com a TI.';
 
 function comUsuario(usuario: UsuarioFluig, filhos: ReactNode) {

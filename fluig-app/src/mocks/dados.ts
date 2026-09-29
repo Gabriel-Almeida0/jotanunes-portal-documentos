@@ -21,8 +21,11 @@ import type {
   SituacaoDocumento,
   StatusEnvio,
   TipoDocumento,
+  OrigemSessao,
+  SituacaoUsuarioInterno,
   Uf,
   UsuarioFluig,
+  UsuarioInterno,
 } from '../api/tipos';
 
 export interface ObraDb {
@@ -95,6 +98,8 @@ export const USUARIO_MOCK: UsuarioFluig = {
   nome: 'Analista Dev',
   email: 'analista@jotanunes.com',
   admin: true,
+  origem: 'FLUIG',
+  trocaSenhaObrigatoria: false,
 };
 
 /** Usuário comum dos mocks (token Fluig sem `roles`): consulta e convida, não cadastra nem analisa. */
@@ -103,32 +108,143 @@ export const USUARIO_MOCK_COMUM: UsuarioFluig = {
   nome: 'João Comum',
   email: 'joao.comum@jotanunes.com',
   admin: false,
+  origem: 'FLUIG',
+  trocaSenhaObrigatoria: false,
 };
 
-// ───────────────────────────── Perfil do mock (R16) ─────────────────────────────
+// ───────────────────────────── Sessão do mock (R16/R17) ─────────────────────────────
 
 export type PerfilMock = 'admin' | 'comum';
+
+/**
+ * O que um token "genérico" do mock (qualquer token que não seja do login próprio, ex.:
+ * `token-de-teste`, `token-dev-mocks`) representa. Padrão: administrador entrando pelo Fluig.
+ * Com `origem: 'LOGIN_LOCAL'` o token genérico vira a sessão de `admin.mock` (ou `comum.mock`).
+ * Os tokens emitidos pelo login do mock (`local:<id>:<versão>`) não dependem disto: valem enquanto o
+ * usuário interno estiver ativo e com a mesma versão de credencial (revogação, R17).
+ */
+export interface SessaoMock {
+  perfil: PerfilMock;
+  origem: OrigemSessao;
+  trocaSenhaObrigatoria: boolean;
+}
 
 /** `VITE_MOCK_PERFIL=comum` simula o usuário comum no `npm run dev`; qualquer outro valor = admin. */
 function perfilDoAmbiente(): PerfilMock {
   return import.meta.env.VITE_MOCK_PERFIL === 'comum' ? 'comum' : 'admin';
 }
 
-let perfilAtual: PerfilMock = perfilDoAmbiente();
+const SESSAO_PADRAO: SessaoMock = { perfil: 'admin', origem: 'FLUIG', trocaSenhaObrigatoria: false };
+
+let sessaoAtual: SessaoMock = { ...SESSAO_PADRAO, perfil: perfilDoAmbiente() };
+let loginLocalHabilitado = true;
 
 /** Troca o perfil do usuário simulado (testes). O `setup.ts` volta para `admin` depois de cada teste. */
 export function definirPerfilMock(perfil: PerfilMock): void {
-  perfilAtual = perfil;
+  sessaoAtual = { ...sessaoAtual, perfil };
 }
 
 export function perfilMock(): PerfilMock {
-  return perfilAtual;
+  return sessaoAtual.perfil;
 }
 
-/** Usuário que o mock de `/api/fluig/me` devolve para o perfil atual. */
-export function usuarioMock(): UsuarioFluig {
-  return perfilAtual === 'comum' ? USUARIO_MOCK_COMUM : USUARIO_MOCK;
+/** Ajusta a sessão do token genérico (testes). O `setup.ts` volta ao padrão (admin, Fluig). */
+export function definirSessaoMock(parcial: Partial<SessaoMock>): void {
+  sessaoAtual = { ...sessaoAtual, ...parcial };
 }
+
+export function reiniciarSessaoMock(): void {
+  sessaoAtual = { ...SESSAO_PADRAO };
+  loginLocalHabilitado = true;
+}
+
+/** `GET /api/fluig/auth/configuracao` do mock (`Auth:LoginLocal:Habilitado`). Padrão: ligado. */
+export function definirLoginLocalMock(habilitado: boolean): void {
+  loginLocalHabilitado = habilitado;
+}
+
+export function loginLocalMock(): boolean {
+  return loginLocalHabilitado;
+}
+
+/** Usuário interno que o token genérico representa quando `origem = LOGIN_LOCAL`. */
+function internoDaSessaoGenerica(): UsuarioInternoDb | undefined {
+  const login = sessaoAtual.perfil === 'comum' ? 'comum.mock' : 'admin.mock';
+  return db.usuarios.find((u) => u.login === login);
+}
+
+/** Usuário que o mock de `/api/fluig/me` devolve para o token genérico. */
+export function usuarioMock(): UsuarioFluig {
+  if (sessaoAtual.origem === 'LOGIN_LOCAL') {
+    const interno = internoDaSessaoGenerica();
+    if (interno) {
+      return {
+        ...paraUsuarioFluig(interno),
+        trocaSenhaObrigatoria: sessaoAtual.trocaSenhaObrigatoria,
+      };
+    }
+  }
+  const base = sessaoAtual.perfil === 'comum' ? USUARIO_MOCK_COMUM : USUARIO_MOCK;
+  return { ...base, origem: sessaoAtual.origem, trocaSenhaObrigatoria: false };
+}
+
+/** Sessão resolvida de uma requisição: o usuário e, no login próprio, o id do usuário interno. */
+export interface SessaoResolvida {
+  usuario: UsuarioFluig;
+  usuarioInternoId: string | null;
+}
+
+const PREFIXO_TOKEN_LOCAL = 'local:';
+
+/** Token do login próprio no mock: `local:<id>:<versão da credencial>` (o `ver` do JWT real). */
+export function tokenLocal(u: UsuarioInternoDb): string {
+  return `${PREFIXO_TOKEN_LOCAL}${u.id}:${u.versao}`;
+}
+
+/**
+ * Esquema fluigAuth simulado. `null` = 401. Tokens `invalido`, `expirado` e `portal:*` são
+ * recusados; `local:*` é conferido no "banco" (ativo, mesma versão); os demais são o token genérico.
+ */
+export function resolverSessao(token: string | null | undefined): SessaoResolvida | null {
+  if (!token || token === 'invalido' || token === 'expirado' || token.startsWith('portal:')) return null;
+  if (token.startsWith(PREFIXO_TOKEN_LOCAL)) {
+    const [id, versao] = token.slice(PREFIXO_TOKEN_LOCAL.length).split(':');
+    const u = db.usuarios.find((x) => x.id === id);
+    if (!u || !u.ativo || String(u.versao) !== versao || !loginLocalHabilitado) return null;
+    return { usuario: paraUsuarioFluig(u), usuarioInternoId: u.id };
+  }
+  const usuario = usuarioMock();
+  const interno = usuario.origem === 'LOGIN_LOCAL' ? internoDaSessaoGenerica() : undefined;
+  return { usuario, usuarioInternoId: interno?.id ?? null };
+}
+
+// ───────────────────────────── Usuários internos (data-model §10) ─────────────────────────────
+
+export interface UsuarioInternoDb {
+  id: string;
+  login: string;
+  nome: string;
+  email: string;
+  admin: boolean;
+  ativo: boolean;
+  /** Mock: senha em texto (a API guarda só o hash BCrypt). */
+  senha: string;
+  trocaSenhaObrigatoria: boolean;
+  senhaProvisoriaExpiraEm: string | null;
+  versao: number;
+  tentativasFalhas: number;
+  bloqueadoAte: string | null;
+  ultimoAcessoEm: string | null;
+  criadoEm: string;
+  criadoPor: string;
+  atualizadoEm: string | null;
+}
+
+/** Senha provisória fixa do mock (a API gera 12 caracteres aleatórios e manda por e-mail). */
+export const SENHA_PROVISORIA_MOCK = 'Temp1234';
+
+/** Tentativas de login inexistente (tabela `tentativas_login` da API). */
+export const tentativasLoginInexistente = new Map<string, { falhas: number; bloqueadoAte: string | null }>();
 
 const OUTRA_ANALISTA: AutorFluig = { login: 'maria.silva', nome: 'Maria Silva' };
 
@@ -139,6 +255,7 @@ export const db = {
   tipos: [] as TipoDb[],
   convites: [] as ConviteDb[],
   envios: [] as EnvioDb[],
+  usuarios: [] as UsuarioInternoDb[],
 };
 
 let sequencia = 0;
@@ -161,7 +278,7 @@ function ha(dias: number, horas = 0): string {
   return new Date(agora().getTime() - (dias * 24 + horas) * 3_600_000).toISOString();
 }
 
-function daqui(dias: number): string {
+export function daqui(dias: number): string {
   return new Date(agora().getTime() + dias * 24 * 3_600_000).toISOString();
 }
 
@@ -190,6 +307,11 @@ export const IDS = {
   envioAlfaAso: '44444444-4444-4444-8444-000000000006',
   envioAlfaAlvaraRejeitado: '44444444-4444-4444-8444-000000000007',
   envioAlfaAlvaraAprovado: '44444444-4444-4444-8444-000000000008',
+  usuarioAdmin: '55555555-5555-4555-8555-000000000001',
+  usuarioComum: '55555555-5555-4555-8555-000000000002',
+  usuarioNovo: '55555555-5555-4555-8555-000000000003',
+  usuarioInativo: '55555555-5555-4555-8555-000000000004',
+  usuarioExpirado: '55555555-5555-4555-8555-000000000005',
 } as const;
 
 function semear(): void {
@@ -249,11 +371,25 @@ function semear(): void {
   ]);
 }
 
+function semearUsuarios(): void {
+  const base = { tentativasFalhas: 0, bloqueadoAte: null, criadoPor: 'sistema', atualizadoEm: null };
+  db.usuarios.splice(0, db.usuarios.length, ...[
+    { ...base, id: IDS.usuarioAdmin, login: 'admin.mock', nome: 'Ana Administradora', email: 'ana.admin@jotanunes.com', admin: true, ativo: true, senha: 'Admin1234', trocaSenhaObrigatoria: false, senhaProvisoriaExpiraEm: null, versao: 0, ultimoAcessoEm: ha(0, 2), criadoEm: ha(30) },
+    { ...base, id: IDS.usuarioComum, login: 'comum.mock', nome: 'Carlos Comum', email: 'carlos.comum@jotanunes.com', admin: false, ativo: true, senha: 'Comum1234', trocaSenhaObrigatoria: false, senhaProvisoriaExpiraEm: null, versao: 0, ultimoAcessoEm: ha(1, 4), criadoEm: ha(20), criadoPor: 'admin.mock' },
+    { ...base, id: IDS.usuarioNovo, login: 'novo.mock', nome: 'Nina Nova', email: 'nina.nova@jotanunes.com', admin: false, ativo: true, senha: SENHA_PROVISORIA_MOCK, trocaSenhaObrigatoria: true, senhaProvisoriaExpiraEm: daqui(6), versao: 0, ultimoAcessoEm: null, criadoEm: ha(1), criadoPor: 'admin.mock' },
+    { ...base, id: IDS.usuarioInativo, login: 'inativo.mock', nome: 'Igor Inativo', email: 'igor.inativo@jotanunes.com', admin: false, ativo: false, senha: 'Inativo1234', trocaSenhaObrigatoria: false, senhaProvisoriaExpiraEm: null, versao: 1, ultimoAcessoEm: ha(40), criadoEm: ha(90), criadoPor: 'admin.mock', atualizadoEm: ha(35) },
+    { ...base, id: IDS.usuarioExpirado, login: 'expirado.mock', nome: 'Eva Expirada', email: 'eva.expirada@jotanunes.com', admin: false, ativo: true, senha: SENHA_PROVISORIA_MOCK, trocaSenhaObrigatoria: true, senhaProvisoriaExpiraEm: ha(2), versao: 0, ultimoAcessoEm: null, criadoEm: ha(9), criadoPor: 'admin.mock' },
+  ]);
+  tentativasLoginInexistente.clear();
+}
+
 export function reiniciarDados(): void {
   semear();
+  semearUsuarios();
 }
 
 semear();
+semearUsuarios();
 
 // ───────────────────────────── Derivações (data-model.md) ─────────────────────────────
 
@@ -411,5 +547,42 @@ export function paraDocumentoSituacao(empresaId: string, t: TipoDb): DocumentoSi
     situacao,
     envioAtual: envioAtual ? paraEnvio(envioAtual) : null,
     quantidadeEnvios: quantidade,
+  };
+}
+
+export function situacaoUsuario(u: UsuarioInternoDb): SituacaoUsuarioInterno {
+  if (!u.ativo) return 'DESATIVADO';
+  if (!u.trocaSenhaObrigatoria) return 'ATIVO';
+  const expira = u.senhaProvisoriaExpiraEm ? new Date(u.senhaProvisoriaExpiraEm).getTime() : 0;
+  return expira > agora().getTime() ? 'AGUARDANDO_PRIMEIRO_ACESSO' : 'SENHA_PROVISORIA_EXPIRADA';
+}
+
+export function paraUsuarioInterno(u: UsuarioInternoDb): UsuarioInterno {
+  const bloqueado = u.bloqueadoAte && new Date(u.bloqueadoAte).getTime() > agora().getTime();
+  return {
+    id: u.id,
+    login: u.login,
+    nome: u.nome,
+    email: u.email,
+    admin: u.admin,
+    ativo: u.ativo,
+    situacao: situacaoUsuario(u),
+    senhaProvisoriaExpiraEm: u.trocaSenhaObrigatoria ? u.senhaProvisoriaExpiraEm : null,
+    bloqueadoAte: bloqueado ? u.bloqueadoAte : null,
+    ultimoAcessoEm: u.ultimoAcessoEm,
+    criadoEm: u.criadoEm,
+    criadoPor: u.criadoPor,
+    atualizadoEm: u.atualizadoEm,
+  };
+}
+
+export function paraUsuarioFluig(u: UsuarioInternoDb): UsuarioFluig {
+  return {
+    login: u.login,
+    nome: u.nome,
+    email: u.email,
+    admin: u.admin,
+    origem: 'LOGIN_LOCAL',
+    trocaSenhaObrigatoria: u.trocaSenhaObrigatoria,
   };
 }

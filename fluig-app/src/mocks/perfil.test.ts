@@ -49,7 +49,8 @@ describe('mocks por perfil', () => {
     definirPerfilMock('comum');
     const me = await (await chamar('GET', '/me')).json();
     expect(me.admin).toBe(false);
-    expect(Object.keys(me).sort()).toEqual(['admin', 'email', 'login', 'nome']);
+    expect(Object.keys(me).sort()).toEqual(['admin', 'email', 'login', 'nome', 'origem', 'trocaSenhaObrigatoria']);
+    expect(me.origem).toBe('FLUIG');
   });
 
   it('com perfil comum as 10 operações de administrador respondem 403 SEM_PERMISSAO sem mudar nada', async () => {

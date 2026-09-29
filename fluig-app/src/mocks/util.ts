@@ -1,7 +1,7 @@
 import { HttpResponse, delay } from 'msw';
 import { MENSAGENS_ERRO, STATUS_ERRO } from '../api/mensagens';
 import type { CodigoErro, Problema } from '../api/tipos';
-import { perfilMock } from './dados';
+import { resolverSessao, type SessaoResolvida } from './dados';
 
 /** Prefixo que casa com qualquer `VITE_API_URL` (ou nenhuma). */
 export const API = '*/api/fluig';
@@ -30,25 +30,43 @@ export function validacao(errors: Record<string, string[]>): HttpResponse<Proble
   return problema('VALIDACAO', { errors });
 }
 
+function tokenDaRequisicao(request: Request): string | null {
+  const auth = request.headers.get('authorization') ?? '';
+  return /^Bearer\s+(.+)$/i.exec(auth)?.[1]?.trim() ?? null;
+}
+
+/** Sessão da requisição (ou `null` quando o token falta, é inválido ou foi revogado). */
+export function sessaoDe(request: Request): SessaoResolvida | null {
+  return resolverSessao(tokenDaRequisicao(request));
+}
+
 /**
- * Esquema fluigAuth simulado: sem Bearer, ou com os tokens `invalido`/`expirado`/`portal:*` → 401.
- * Qualquer outro token é aceito como o usuário de desenvolvimento.
+ * Rotas de sessão (`/me`, `/auth/trocar-senha`, `/auth/sair`): só exigem um token válido — valem
+ * também com a troca de senha pendente.
+ */
+export function exigirSessao(request: Request): HttpResponse<Problema> | null {
+  return sessaoDe(request) ? null : problema('NAO_AUTENTICADO');
+}
+
+/**
+ * Esquema fluigAuth simulado (ver `resolverSessao`): sem Bearer, com os tokens
+ * `invalido`/`expirado`/`portal:*` ou com token do login próprio revogado → 401. Login próprio com
+ * troca de senha pendente → 403 `TROCA_SENHA_OBRIGATORIA` (regra global do contrato).
  */
 export function exigirFluig(request: Request): HttpResponse<Problema> | null {
-  const auth = request.headers.get('authorization') ?? '';
-  const token = /^Bearer\s+(.+)$/i.exec(auth)?.[1]?.trim();
-  if (!token || token === 'invalido' || token === 'expirado' || token.startsWith('portal:')) {
-    return problema('NAO_AUTENTICADO');
-  }
+  const sessao = sessaoDe(request);
+  if (!sessao) return problema('NAO_AUTENTICADO');
+  if (sessao.usuario.trocaSenhaObrigatoria) return problema('TROCA_SENHA_OBRIGATORIA');
   return null;
 }
 
 /**
- * Operações `x-requer-admin` do contrato: com o perfil comum → 403 `SEM_PERMISSAO`. Chamar logo depois
- * de `exigirFluig` (sem token continua 401) e antes de ler o corpo ou procurar o recurso (FR-083).
+ * Operações `x-requer-admin` do contrato: usuário comum (Fluig ou login próprio) → 403
+ * `SEM_PERMISSAO`. Chamar logo depois de `exigirFluig` (sem token continua 401) e antes de ler o
+ * corpo ou procurar o recurso (FR-083).
  */
-export function exigirAdmin(): HttpResponse<Problema> | null {
-  return perfilMock() === 'comum' ? problema('SEM_PERMISSAO') : null;
+export function exigirAdmin(request: Request): HttpResponse<Problema> | null {
+  return sessaoDe(request)?.usuario.admin ? null : problema('SEM_PERMISSAO');
 }
 
 /** Latência realista no navegador (MSW ignora em Node/testes). */

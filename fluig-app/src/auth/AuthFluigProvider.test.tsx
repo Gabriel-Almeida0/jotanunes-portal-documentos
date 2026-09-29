@@ -1,14 +1,28 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../mocks/server';
 import App from '../App';
+import { api } from '../api/fluig';
+import { IDS, definirLoginLocalMock } from '../mocks/dados';
 import { AuthFluigProvider } from './AuthFluigProvider';
 import { useUsuarioFluig } from './contexto';
 import { CHAVE_TOKEN } from './tokenFluig';
 
+const TOKEN_LOCAL_COMUM = `local:${IDS.usuarioComum}:0`;
+const TITULO_LOGIN = 'Acesse a documentação de terceirizadas';
+
 function Conteudo() {
   const usuario = useUsuarioFluig();
-  return <p>Olá, {usuario.nome}</p>;
+  return (
+    <>
+      <p>Olá, {usuario.nome}</p>
+      <p>Origem: {usuario.origem}</p>
+      <button type="button" onClick={() => void api.painel().catch(() => undefined)}>
+        Carregar painel
+      </button>
+    </>
+  );
 }
 
 function renderizar() {
@@ -49,10 +63,79 @@ describe('AuthFluigProvider', () => {
     expect(window.sessionStorage.getItem(CHAVE_TOKEN)).toBe('token-do-fluig');
   });
 
-  it('sem token mostra "Abra este sistema pelo Fluig." e nenhum dado', async () => {
+  it('sem token e com o login próprio ligado mostra a tela de login e nenhum dado', async () => {
+    renderizar();
+    expect(await screen.findByRole('heading', { level: 1, name: TITULO_LOGIN })).toBeInTheDocument();
+    expect(screen.getByLabelText('Login')).toBeInTheDocument();
+    expect(screen.getByLabelText('Senha')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Acessar' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Jotanunes Construtora' })).toBeInTheDocument();
+    expect(screen.queryByText(/Olá/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Abra este sistema pelo Fluig.')).not.toBeInTheDocument();
+  });
+
+  it('sem token e com o login próprio desligado mostra "Abra este sistema pelo Fluig." e nenhum dado', async () => {
+    definirLoginLocalMock(false);
     renderizar();
     expect(await screen.findByText('Abra este sistema pelo Fluig.')).toBeInTheDocument();
     expect(screen.queryByText(/Olá/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Senha')).not.toBeInTheDocument();
+  });
+
+  it('sem token e sem resposta da configuração mostra o erro com "Tentar de novo"', async () => {
+    server.use(http.get('*/api/fluig/auth/configuracao', () => HttpResponse.error()));
+    renderizar();
+    const tentar = await screen.findByRole('button', { name: 'Tentar de novo' });
+    server.resetHandlers();
+    await userEvent.click(tentar);
+    expect(await screen.findByRole('heading', { level: 1, name: TITULO_LOGIN })).toBeInTheDocument();
+  });
+
+  it('token do Fluig no fragmento abre o app sem "Sair" nem "Trocar senha"', async () => {
+    window.history.replaceState(null, '', '/#fluigToken=token-do-fluig');
+    render(
+      <AuthFluigProvider>
+        <App />
+      </AuthFluigProvider>,
+    );
+    expect(await screen.findByRole('heading', { level: 1, name: 'Painel' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sair' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Trocar senha' })).not.toBeInTheDocument();
+  });
+
+  it('401 numa sessão de login próprio volta para o login com "Sua sessão expirou. Entre de novo."', async () => {
+    window.sessionStorage.setItem(CHAVE_TOKEN, TOKEN_LOCAL_COMUM);
+    renderizar();
+    expect(await screen.findByText('Origem: LOGIN_LOCAL')).toBeInTheDocument();
+    server.use(
+      http.get('*/api/fluig/painel', () =>
+        HttpResponse.json({ code: 'NAO_AUTENTICADO', status: 401, title: 'Sua sessão expirou. Entre de novo.', type: 'x' }, { status: 401 }),
+      ),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Carregar painel' }));
+
+    expect(await screen.findByRole('heading', { level: 1, name: TITULO_LOGIN })).toBeInTheDocument();
+    expect(screen.getByText('Sua sessão expirou. Entre de novo.')).toBeInTheDocument();
+    expect(screen.queryByText(/Olá/)).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem(CHAVE_TOKEN)).toBeNull();
+  });
+
+  it('401 numa sessão do Fluig mostra "Abra este sistema pelo Fluig." mesmo com o login próprio ligado', async () => {
+    window.sessionStorage.setItem(CHAVE_TOKEN, 'token-valido');
+    renderizar();
+    expect(await screen.findByText('Origem: FLUIG')).toBeInTheDocument();
+    server.use(
+      http.get('*/api/fluig/painel', () =>
+        HttpResponse.json({ code: 'NAO_AUTENTICADO', status: 401, title: 'x', type: 'x' }, { status: 401 }),
+      ),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Carregar painel' }));
+
+    expect(await screen.findByText('Abra este sistema pelo Fluig.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Senha')).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem(CHAVE_TOKEN)).toBeNull();
   });
 
   it('401 do /me mostra a mesma tela e descarta o token', async () => {
@@ -96,6 +179,7 @@ describe('AuthFluigProvider', () => {
     });
 
     it('sai de "Abra este sistema pelo Fluig." quando o token chega pelo hashchange e limpa a URL', async () => {
+      definirLoginLocalMock(false);
       const autorizacoes = espiarAutorizacao();
       const tamanhoInicial = window.history.length;
       renderizar();
@@ -136,6 +220,7 @@ describe('AuthFluigProvider', () => {
     });
 
     it('token junto com uma rota no fragmento abre essa rota', async () => {
+      definirLoginLocalMock(false);
       render(
         <AuthFluigProvider>
           <App />
@@ -148,6 +233,30 @@ describe('AuthFluigProvider', () => {
       expect(await screen.findByRole('heading', { level: 1, name: 'Obras' })).toBeInTheDocument();
       expect(window.location.hash).toBe('#/obras');
       expect(window.location.href).not.toContain('token-com-rota');
+    });
+
+    it('sai da tela de login quando o token do Fluig chega pelo hashchange', async () => {
+      renderizar();
+      expect(await screen.findByRole('heading', { level: 1, name: TITULO_LOGIN })).toBeInTheDocument();
+
+      fluigTrocaFragmento('#fluigToken=token-chegou-depois');
+
+      expect(await screen.findByText('Olá, Analista Dev')).toBeInTheDocument();
+      expect(screen.getByText('Origem: FLUIG')).toBeInTheDocument();
+      expect(window.location.href).not.toContain('token-chegou-depois');
+    });
+
+    it('o token do fragmento substitui uma sessão de login próprio na mesma aba', async () => {
+      window.sessionStorage.setItem(CHAVE_TOKEN, TOKEN_LOCAL_COMUM);
+      renderizar();
+      expect(await screen.findByText('Olá, Carlos Comum')).toBeInTheDocument();
+      expect(screen.getByText('Origem: LOGIN_LOCAL')).toBeInTheDocument();
+
+      fluigTrocaFragmento('#fluigToken=token-do-fluig');
+
+      expect(await screen.findByText('Olá, Analista Dev')).toBeInTheDocument();
+      expect(screen.getByText('Origem: FLUIG')).toBeInTheDocument();
+      expect(window.sessionStorage.getItem(CHAVE_TOKEN)).toBe('token-do-fluig');
     });
 
     it('token novo recusado (401) volta para "Abra este sistema pelo Fluig."', async () => {

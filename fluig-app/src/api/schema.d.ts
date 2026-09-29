@@ -28,10 +28,104 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Dados do usuário Fluig identificado pelo token (inclui se é administrador) */
+        /**
+         * Dados do usuário da área Jotanunes identificado pelo token (perfil, origem e troca pendente)
+         * @description Responde também com troca de senha pendente (login próprio), para o front mostrar a tela de troca.
+         */
         get: operations["fluigObterUsuarioAtual"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fluig/auth/configuracao": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Diz se o login próprio da área Jotanunes está ligado (anônimo)
+         * @description Sempre 200, sem autenticação, com `Cache-Control: no-store`. O front chama quando não tem
+         *     token: `true` → tela de login; `false` → "Abra este sistema pelo Fluig.".
+         */
+        get: operations["fluigObterConfiguracaoAcesso"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fluig/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login próprio da área Jotanunes (login + senha de usuário interno)
+         * @description Anônimo, com limite de 10 requisições/min por IP (mesma regra do login do portal).
+         *     Login sem diferenciar maiúsculas (espaços nas pontas removidos).
+         *     5 falhas seguidas no mesmo login — existente ou não — → bloqueio de 15 min (423 `ACESSO_BLOQUEADO`).
+         *     `LOGIN_INVALIDO` não revela se o login existe (mesma mensagem e mesma sequência de respostas).
+         *     Com senha provisória, a sessão volta com `usuario.trocaSenhaObrigatoria=true`.
+         *     Login próprio desligado → 404 `NAO_ENCONTRADO`.
+         */
+        post: operations["fluigLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fluig/auth/trocar-senha": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Troca a senha do usuário interno (obrigatória no primeiro acesso) e devolve nova sessão
+         * @description Só para sessão de login próprio (token Fluig → 409 `SO_LOGIN_LOCAL`). Permitida com
+         *     `troca_senha=true`. Exige a senha atual; nova senha com 8–128 caracteres, letra e número,
+         *     diferente da atual. Incrementa a versão da credencial (tokens anteriores deixam de valer) e
+         *     devolve novo token com `troca_senha=false`. Login próprio desligado → 404.
+         */
+        post: operations["fluigTrocarSenha"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fluig/auth/sair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Encerra a sessão de login próprio (revoga o token na hora)
+         * @description Incrementa a versão da credencial do usuário interno: o token atual (e outras sessões do mesmo
+         *     usuário) passam a 401. Com token do Fluig → 204 sem efeito. Permitida com troca de senha
+         *     pendente. Login próprio desligado → 404.
+         */
+        post: operations["fluigSair"];
         delete?: never;
         options?: never;
         head?: never;
@@ -356,6 +450,79 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/fluig/usuarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lista usuários internos (ordenados por nome) */
+        get: operations["fluigListarUsuariosInternos"];
+        put?: never;
+        /**
+         * Cadastra usuário interno e envia a senha provisória por e-mail
+         * @description Gera senha provisória (12 caracteres, vale 7 dias, troca obrigatória no primeiro acesso) e
+         *     envia o e-mail de acesso ao `email`. A senha NUNCA volta na resposta. Se o e-mail falhar,
+         *     nada é gravado (502 `EMAIL_ACESSO_FALHOU`).
+         */
+        post: operations["fluigCriarUsuarioInterno"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fluig/usuarios/{usuarioId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                usuarioId: components["parameters"]["UsuarioId"];
+            };
+            cookie?: never;
+        };
+        /** Detalhe do usuário interno */
+        get: operations["fluigObterUsuarioInterno"];
+        /**
+         * Atualiza nome, e-mail, perfil e ativação do usuário interno (o login não muda)
+         * @description Mudar `admin` ou `ativo` revoga na hora as sessões do usuário (versão da credencial + 1).
+         *     Recusas: a sessão de login próprio desativando a si mesma ou tirando o próprio papel →
+         *     409 `ALTERACAO_PROPRIA_NAO_PERMITIDA`; deixaria o sistema sem nenhum usuário interno
+         *     administrador ativo → 409 `ULTIMO_ADMINISTRADOR`.
+         */
+        put: operations["fluigAtualizarUsuarioInterno"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fluig/usuarios/{usuarioId}/redefinir-senha": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                usuarioId: components["parameters"]["UsuarioId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Gera nova senha provisória e envia por e-mail
+         * @description Nova senha provisória (7 dias, troca obrigatória), zera tentativas/bloqueio e revoga as
+         *     sessões do usuário. Usuário desativado → 409 `USUARIO_INATIVO`. Se o e-mail falhar, nada
+         *     muda (502 `EMAIL_ACESSO_FALHOU`). A senha NUNCA volta na resposta.
+         */
+        post: operations["fluigRedefinirSenhaUsuarioInterno"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portal/convites/validar": {
         parameters: {
             query?: never;
@@ -512,7 +679,7 @@ export interface components {
          *     |---|---|---|
          *     | VALIDACAO | 400 | Confira os dados informados. |
          *     | NAO_AUTENTICADO | 401 | Sua sessão expirou. Entre de novo. |
-         *     | TROCA_SENHA_OBRIGATORIA | 403 | Crie uma nova senha para continuar. |
+         *     | TROCA_SENHA_OBRIGATORIA | 403 | Crie uma nova senha para continuar. (portal e login próprio da área Jotanunes) |
          *     | SEM_PERMISSAO | 403 | Só administradores podem fazer isso. Se você precisa, fale com a TI. |
          *     | NAO_ENCONTRADO | 404 | Não encontramos o que você procurou. |
          *     | CNPJ_DUPLICADO | 409 | Já existe uma empresa com este CNPJ. |
@@ -521,7 +688,7 @@ export interface components {
          *     | NOME_DUPLICADO | 409 | Já existe um tipo de documento com este nome. |
          *     | EMPRESA_INATIVA | 409 (Fluig) / 403 (login) | Esta empresa está desativada. |
          *     | CREDENCIAIS_INVALIDAS | 401 | CNPJ ou senha incorretos. |
-         *     | ACESSO_BLOQUEADO | 423 | Muitas tentativas. Tente de novo em 15 minutos. |
+         *     | ACESSO_BLOQUEADO | 423 | Muitas tentativas. Tente de novo em 15 minutos. (portal e login próprio) |
          *     | CONVITE_INVALIDO | 404 | Este link não é mais válido. |
          *     | CONVITE_EXPIRADO | 401 | Seu convite expirou. Peça um novo convite à Jotanunes. |
          *     | SENHA_FRACA | 400 | A senha precisa ter pelo menos 8 caracteres, com letras e números. |
@@ -534,9 +701,17 @@ export interface components {
          *     | EMAIL_FALHOU | 502 | Não conseguimos enviar o convite. Tente de novo em alguns minutos. |
          *     | LIMITE_REQUISICOES | 429 | Muitas tentativas. Aguarde um pouco. |
          *     | ERRO_INTERNO | 500 | Algo deu errado do nosso lado. Tente de novo. |
+         *     | LOGIN_INVALIDO | 401 | Login ou senha incorretos. |
+         *     | USUARIO_INATIVO | 403 (login) / 409 (redefinir senha) | Este usuário está desativado. Fale com um administrador do sistema. |
+         *     | SENHA_PROVISORIA_EXPIRADA | 401 | Sua senha provisória expirou. Peça a um administrador para gerar outra. |
+         *     | LOGIN_DUPLICADO | 409 | Já existe um usuário com este login. |
+         *     | ULTIMO_ADMINISTRADOR | 409 | O sistema precisa de pelo menos um administrador ativo. |
+         *     | ALTERACAO_PROPRIA_NAO_PERMITIDA | 409 | Você não pode desativar nem tirar o seu próprio acesso de administrador. Peça a outro administrador. |
+         *     | EMAIL_ACESSO_FALHOU | 502 | Não conseguimos enviar o e-mail com a senha provisória. Tente de novo em alguns minutos. |
+         *     | SO_LOGIN_LOCAL | 409 | Esta opção é só para quem entra com login e senha. |
          * @enum {string}
          */
-        CodigoErro: "VALIDACAO" | "NAO_AUTENTICADO" | "TROCA_SENHA_OBRIGATORIA" | "SEM_PERMISSAO" | "NAO_ENCONTRADO" | "CNPJ_DUPLICADO" | "CNPJ_IMUTAVEL" | "CODIGO_OBRA_DUPLICADO" | "NOME_DUPLICADO" | "EMPRESA_INATIVA" | "CREDENCIAIS_INVALIDAS" | "ACESSO_BLOQUEADO" | "CONVITE_INVALIDO" | "CONVITE_EXPIRADO" | "SENHA_FRACA" | "SENHA_ATUAL_INCORRETA" | "ENVIO_NAO_PERMITIDO" | "ENVIO_JA_ANALISADO" | "ARQUIVO_INVALIDO" | "ARQUIVO_MUITO_GRANDE" | "ARQUIVO_TIPO_NAO_SUPORTADO" | "EMAIL_FALHOU" | "LIMITE_REQUISICOES" | "ERRO_INTERNO";
+        CodigoErro: "VALIDACAO" | "NAO_AUTENTICADO" | "TROCA_SENHA_OBRIGATORIA" | "SEM_PERMISSAO" | "NAO_ENCONTRADO" | "CNPJ_DUPLICADO" | "CNPJ_IMUTAVEL" | "CODIGO_OBRA_DUPLICADO" | "NOME_DUPLICADO" | "EMPRESA_INATIVA" | "CREDENCIAIS_INVALIDAS" | "ACESSO_BLOQUEADO" | "CONVITE_INVALIDO" | "CONVITE_EXPIRADO" | "SENHA_FRACA" | "SENHA_ATUAL_INCORRETA" | "ENVIO_NAO_PERMITIDO" | "ENVIO_JA_ANALISADO" | "ARQUIVO_INVALIDO" | "ARQUIVO_MUITO_GRANDE" | "ARQUIVO_TIPO_NAO_SUPORTADO" | "EMAIL_FALHOU" | "LIMITE_REQUISICOES" | "ERRO_INTERNO" | "LOGIN_INVALIDO" | "USUARIO_INATIVO" | "SENHA_PROVISORIA_EXPIRADA" | "LOGIN_DUPLICADO" | "ULTIMO_ADMINISTRADOR" | "ALTERACAO_PROPRIA_NAO_PERMITIDA" | "EMAIL_ACESSO_FALHOU" | "SO_LOGIN_LOCAL";
         Problema: {
             /** @example https://jotanunes.com/problemas/nao-encontrado */
             type: string;
@@ -574,15 +749,87 @@ export interface components {
         SituacaoDocumento: "PENDENTE_ENVIO" | "EM_ANALISE" | "APROVADO" | "REJEITADO";
         /** @enum {string} */
         FormatoArquivo: "application/pdf" | "image/jpeg" | "image/png";
+        /**
+         * @description Usuário atual da área Jotanunes (nome histórico do schema: desde 1.2.0 representa também a
+         *     sessão do login próprio).
+         */
         UsuarioFluig: {
             login: string;
             nome: string;
             email: string;
             /**
-             * @description true quando o token Fluig traz `roles` com `admin`. O front usa para esconder as ações
+             * @description true quando o token traz `roles` com `admin`. O front usa para esconder as ações
              *     de administrador; a API confere o papel em toda operação `x-requer-admin`.
              */
             admin: boolean;
+            origem: components["schemas"]["OrigemSessao"];
+            /** @description Só no login próprio (senha provisória ainda não trocada). Sempre false para o Fluig. */
+            trocaSenhaObrigatoria: boolean;
+        };
+        /**
+         * @description `FLUIG` = token emitido pelo Fluig; `LOGIN_LOCAL` = login próprio (mostra "Sair" e "Trocar senha").
+         * @enum {string}
+         */
+        OrigemSessao: "FLUIG" | "LOGIN_LOCAL";
+        ConfiguracaoAcesso: {
+            loginLocalHabilitado: boolean;
+        };
+        LoginJotanunesInput: {
+            login: string;
+            senha: string;
+        };
+        SessaoJotanunes: {
+            /** @description JWT fluigAuth do login próprio (iss=jotanunes-docs). */
+            accessToken: string;
+            /** Format: date-time */
+            expiraEm: string;
+            usuario: components["schemas"]["UsuarioFluig"];
+        };
+        /** @enum {string} */
+        SituacaoUsuarioInterno: "AGUARDANDO_PRIMEIRO_ACESSO" | "SENHA_PROVISORIA_EXPIRADA" | "ATIVO" | "DESATIVADO";
+        UsuarioInternoInput: {
+            /** @description Único sem diferenciar maiúsculas; gravado em minúsculas; não pode ser alterado depois. */
+            login: string;
+            nome: string;
+            /** Format: email */
+            email: string;
+            /** @default false */
+            admin: boolean;
+        };
+        UsuarioInternoAtualizacao: {
+            nome: string;
+            /** Format: email */
+            email: string;
+            admin: boolean;
+            ativo: boolean;
+        };
+        UsuarioInterno: {
+            /** Format: uuid */
+            id: string;
+            login: string;
+            nome: string;
+            email: string;
+            admin: boolean;
+            ativo: boolean;
+            situacao: components["schemas"]["SituacaoUsuarioInterno"];
+            /** Format: date-time */
+            senhaProvisoriaExpiraEm?: string | null;
+            /**
+             * Format: date-time
+             * @description Preenchido enquanto o login estiver bloqueado por tentativas erradas.
+             */
+            bloqueadoAte?: string | null;
+            /** Format: date-time */
+            ultimoAcessoEm?: string | null;
+            /** Format: date-time */
+            criadoEm: string;
+            /** @description Login de quem cadastrou, ou `sistema` (comando de instalação). */
+            criadoPor: string;
+            /** Format: date-time */
+            atualizadoEm?: string | null;
+        };
+        PaginaUsuariosInternos: components["schemas"]["PaginaBase"] & {
+            itens: components["schemas"]["UsuarioInterno"][];
         };
         AutorFluig: {
             login: string;
@@ -866,7 +1113,7 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problema"];
             };
         };
-        /** @description `TROCA_SENHA_OBRIGATORIA` — a empresa precisa trocar a senha antes de continuar */
+        /** @description `TROCA_SENHA_OBRIGATORIA` — a empresa (portal) ou o usuário interno (login próprio da área Jotanunes) precisa trocar a senha antes de continuar */
         TrocaSenhaObrigatoria: {
             headers: {
                 [name: string]: unknown;
@@ -875,7 +1122,7 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problema"];
             };
         };
-        /** @description `SEM_PERMISSAO` — operação só para administradores; o token Fluig não tem `roles` com `admin` */
+        /** @description `SEM_PERMISSAO` — operação só para administradores; o token (Fluig ou login próprio) não tem `roles` com `admin`. Com login próprio e troca de senha pendente, esta rota devolve antes `TROCA_SENHA_OBRIGATORIA` (mesmo status 403) */
         SemPermissao: {
             headers: {
                 [name: string]: unknown;
@@ -936,6 +1183,7 @@ export interface components {
         EmpresaId: string;
         TipoDocumentoId: string;
         EnvioId: string;
+        UsuarioId: string;
     };
     requestBodies: never;
     headers: never;
@@ -987,6 +1235,144 @@ export interface operations {
             401: components["responses"]["NaoAutenticado"];
         };
     };
+    fluigObterConfiguracaoAcesso: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Configuração de acesso */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfiguracaoAcesso"];
+                };
+            };
+        };
+    };
+    fluigLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginJotanunesInput"];
+            };
+        };
+        responses: {
+            /** @description Autenticado */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessaoJotanunes"];
+                };
+            };
+            400: components["responses"]["Validacao"];
+            /** @description `LOGIN_INVALIDO` ou `SENHA_PROVISORIA_EXPIRADA` (senha certa, provisória vencida) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description `USUARIO_INATIVO` (senha certa, usuário desativado) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            404: components["responses"]["NaoEncontrado"];
+            /** @description `ACESSO_BLOQUEADO` (extensão `bloqueadoAte` com a data/hora de liberação) */
+            423: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            429: components["responses"]["LimiteRequisicoes"];
+        };
+    };
+    fluigTrocarSenha: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrocaSenhaInput"];
+            };
+        };
+        responses: {
+            /** @description Senha trocada */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessaoJotanunes"];
+                };
+            };
+            /** @description `VALIDACAO`, `SENHA_FRACA` ou `SENHA_ATUAL_INCORRETA` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            401: components["responses"]["NaoAutenticado"];
+            404: components["responses"]["NaoEncontrado"];
+            /** @description `SO_LOGIN_LOCAL` (sessão aberta pelo Fluig) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    fluigSair: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sessão encerrada (ou nada a fazer */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NaoAutenticado"];
+            404: components["responses"]["NaoEncontrado"];
+        };
+    };
     fluigObterPainel: {
         parameters: {
             query?: never;
@@ -1006,6 +1392,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
         };
     };
     fluigListarObras: {
@@ -1035,6 +1422,7 @@ export interface operations {
             };
             400: components["responses"]["Validacao"];
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
         };
     };
     fluigCriarObra: {
@@ -1095,6 +1483,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
             404: components["responses"]["NaoEncontrado"];
         };
     };
@@ -1215,6 +1604,7 @@ export interface operations {
             };
             400: components["responses"]["Validacao"];
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
         };
     };
     fluigCriarEmpresa: {
@@ -1275,6 +1665,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
             404: components["responses"]["NaoEncontrado"];
         };
     };
@@ -1338,6 +1729,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
             404: components["responses"]["NaoEncontrado"];
         };
     };
@@ -1362,6 +1754,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
             404: components["responses"]["NaoEncontrado"];
             /** @description `EMPRESA_INATIVA` */
             409: {
@@ -1404,6 +1797,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
             404: components["responses"]["NaoEncontrado"];
         };
     };
@@ -1429,6 +1823,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
             404: components["responses"]["NaoEncontrado"];
         };
     };
@@ -1454,6 +1849,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
         };
     };
     fluigCriarTipoDocumento: {
@@ -1514,6 +1910,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
             404: components["responses"]["NaoEncontrado"];
         };
     };
@@ -1584,6 +1981,7 @@ export interface operations {
             };
             400: components["responses"]["Validacao"];
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
         };
     };
     fluigObterEnvio: {
@@ -1607,6 +2005,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
             404: components["responses"]["NaoEncontrado"];
         };
     };
@@ -1623,6 +2022,7 @@ export interface operations {
         responses: {
             200: components["responses"]["Arquivo"];
             401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
             404: components["responses"]["NaoEncontrado"];
         };
     };
@@ -1690,6 +2090,191 @@ export interface operations {
             404: components["responses"]["NaoEncontrado"];
             /** @description `ENVIO_JA_ANALISADO` */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    fluigListarUsuariosInternos: {
+        parameters: {
+            query?: {
+                /** @description Trecho do nome, login ou e-mail (sem diferenciar maiúsculas/acentos). */
+                busca?: string;
+                /** @description Filtra por ativo/desativado. Omitido = todos. */
+                ativo?: boolean;
+                /** @description Filtra por perfil (true = administradores). Omitido = todos. */
+                admin?: boolean;
+                pagina?: components["parameters"]["Pagina"];
+                tamanhoPagina?: components["parameters"]["TamanhoPagina"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Página de usuários internos */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginaUsuariosInternos"];
+                };
+            };
+            400: components["responses"]["Validacao"];
+            401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["SemPermissao"];
+        };
+    };
+    fluigCriarUsuarioInterno: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UsuarioInternoInput"];
+            };
+        };
+        responses: {
+            /** @description Usuário criado (situação `AGUARDANDO_PRIMEIRO_ACESSO`) */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsuarioInterno"];
+                };
+            };
+            400: components["responses"]["Validacao"];
+            401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["SemPermissao"];
+            /** @description `LOGIN_DUPLICADO` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description `EMAIL_ACESSO_FALHOU` */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    fluigObterUsuarioInterno: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                usuarioId: components["parameters"]["UsuarioId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Usuário interno */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsuarioInterno"];
+                };
+            };
+            401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["SemPermissao"];
+            404: components["responses"]["NaoEncontrado"];
+        };
+    };
+    fluigAtualizarUsuarioInterno: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                usuarioId: components["parameters"]["UsuarioId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UsuarioInternoAtualizacao"];
+            };
+        };
+        responses: {
+            /** @description Usuário atualizado */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsuarioInterno"];
+                };
+            };
+            400: components["responses"]["Validacao"];
+            401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["SemPermissao"];
+            404: components["responses"]["NaoEncontrado"];
+            /** @description `ULTIMO_ADMINISTRADOR` ou `ALTERACAO_PROPRIA_NAO_PERMITIDA` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    fluigRedefinirSenhaUsuarioInterno: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                usuarioId: components["parameters"]["UsuarioId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Senha redefinida (situação `AGUARDANDO_PRIMEIRO_ACESSO`) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsuarioInterno"];
+                };
+            };
+            401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["SemPermissao"];
+            404: components["responses"]["NaoEncontrado"];
+            /** @description `USUARIO_INATIVO` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description `EMAIL_ACESSO_FALHOU` */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };

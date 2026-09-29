@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { server } from '../mocks/server';
-import { definirPerfilMock, reiniciarDados } from '../mocks/dados';
+import { reiniciarDados, reiniciarSessaoMock } from '../mocks/dados';
 
 beforeAll(() => {
   server.listen({ onUnhandledRequest: 'error' });
@@ -12,7 +12,8 @@ beforeAll(() => {
 afterEach(() => {
   cleanup();
   server.resetHandlers();
-  definirPerfilMock('admin');
+  // Padrão dos testes: administrador entrando pelo Fluig, login próprio ligado.
+  reiniciarSessaoMock();
   reiniciarDados();
   window.sessionStorage.clear();
 });
