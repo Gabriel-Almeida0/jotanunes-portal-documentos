@@ -496,6 +496,100 @@ namespace Jotanunes.Docs.Infrastructure.Persistencia.Migrations
                     b.ToTable("tipos_documento", (string)null);
                 });
 
+            modelBuilder.Entity("Jotanunes.Docs.Domain.UsuariosInternos.UsuarioInterno", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Admin")
+                        .HasColumnType("boolean")
+                        .HasColumnName("admin");
+
+                    b.Property<bool>("Ativo")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ativo");
+
+                    b.Property<DateTimeOffset?>("AtualizadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("atualizado_em");
+
+                    b.Property<string>("AtualizadoPorLogin")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("atualizado_por_login");
+
+                    b.Property<DateTimeOffset?>("BloqueadoAte")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("bloqueado_ate");
+
+                    b.Property<DateTimeOffset>("CriadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criado_em");
+
+                    b.Property<string>("CriadoPorLogin")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("criado_por_login");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("email");
+
+                    b.Property<string>("Login")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("login");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("nome");
+
+                    b.Property<string>("SenhaHash")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("senha_hash");
+
+                    b.Property<DateTimeOffset?>("SenhaProvisoriaExpiraEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("senha_provisoria_expira_em");
+
+                    b.Property<int>("TentativasFalhas")
+                        .HasColumnType("integer")
+                        .HasColumnName("tentativas_falhas");
+
+                    b.Property<bool>("TrocaSenhaObrigatoria")
+                        .HasColumnType("boolean")
+                        .HasColumnName("troca_senha_obrigatoria");
+
+                    b.Property<DateTimeOffset?>("UltimoAcessoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ultimo_acesso_em");
+
+                    b.Property<int>("VersaoCredencial")
+                        .HasColumnType("integer")
+                        .HasColumnName("versao_credencial");
+
+                    b.HasKey("Id")
+                        .HasName("pk_usuarios_internos");
+
+                    b.HasIndex("Nome")
+                        .HasDatabaseName("ix_usuarios_internos_nome");
+
+                    b.HasIndex("Admin", "Ativo")
+                        .HasDatabaseName("ix_usuarios_internos_admin_ativo")
+                        .HasFilter("admin AND ativo");
+
+                    b.ToTable("usuarios_internos", (string)null);
+                });
+
             modelBuilder.Entity("Jotanunes.Docs.Domain.Convites.Convite", b =>
                 {
                     b.HasOne("Jotanunes.Docs.Domain.Empresas.Empresa", null)

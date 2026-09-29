@@ -13,14 +13,23 @@ namespace Jotanunes.Docs.Infrastructure.Persistencia.Repositorios;
 /// com uma chave derivada de <c>Auth:Portal:Secret</c>: o CNPJ digitado nunca é gravado, e o espaço pequeno
 /// de CNPJs não permite reverter a chave sem o segredo (um SHA-256 puro seria revertido por força bruta).
 /// Trocar o segredo apenas zera esses contadores (o bloqueio dura 15 min).
+/// Logins do login próprio (research R17) usam a mesma tabela com chave HMAC de <c>"usuario:" + login</c>, derivada de
+/// <c>Auth:LoginLocal:Secret</c> com rótulo próprio: as chaves não colidem com as de CNPJ e o login digitado não é gravado.
 /// </summary>
-public sealed class TentativasLoginRepositorio(DocsDbContext db, IOptions<OpcoesAuthPortal> opcoes) : ITentativasLoginRepositorio
+public sealed class TentativasLoginRepositorio(DocsDbContext db, IOptions<OpcoesAuthPortal> opcoes, IOptions<OpcoesLoginLocal> loginLocal)
+    : ITentativasLoginRepositorio
 {
     private const string Rotulo = "jotanunes-docs/tentativas-login/v1";
+    private const string RotuloLoginLocal = "jotanunes-docs/tentativas-login-local/v1";
 
-    public async Task<TentativasLoginCnpj> ObterOuCriarAsync(string cnpjNormalizado, CancellationToken ct = default)
+    public Task<TentativasLoginCnpj> ObterOuCriarAsync(string cnpjNormalizado, CancellationToken ct = default) =>
+        ObterOuCriarPorChaveAsync(CalcularChave(cnpjNormalizado), ct);
+
+    public Task<TentativasLoginCnpj> ObterOuCriarPorLoginLocalAsync(string loginNormalizado, CancellationToken ct = default) =>
+        ObterOuCriarPorChaveAsync(CalcularChaveLoginLocal(loginNormalizado), ct);
+
+    private async Task<TentativasLoginCnpj> ObterOuCriarPorChaveAsync(string chave, CancellationToken ct)
     {
-        var chave = CalcularChave(cnpjNormalizado);
         var existente = await db.TentativasLogin.FirstOrDefaultAsync(t => t.Chave == chave, ct);
         if (existente is not null) return existente;
 
@@ -30,9 +39,13 @@ public sealed class TentativasLoginRepositorio(DocsDbContext db, IOptions<Opcoes
         return await db.TentativasLogin.FirstAsync(t => t.Chave == chave, ct);
     }
 
-    internal string CalcularChave(string cnpjNormalizado)
+    internal string CalcularChave(string cnpjNormalizado) => Hmac(Rotulo, opcoes.Value.Secret, cnpjNormalizado);
+
+    internal string CalcularChaveLoginLocal(string loginNormalizado) => Hmac(RotuloLoginLocal, loginLocal.Value.Secret, "usuario:" + loginNormalizado);
+
+    private static string Hmac(string rotulo, string segredoConfigurado, string valor)
     {
-        var segredo = SHA256.HashData(Encoding.UTF8.GetBytes(Rotulo + "\n" + opcoes.Value.Secret));
-        return Convert.ToHexString(HMACSHA256.HashData(segredo, Encoding.UTF8.GetBytes(cnpjNormalizado))).ToLowerInvariant();
+        var segredo = SHA256.HashData(Encoding.UTF8.GetBytes(rotulo + "\n" + segredoConfigurado));
+        return Convert.ToHexString(HMACSHA256.HashData(segredo, Encoding.UTF8.GetBytes(valor))).ToLowerInvariant();
     }
 }

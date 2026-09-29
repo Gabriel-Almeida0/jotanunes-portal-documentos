@@ -27,6 +27,14 @@ public enum CodigoErro
     EMAIL_FALHOU,
     LIMITE_REQUISICOES,
     ERRO_INTERNO,
+    LOGIN_INVALIDO,
+    USUARIO_INATIVO,
+    SENHA_PROVISORIA_EXPIRADA,
+    LOGIN_DUPLICADO,
+    ULTIMO_ADMINISTRADOR,
+    ALTERACAO_PROPRIA_NAO_PERMITIDA,
+    EMAIL_ACESSO_FALHOU,
+    SO_LOGIN_LOCAL,
 }
 
 /// <summary>Status HTTP e mensagem padrão (title) de cada código — tabela do contrato.</summary>
@@ -57,6 +65,15 @@ public static class CatalogoErros
         CodigoErro.ARQUIVO_TIPO_NAO_SUPORTADO => (415, "Envie um arquivo PDF, JPG ou PNG."),
         CodigoErro.EMAIL_FALHOU => (502, "Não conseguimos enviar o convite. Tente de novo em alguns minutos."),
         CodigoErro.LIMITE_REQUISICOES => (429, "Muitas tentativas. Aguarde um pouco."),
+        CodigoErro.LOGIN_INVALIDO => (401, "Login ou senha incorretos."),
+        // 403 no login (senha certa, usuário desativado); 409 ao redefinir a senha de um usuário desativado.
+        CodigoErro.USUARIO_INATIVO => (409, "Este usuário está desativado. Fale com um administrador do sistema."),
+        CodigoErro.SENHA_PROVISORIA_EXPIRADA => (401, "Sua senha provisória expirou. Peça a um administrador para gerar outra."),
+        CodigoErro.LOGIN_DUPLICADO => (409, "Já existe um usuário com este login."),
+        CodigoErro.ULTIMO_ADMINISTRADOR => (409, "O sistema precisa de pelo menos um administrador ativo."),
+        CodigoErro.ALTERACAO_PROPRIA_NAO_PERMITIDA => (409, "Você não pode desativar nem tirar o seu próprio acesso de administrador. Peça a outro administrador."),
+        CodigoErro.EMAIL_ACESSO_FALHOU => (502, "Não conseguimos enviar o e-mail com a senha provisória. Tente de novo em alguns minutos."),
+        CodigoErro.SO_LOGIN_LOCAL => (409, "Esta opção é só para quem entra com login e senha."),
         _ => (500, "Algo deu errado do nosso lado. Tente de novo."),
     };
 }

@@ -5,6 +5,7 @@ using Jotanunes.Docs.Domain.Empresas;
 using Jotanunes.Docs.Domain.Envios;
 using Jotanunes.Docs.Domain.Obras;
 using Jotanunes.Docs.Domain.TiposDocumento;
+using Jotanunes.Docs.Domain.UsuariosInternos;
 using Jotanunes.Docs.Infrastructure.Seguranca;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,6 +17,10 @@ public sealed class Semente(ApiFactory api)
     public const string SenhaPadrao = "SenhaBoa123";
     private static readonly BCryptHasherSenha Hasher = new();
     private static readonly Lazy<string> HashSenhaPadrao = new(() => Hasher.Gerar(SenhaPadrao));
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> Hashes = new();
+
+    /// <summary>Hash BCrypt (custo 12) em cache por senha: semear muitos usuários não custa 250 ms cada.</summary>
+    public static string HashDe(string senha) => Hashes.GetOrAdd(senha, Hasher.Gerar);
 
     public DateTimeOffset Agora => api.Relogio.GetUtcNow();
 
@@ -72,6 +77,34 @@ public sealed class Semente(ApiFactory api)
         await api.NoBancoAsync(async db => { db.Envios.Add(envio); await db.SaveChangesAsync(); });
         return envio;
     }
+
+    /// <summary>
+    /// Usuário interno gravado direto no banco (hash BCrypt de <paramref name="senha"/>). Padrão: comum, ativo, com a senha
+    /// já definida (sem troca pendente) e versão 0. Com <paramref name="trocaSenhaObrigatoria"/>, a provisória vence em
+    /// <paramref name="senhaProvisoriaExpiraEm"/> (padrão: agora + 7 dias).
+    /// </summary>
+    public async Task<UsuarioInterno> UsuarioInternoAsync(string? login = null, string? nome = null, string? email = null, bool admin = false,
+        bool ativo = true, string senha = SenhaPadrao, bool trocaSenhaObrigatoria = false, DateTimeOffset? senhaProvisoriaExpiraEm = null)
+    {
+        login ??= "usuario." + Guid.NewGuid().ToString("N")[..8];
+        var u = UsuarioInterno.Criar(login, nome ?? "Usuário " + login, email ?? $"{login}@jotanunes.com", admin, HashDe(senha), "semente", Agora);
+        await api.NoBancoAsync(async db =>
+        {
+            db.UsuariosInternos.Add(u);
+            var e = db.Entry(u);
+            e.Property(x => x.Ativo).CurrentValue = ativo;
+            e.Property(x => x.TrocaSenhaObrigatoria).CurrentValue = trocaSenhaObrigatoria;
+            e.Property(x => x.SenhaProvisoriaExpiraEm).CurrentValue = trocaSenhaObrigatoria ? senhaProvisoriaExpiraEm ?? Agora.AddDays(7) : null;
+            await db.SaveChangesAsync();
+        });
+        return await RecarregarUsuarioAsync(u.Id);
+    }
+
+    public Task<UsuarioInterno> RecarregarUsuarioAsync(Guid id) =>
+        api.NoBancoAsync(db => db.UsuariosInternos.AsNoTracking().SingleAsync(u => u.Id == id));
+
+    public Task<List<UsuarioInterno>> UsuariosInternosAsync() =>
+        api.NoBancoAsync(db => db.UsuariosInternos.AsNoTracking().OrderBy(u => u.Login).ToListAsync());
 
     public Task<Empresa> RecarregarEmpresaAsync(Guid id) =>
         api.NoBancoAsync(db => db.Empresas.AsNoTracking().SingleAsync(e => e.Id == id));

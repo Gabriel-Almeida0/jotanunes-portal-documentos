@@ -5,6 +5,7 @@ using Jotanunes.Docs.Domain.Empresas;
 using Jotanunes.Docs.Domain.Envios;
 using Jotanunes.Docs.Domain.Obras;
 using Jotanunes.Docs.Domain.TiposDocumento;
+using Jotanunes.Docs.Domain.UsuariosInternos;
 
 namespace Jotanunes.Docs.Application.Portas;
 
@@ -79,6 +80,33 @@ public interface ITentativasLoginRepositorio
 {
     /// <summary>Contador rastreado do CNPJ normalizado; criado (zerado) se ainda não existir. Seguro sob concorrência.</summary>
     Task<TentativasLoginCnpj> ObterOuCriarAsync(string cnpjNormalizado, CancellationToken ct = default);
+
+    /// <summary>
+    /// Mesmo contador para um login do login próprio que não corresponde a usuário interno (FR-104). A chave é
+    /// derivada de <c>"usuario:" + login</c> com um segredo e rótulo próprios: não colide com as chaves de CNPJ.
+    /// </summary>
+    Task<TentativasLoginCnpj> ObterOuCriarPorLoginLocalAsync(string loginNormalizado, CancellationToken ct = default);
+}
+
+public sealed record FiltroUsuariosInternos(string? Busca, bool? Ativo, bool? Admin);
+
+/// <summary>Usuários internos do login próprio (data-model §10).</summary>
+public interface IUsuarioInternoRepositorio
+{
+    /// <summary>Rastreado (para alteração).</summary>
+    Task<UsuarioInterno?> ObterAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>Pelo login já normalizado (minúsculas); rastreado.</summary>
+    Task<UsuarioInterno?> ObterPorLoginAsync(string loginNormalizado, CancellationToken ct = default);
+
+    /// <summary>Ordenada por nome (sem diferenciar maiúsculas/acentos); busca em nome, login e e-mail.</summary>
+    Task<PaginaResultado<UsuarioInterno>> ListarAsync(FiltroUsuariosInternos filtro, Paginacao paginacao, CancellationToken ct = default);
+
+    /// <summary>Usuários com <c>admin AND ativo</c> no banco (ignora o bloqueio temporário).</summary>
+    Task<int> ContarAdministradoresAtivosAsync(CancellationToken ct = default);
+
+    /// <summary>Login repetido (sem diferenciar maiúsculas) → LOGIN_DUPLICADO ao salvar.</summary>
+    void Adicionar(UsuarioInterno usuario);
 }
 
 public interface ITipoDocumentoRepositorio

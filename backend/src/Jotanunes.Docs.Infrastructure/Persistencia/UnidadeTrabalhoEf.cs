@@ -68,6 +68,7 @@ internal static class ErroUnicidade
             DocsDbContext.IndiceCodigoObra => new ErroAplicacao(CodigoErro.CODIGO_OBRA_DUPLICADO),
             DocsDbContext.IndiceNomeTipo => new ErroAplicacao(CodigoErro.NOME_DUPLICADO),
             DocsDbContext.IndiceEnvioVivo => new ErroAplicacao(CodigoErro.ENVIO_NAO_PERMITIDO),
+            DocsDbContext.IndiceLoginUsuario => new ErroAplicacao(CodigoErro.LOGIN_DUPLICADO),
             _ => null,
         };
     }

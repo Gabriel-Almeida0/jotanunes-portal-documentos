@@ -40,7 +40,10 @@ public class PerfilClaimTests(ApiFactory api) : TesteApi(api)
 
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         var j = await r.LerAsync();
-        Assert.Equal(["admin", "email", "login", "nome"], j.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal));
+        Assert.Equal(["admin", "email", "login", "nome", "origem", "trocaSenhaObrigatoria"],
+            j.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal));
+        Assert.Equal("FLUIG", j.Str("origem"));
+        Assert.False(j.GetProperty("trocaSenhaObrigatoria").GetBoolean());
         Assert.Equal("ana.perfil", j.Str("login"));
         Assert.Equal("Ana Perfil", j.Str("nome"));
         Assert.Equal("ana@jotanunes.com", j.Str("email"));
@@ -56,5 +59,26 @@ public class PerfilClaimTests(ApiFactory api) : TesteApi(api)
 
         var padrao = await (await Fluig().GetAsync("/api/fluig/me")).LerAsync();
         Assert.True(padrao.GetProperty("admin").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Me_do_login_proprio_tem_as_mesmas_chaves_e_perfil_do_cadastro()
+    {
+        var admin = await Semente.UsuarioInternoAsync("lia.admin", "Lia Admin", "lia@jotanunes.com", admin: true);
+        var comum = await Semente.UsuarioInternoAsync("rui.comum", "Rui Comum", "rui@jotanunes.com");
+
+        var ja = await (await Local(admin).GetAsync("/api/fluig/me")).LerAsync();
+        Assert.Equal(["admin", "email", "login", "nome", "origem", "trocaSenhaObrigatoria"],
+            ja.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal));
+        Assert.True(ja.GetProperty("admin").GetBoolean());
+        Assert.Equal("LOGIN_LOCAL", ja.Str("origem"));
+        Assert.Equal("lia.admin", ja.Str("login"));
+        Assert.Equal("Lia Admin", ja.Str("nome"));
+        Assert.Equal("lia@jotanunes.com", ja.Str("email"));
+        Assert.False(ja.GetProperty("trocaSenhaObrigatoria").GetBoolean());
+
+        var jc = await (await Local(comum).GetAsync("/api/fluig/me")).LerAsync();
+        Assert.False(jc.GetProperty("admin").GetBoolean());
+        Assert.Equal("LOGIN_LOCAL", jc.Str("origem"));
     }
 }

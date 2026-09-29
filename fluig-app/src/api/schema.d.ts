@@ -1362,7 +1362,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Sessão encerrada (ou nada a fazer */
+            /** @description Sessão encerrada (ou nada a fazer, para token do Fluig) */
             204: {
                 headers: {
                     [name: string]: unknown;

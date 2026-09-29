@@ -2,6 +2,7 @@ using System.Reflection;
 using Jotanunes.Docs.Api.Autenticacao;
 using Jotanunes.Docs.Api.Infra;
 using Jotanunes.Docs.Api.Tests.Autorizacao;
+using Jotanunes.Docs.Application.Comum;
 using Jotanunes.Docs.Application.Dtos;
 using Jotanunes.Docs.Application.Erros;
 using Jotanunes.Docs.Domain.Convites;
@@ -43,9 +44,10 @@ public class ContratoOpenApiTests(ApiFactory api) : TesteApi(api)
             .ToList();
 
     [Fact]
-    public void Contrato_tem_34_operacoes()
+    public void Contrato_tem_43_operacoes()
     {
-        Assert.Equal(34, RotasContrato().Count);
+        // 34 até o contrato 1.1.0 + 9 do login próprio (1.2.0): configuracao, login, trocar-senha, sair e as 5 de usuários.
+        Assert.Equal(43, RotasContrato().Count);
     }
 
     [Fact]
@@ -75,7 +77,8 @@ public class ContratoOpenApiTests(ApiFactory api) : TesteApi(api)
             .Where(o => o.Extensions.TryGetValue("x-requer-admin", out var ext) && ext is OpenApiBoolean { Value: true })
             .Select(o => o.OperationId)
             .ToHashSet();
-        Assert.Equal(10, contrato.Count);
+        // 10 de escrita (1.1.0) + as 5 rotas /api/fluig/usuarios* (1.2.0), inclusive os 2 GET.
+        Assert.Equal(15, contrato.Count);
 
         var api = Api.Services.GetRequiredService<EndpointDataSource>().Endpoints
             .Where(e => e.Metadata.GetOrderedMetadata<IAuthorizeData>().Any(a => a.Policy == Politicas.FluigAdmin))
@@ -97,6 +100,8 @@ public class ContratoOpenApiTests(ApiFactory api) : TesteApi(api)
         Assert.Equal(EnumContrato("StatusEnvio"), Enum.GetNames<StatusEnvio>());
         Assert.Equal(EnumContrato("SituacaoDocumento"), Enum.GetNames<SituacaoDocumento>());
         Assert.Equal(EnumContrato("Uf"), Enum.GetNames<Uf>());
+        Assert.Equal(EnumContrato("SituacaoUsuarioInterno"), Enum.GetNames<Domain.UsuariosInternos.SituacaoUsuarioInterno>());
+        Assert.Equal(EnumContrato("OrigemSessao"), Enum.GetNames<OrigemSessao>());
     }
 
     [Fact]
@@ -107,7 +112,9 @@ public class ContratoOpenApiTests(ApiFactory api) : TesteApi(api)
         {
             var (status, titulo) = CatalogoErros.Obter(codigo);
             var linha = descricao.Split('\n').Single(l => l.StartsWith($"| {codigo} |", StringComparison.Ordinal));
-            Assert.Contains($"| {titulo} |", linha);
+            // A tabela pode trazer uma observação entre parênteses depois do título (ex.: "(portal e login próprio)").
+            Assert.True(linha.Contains($"| {titulo} |", StringComparison.Ordinal) || linha.Contains($"| {titulo} (", StringComparison.Ordinal),
+                $"{codigo}: título \"{titulo}\" não está na linha \"{linha}\"");
             Assert.Contains(status.ToString(), linha);
         }
     }
@@ -159,6 +166,13 @@ public class ContratoOpenApiTests(ApiFactory api) : TesteApi(api)
         { typeof(LoginInput), "LoginInput" },
         { typeof(TrocaSenhaInput), "TrocaSenhaInput" },
         { typeof(RejeicaoInput), "Rejeicao" },
+        { typeof(ConfiguracaoAcessoDto), "ConfiguracaoAcesso" },
+        { typeof(LoginJotanunesInput), "LoginJotanunesInput" },
+        { typeof(SessaoJotanunesDto), "SessaoJotanunes" },
+        { typeof(UsuarioInternoInput), "UsuarioInternoInput" },
+        { typeof(UsuarioInternoAtualizacao), "UsuarioInternoAtualizacao" },
+        { typeof(UsuarioInternoDto), "UsuarioInterno" },
+        { typeof(PaginaResultado<UsuarioInternoDto>), "PaginaUsuariosInternos" },
     };
 
     [Theory]

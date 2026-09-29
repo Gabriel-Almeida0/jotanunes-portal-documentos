@@ -30,6 +30,18 @@ export const MENSAGENS: Record<CodigoErro, string> = {
   EMAIL_FALHOU: 'Não conseguimos enviar o convite. Tente de novo em alguns minutos.',
   LIMITE_REQUISICOES: 'Muitas tentativas. Aguarde um pouco.',
   ERRO_INTERNO: 'Algo deu errado do nosso lado. Tente de novo.',
+  // Só do login próprio da área Jotanunes e da gestão de usuários internos (contrato 1.2.0); o portal
+  // nunca recebe estes códigos. Estão aqui porque o mapa cobre todo o enum CodigoErro.
+  LOGIN_INVALIDO: 'Login ou senha incorretos.',
+  USUARIO_INATIVO: 'Este usuário está desativado. Fale com um administrador do sistema.',
+  SENHA_PROVISORIA_EXPIRADA: 'Sua senha provisória expirou. Peça a um administrador para gerar outra.',
+  LOGIN_DUPLICADO: 'Já existe um usuário com este login.',
+  ULTIMO_ADMINISTRADOR: 'O sistema precisa de pelo menos um administrador ativo.',
+  ALTERACAO_PROPRIA_NAO_PERMITIDA:
+    'Você não pode desativar nem tirar o seu próprio acesso de administrador. Peça a outro administrador.',
+  EMAIL_ACESSO_FALHOU:
+    'Não conseguimos enviar o e-mail com a senha provisória. Tente de novo em alguns minutos.',
+  SO_LOGIN_LOCAL: 'Esta opção é só para quem entra com login e senha.',
 };
 
 export const MENSAGEM_FALHA_REDE =

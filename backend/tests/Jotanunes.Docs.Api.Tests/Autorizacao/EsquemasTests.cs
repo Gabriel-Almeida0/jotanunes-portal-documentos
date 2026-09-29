@@ -19,6 +19,8 @@ public class EsquemasTests(ApiFactory api) : TesteApi(api)
         Assert.Equal("dev.analista", j.Str("login"));
         Assert.Equal("Analista Dev", j.Str("nome"));
         Assert.Equal("analista@jotanunes.com", j.Str("email"));
+        Assert.Equal("FLUIG", j.Str("origem"));
+        Assert.False(j.GetProperty("trocaSenhaObrigatoria").GetBoolean());
     }
 
     [Fact]
@@ -114,5 +116,83 @@ public class EsquemasTests(ApiFactory api) : TesteApi(api)
         var r = await Fluig().PostAsync("/api/fluig/obras", new StringContent("{nao json", System.Text.Encoding.UTF8, "application/json"));
         Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
         Assert.Equal("VALIDACAO", await r.CodigoAsync());
+    }
+
+    // ── Login próprio (research R17): dois esquemas atrás do seletor AreaJotanunes, cada um com a própria chave ──
+
+    [Fact]
+    public async Task Token_local_valido_entra_na_area_jotanunes_e_nunca_no_portal()
+    {
+        var u = await Semente.UsuarioInternoAsync("tina.local", "Tina Local");
+        var token = Tokens.Local(Api, u);
+        Assert.Equal(HttpStatusCode.OK, (await Api.Cliente(token: token).GetAsync("/api/fluig/me")).StatusCode);
+
+        var portal = await Api.Cliente(token: token).GetAsync("/api/portal/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, portal.StatusCode);
+        Assert.Equal("NAO_AUTENTICADO", await portal.CodigoAsync());
+    }
+
+    [Fact]
+    public async Task Token_do_portal_nao_entra_na_area_jotanunes()
+    {
+        var (_, tokenPortal) = await Semente.EmpresaComAcessoAsync();
+        var r = await Api.Cliente(token: tokenPortal).GetAsync("/api/fluig/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, r.StatusCode);
+        Assert.Equal("NAO_AUTENTICADO", await r.CodigoAsync());
+    }
+
+    public static TheoryData<string> CasosLocaisInvalidos => new()
+    {
+        "iss jotanunes-docs assinado com o segredo do Fluig",
+        "iss fluig assinado com o segredo local",
+        "iss jotanunes-docs assinado com o segredo do portal",
+        "alg none",
+        "validade acima de 8h",
+        "expirado",
+        "aud errado",
+        "sem uid",
+        "uid que não é uuid",
+        "sem ver",
+        "sem troca_senha",
+        "sem iat",
+        "sub vazio",
+        "segredo inventado",
+    };
+
+    [Theory]
+    [MemberData(nameof(CasosLocaisInvalidos))]
+    public async Task Token_local_invalido_e_recusado(string caso)
+    {
+        var u = await Semente.UsuarioInternoAsync("vera.local", "Vera Local", admin: true);
+        var token = caso switch
+        {
+            "iss jotanunes-docs assinado com o segredo do Fluig" => Tokens.LocalBruto(Api, u, segredo: ApiFactory.SegredoFluig),
+            "iss fluig assinado com o segredo local" => Tokens.LocalBruto(Api, u, p => p["iss"] = "fluig"),
+            "iss jotanunes-docs assinado com o segredo do portal" => Tokens.LocalBruto(Api, u, segredo: ApiFactory.SegredoPortal),
+            "alg none" => Tokens.LocalBruto(Api, u, algNone: true),
+            "validade acima de 8h" => Tokens.LocalBruto(Api, u, validade: TimeSpan.FromHours(8) + TimeSpan.FromMinutes(1)),
+            "expirado" => Tokens.LocalBruto(Api, u, emitidoHa: TimeSpan.FromHours(9)),
+            "aud errado" => Tokens.LocalBruto(Api, u, p => p["aud"] = "outra-api"),
+            "sem uid" => Tokens.LocalBruto(Api, u, p => p.Remove("uid")),
+            "uid que não é uuid" => Tokens.LocalBruto(Api, u, p => p["uid"] = "123"),
+            "sem ver" => Tokens.LocalBruto(Api, u, p => p.Remove("ver")),
+            "sem troca_senha" => Tokens.LocalBruto(Api, u, p => p.Remove("troca_senha")),
+            "sem iat" => Tokens.LocalBruto(Api, u, p => p.Remove("iat")),
+            "sub vazio" => Tokens.LocalBruto(Api, u, p => p["sub"] = ""),
+            _ => Tokens.LocalBruto(Api, u, segredo: "segredo-inventado-por-atacante-com-mais-de-32-bytes"),
+        };
+        var r = await Api.Cliente(token: token).GetAsync("/api/fluig/me");
+        Assert.True(r.StatusCode == HttpStatusCode.Unauthorized, $"{caso} → {(int)r.StatusCode}");
+        Assert.Equal("NAO_AUTENTICADO", await r.CodigoAsync());
+        // Nem nas rotas de administrador (o token é de um administrador).
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Api.Cliente(token: token).GetAsync("/api/fluig/usuarios")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Token_fluig_assinado_com_o_segredo_local_e_recusado()
+    {
+        var r = await Api.Cliente(token: Tokens.Fluig(Api, segredo: ApiFactory.SegredoLoginLocal)).GetAsync("/api/fluig/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, r.StatusCode);
+        Assert.Equal("NAO_AUTENTICADO", await r.CodigoAsync());
     }
 }

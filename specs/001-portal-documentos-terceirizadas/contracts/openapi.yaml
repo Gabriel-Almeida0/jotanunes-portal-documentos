@@ -211,7 +211,7 @@ paths:
         pendente. Login próprio desligado → 404.
       security: [{ fluigAuth: [] }]
       responses:
-        '204': { description: Sessão encerrada (ou nada a fazer, para token do Fluig) }
+        '204': { description: 'Sessão encerrada (ou nada a fazer, para token do Fluig)' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
 

@@ -93,7 +93,58 @@ public static class ModelosEmail
         return new MensagemEmail(para, assunto, html, texto);
     }
 
-    private static string FormatarData(DateTimeOffset data) =>
+    /// <summary>
+    /// Acesso de usuário interno à área Jotanunes (login próprio, research R17): cadastro ou redefinição de senha.
+    /// Leva login, senha provisória, endereço da área Jotanunes e a validade (7 dias).
+    /// </summary>
+    public static MensagemEmail AcessoUsuarioInterno(string para, string nome, string login, string senhaProvisoria,
+        string urlAreaJotanunes, DateTimeOffset expiraEm, bool redefinicao)
+    {
+        var assunto = redefinicao
+            ? "Jotanunes: sua nova senha provisória"
+            : "Jotanunes: seu acesso ao sistema de documentação de terceirizadas";
+        var frase = redefinicao
+            ? "Um administrador gerou uma nova senha provisória para você entrar no sistema de documentação de terceirizadas da Jotanunes."
+            : "Você recebeu acesso ao sistema de documentação de terceirizadas da Jotanunes. É só clicar no botão abaixo.";
+        var validade = FormatarData(expiraEm);
+        var link = urlAreaJotanunes.TrimEnd('/');
+
+        var texto = $"""
+            Olá, {nome}!
+
+            {frase}
+
+            Acesse: {link}
+
+            Para entrar, use:
+            Login: {login}
+            Senha provisória: {senhaProvisoria}
+
+            Você vai criar a sua própria senha no primeiro acesso. Esta senha provisória vale 7 dias (até {validade}).
+
+            Jotanunes Construtora
+            """;
+
+        Func<string, string> e = s => WebUtility.HtmlEncode(s);
+        var html = $"""
+            <!doctype html>
+            <html lang="pt-BR"><body style="margin:0;padding:24px;background:#F2F2F2;font-family:Montserrat,Arial,sans-serif;color:#333333">
+            <div style="max-width:560px;margin:0 auto;background:#FFFFFF;border-radius:20px 0;padding:32px">
+            {Logo}
+            <div style="width:50px;height:6px;background:#DF1A1A;margin-bottom:16px"></div>
+            <h1 style="font-size:22px;margin:0 0 16px">Olá, {e(nome)}!</h1>
+            <p style="font-size:16px;line-height:1.5">{e(frase)}</p>
+            <p style="margin:24px 0"><a href="{e(link)}" style="background:#DF1A1A;color:#FFFFFF;text-decoration:none;padding:12px 24px;border-radius:30px;font-weight:600;display:inline-block">Acessar o sistema</a></p>
+            <p style="font-size:16px;line-height:1.5">Para entrar, use:<br>Login: <strong>{e(login)}</strong><br>Senha provisória: <strong>{e(senhaProvisoria)}</strong></p>
+            <p style="font-size:14px;line-height:1.5">Você vai criar a sua própria senha no primeiro acesso. Esta senha provisória vale 7 dias (até {e(validade)}).</p>
+            <p style="font-size:14px;color:#555555">Se o botão não funcionar, copie este endereço: {e(link)}</p>
+            <p style="font-size:14px">Jotanunes Construtora</p>
+            </div></body></html>
+            """;
+        return new MensagemEmail(para, assunto, html, texto);
+    }
+
+    public static string FormatarData(DateTimeOffset data) =>
         TimeZoneInfo.ConvertTime(data, FusoBrasil).ToString("dd/MM/yyyy 'às' HH:mm", System.Globalization.CultureInfo.InvariantCulture);
 
     private static TimeZoneInfo ObterFuso()

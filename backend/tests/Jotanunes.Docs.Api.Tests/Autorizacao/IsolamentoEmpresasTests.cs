@@ -43,7 +43,7 @@ public class IsolamentoEmpresasTests(ApiFactory api) : TesteApi(api)
     }
 
     [Fact]
-    public async Task Todas_as_rotas_autenticadas_do_portal_recusam_sem_token_e_com_token_fluig()
+    public async Task Todas_as_rotas_autenticadas_do_portal_recusam_sem_token_e_com_tokens_da_area_jotanunes()
     {
         var anonimas = new[] { "/api/portal/auth/login", "/api/portal/convites/validar" };
         var rotas = Rota.Registradas(Api)
@@ -51,11 +51,12 @@ public class IsolamentoEmpresasTests(ApiFactory api) : TesteApi(api)
             .ToList();
         Assert.True(rotas.Count >= 6, $"achou {rotas.Count}");
         var tokenFluig = Tokens.Fluig(Api);
+        var tokenLocal = await Tokens.LocalAdminAsync(Api);
         var c = Anonimo();
         var falhas = new List<string>();
         foreach (var rota in rotas)
         {
-            foreach (var (caso, token) in new[] { ("sem token", (string?)null), ("token Fluig", tokenFluig) })
+            foreach (var (caso, token) in new[] { ("sem token", (string?)null), ("token Fluig", tokenFluig), ("token do login próprio", tokenLocal) })
             {
                 var r = await c.SendAsync(rota.Requisicao(token));
                 if (r.StatusCode != HttpStatusCode.Unauthorized || await r.CodigoAsync() != "NAO_AUTENTICADO") falhas.Add($"{rota} ({caso}) → {(int)r.StatusCode}");

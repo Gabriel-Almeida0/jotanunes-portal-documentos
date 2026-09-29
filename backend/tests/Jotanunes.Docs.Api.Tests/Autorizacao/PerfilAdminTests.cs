@@ -3,15 +3,22 @@ using Jotanunes.Docs.Domain.Empresas;
 using Jotanunes.Docs.Domain.Envios;
 using Jotanunes.Docs.Domain.Obras;
 using Jotanunes.Docs.Domain.TiposDocumento;
+using Jotanunes.Docs.Domain.UsuariosInternos;
+using Jotanunes.Docs.Api.Autenticacao;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Jotanunes.Docs.Api.Tests.Autorizacao;
 
 /// <summary>
-/// Percorre TODAS as rotas de escrita da área Jotanunes registradas na API (constituição III/IV v1.1.0, SC-009):
-/// cada uma está classificada como "exige administrador" ou "permitida ao comum"; rota nova sem classificação faz
-/// o teste falhar. Usuário comum → 403 SEM_PERMISSAO antes de validar ou procurar o recurso, sem efeito de negócio;
-/// administrador → sucesso do contrato (FR-081, FR-082, FR-083, US6/AC3–AC5).
+/// Percorre TODAS as rotas da área Jotanunes registradas na API (constituição III/IV v1.2.0, SC-009, SC-012): toda rota
+/// de escrita está classificada como "exige administrador", "permitida ao comum", "anônima" ou "sessão", e todo GET
+/// <c>x-requer-admin</c> está em "exige administrador"; rota nova sem classificação faz o teste falhar. Usuário comum →
+/// 403 SEM_PERMISSAO antes de validar ou procurar o recurso, sem efeito de negócio; administrador → sucesso do
+/// contrato (FR-081–FR-083, FR-107, FR-108, US6/AC3–AC5). Os cenários rodam para as DUAS origens de token: Fluig e
+/// login próprio.
 /// </summary>
 public class PerfilAdminTests(ApiFactory api) : TesteApi(api)
 {
@@ -19,13 +26,21 @@ public class PerfilAdminTests(ApiFactory api) : TesteApi(api)
 
     /// <summary>Dados válidos semeados para as requisições de sucesso.</summary>
     private sealed record Cenario(Obra Obra, Empresa Empresa, Empresa EmpresaVinculada, TipoDocumento Tipo, TipoDocumento Tipo2,
-        EnvioDocumento EnvioAprovar, EnvioDocumento EnvioRejeitar);
+        EnvioDocumento EnvioAprovar, EnvioDocumento EnvioRejeitar, UsuarioInterno Usuario);
 
     private sealed record Operacao(HttpStatusCode Sucesso, Func<Cenario, (string Url, object? Corpo)> Valida);
 
-    /// <summary>As 10 operações <c>x-requer-admin: true</c> do contrato, com a requisição válida e o status de sucesso.</summary>
+    /// <summary>As 15 operações <c>x-requer-admin: true</c> do contrato, com a requisição válida e o status de sucesso.</summary>
     private static readonly Dictionary<Rota, Operacao> ExigemAdmin = new()
     {
+        [new("GET", "/api/fluig/usuarios")] = new(HttpStatusCode.OK, _ => ("/api/fluig/usuarios", null)),
+        [new("POST", "/api/fluig/usuarios")] = new(HttpStatusCode.Created,
+            _ => ("/api/fluig/usuarios", new { login = "novo.perfil", nome = "Novo Perfil", email = "novo.perfil@jotanunes.com" })),
+        [new("GET", "/api/fluig/usuarios/{usuarioId}")] = new(HttpStatusCode.OK, c => ($"/api/fluig/usuarios/{c.Usuario.Id}", null)),
+        [new("PUT", "/api/fluig/usuarios/{usuarioId}")] = new(HttpStatusCode.OK,
+            c => ($"/api/fluig/usuarios/{c.Usuario.Id}", new { nome = c.Usuario.Nome + " editado", email = c.Usuario.Email, admin = false, ativo = false })),
+        [new("POST", "/api/fluig/usuarios/{usuarioId}/redefinir-senha")] = new(HttpStatusCode.OK,
+            c => ($"/api/fluig/usuarios/{c.Usuario.Id}/redefinir-senha", null)),
         [new("POST", "/api/fluig/obras")] = new(HttpStatusCode.Created,
             _ => ("/api/fluig/obras", new { nome = "Obra criada no teste de perfil", cidade = "Aracaju", uf = "SE" })),
         [new("PUT", "/api/fluig/obras/{obraId}")] = new(HttpStatusCode.OK,
@@ -54,9 +69,33 @@ public class PerfilAdminTests(ApiFactory api) : TesteApi(api)
         new("POST", "/api/fluig/empresas/{empresaId}/convites"),
     ];
 
-    private HttpClient Comum() => Api.Cliente(token: Tokens.FluigComum(Api));
+    /// <summary>Rotas sem autenticação (login próprio, research R17).</summary>
+    public static readonly HashSet<Rota> Anonimas =
+    [
+        new("GET", "/api/fluig/auth/configuracao"),
+        new("POST", "/api/fluig/auth/login"),
+    ];
 
-    private HttpClient Admin() => Api.Cliente(token: Tokens.Fluig(Api, "ana.admin", "Ana Admin"));
+    /// <summary>Rotas da sessão: qualquer usuário autenticado, inclusive com troca de senha pendente.</summary>
+    public static readonly HashSet<Rota> Sessao =
+    [
+        new("GET", "/api/fluig/me"),
+        new("POST", "/api/fluig/auth/trocar-senha"),
+        new("POST", "/api/fluig/auth/sair"),
+    ];
+
+    public const string OrigemFluig = "FLUIG";
+    public const string OrigemLocal = "LOGIN_LOCAL";
+
+    public static TheoryData<string> Origens => new() { OrigemFluig, OrigemLocal };
+
+    private async Task<HttpClient> ComumAsync(string origem) => Api.Cliente(token: origem == OrigemFluig
+        ? Tokens.FluigComum(Api)
+        : await Tokens.LocalComumAsync(Api, "joao.comum", "João Comum"));
+
+    private async Task<HttpClient> AdminAsync(string origem) => Api.Cliente(token: origem == OrigemFluig
+        ? Tokens.Fluig(Api, "ana.admin", "Ana Admin")
+        : await Tokens.LocalAdminAsync(Api, "ana.admin", "Ana Admin"));
 
     private async Task<Cenario> SemearAsync()
     {
@@ -68,7 +107,8 @@ public class PerfilAdminTests(ApiFactory api) : TesteApi(api)
         var tipo2 = await Semente.TipoAsync();
         var aprovar = await Semente.EnvioAsync(empresa, tipo);
         var rejeitar = await Semente.EnvioAsync(empresa, tipo2);
-        return new Cenario(obra, empresa, vinculada, tipo, tipo2, aprovar, rejeitar);
+        var usuario = await Semente.UsuarioInternoAsync("alvo.perfil", "Alvo Perfil");
+        return new Cenario(obra, empresa, vinculada, tipo, tipo2, aprovar, rejeitar, usuario);
     }
 
     private static HttpRequestMessage Requisicao(Rota rota, string url, object? corpo)
@@ -87,6 +127,7 @@ public class PerfilAdminTests(ApiFactory api) : TesteApi(api)
             UNION ALL SELECT 'tipos_documento ' || row_to_json(t)::text FROM tipos_documento t
             UNION ALL SELECT 'envios_documento ' || row_to_json(t)::text FROM envios_documento t
             UNION ALL SELECT 'convites ' || row_to_json(t)::text FROM convites t
+            UNION ALL SELECT 'usuarios_internos ' || row_to_json(t)::text FROM usuarios_internos t
         ) s ORDER BY s.x
         """).ToListAsync());
 
@@ -109,22 +150,37 @@ public class PerfilAdminTests(ApiFactory api) : TesteApi(api)
     [Fact]
     public void Toda_rota_de_escrita_fluig_esta_classificada()
     {
-        var escrita = Rota.Registradas(Api)
-            .Where(r => r.Padrao.StartsWith("/api/fluig/", StringComparison.Ordinal) && r.Metodo != "GET")
-            .ToHashSet();
-        var classificadas = ExigemAdmin.Keys.ToHashSet();
-        Assert.Empty(classificadas.Intersect(PermitidasAoComum));
-        classificadas.UnionWith(PermitidasAoComum);
+        var fluig = Rota.Registradas(Api).Where(r => r.Padrao.StartsWith("/api/fluig/", StringComparison.Ordinal)).ToList();
+        var escrita = fluig.Where(r => r.Metodo != "GET").ToHashSet();
+        var listas = new[] { ExigemAdmin.Keys.ToHashSet(), PermitidasAoComum, Anonimas, Sessao };
+        var classificadas = new HashSet<Rota>();
+        foreach (var lista in listas)
+        {
+            Assert.Empty(classificadas.Intersect(lista)); // cada rota em uma lista só
+            classificadas.UnionWith(lista);
+        }
 
-        Assert.True(escrita.SetEquals(classificadas),
-            $"Sem classificação: [{string.Join(", ", escrita.Except(classificadas))}]; classificadas mas não registradas: [{string.Join(", ", classificadas.Except(escrita))}]");
-        Assert.Equal(10, ExigemAdmin.Count);
+        Assert.Empty(escrita.Except(classificadas));
+        Assert.Empty(classificadas.Except(fluig));
+        Assert.Equal(15, ExigemAdmin.Count);
     }
 
     [Fact]
-    public async Task Comum_recebe_403_antes_de_validar_corpo_ou_procurar_o_recurso()
+    public void Todo_get_com_politica_de_administrador_esta_em_ExigemAdmin_e_vice_versa()
     {
-        var cliente = Comum();
+        var comPolitica = Api.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>()
+            .Where(e => e.Metadata.GetOrderedMetadata<IAuthorizeData>().Any(a => a.Policy == Politicas.FluigAdmin))
+            .SelectMany(e => (e.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? []).Select(m => new Rota(m, "/" + e.RoutePattern.RawText!.TrimStart('/'))))
+            .ToHashSet();
+        Assert.True(comPolitica.SetEquals(ExigemAdmin.Keys), $"diferença: [{string.Join(", ", comPolitica.Except(ExigemAdmin.Keys).Concat(ExigemAdmin.Keys.Except(comPolitica)))}]");
+        Assert.Equal(2, comPolitica.Count(r => r.Metodo == "GET"));
+    }
+
+    [Theory]
+    [MemberData(nameof(Origens))]
+    public async Task Comum_recebe_403_antes_de_validar_corpo_ou_procurar_o_recurso(string origem)
+    {
+        var cliente = await ComumAsync(origem);
         foreach (var rota in ExigemAdmin.Keys)
         {
             // Corpo {} (inválido) e ids aleatórios (inexistentes): 403, não 400 nem 404.
@@ -134,13 +190,14 @@ public class PerfilAdminTests(ApiFactory api) : TesteApi(api)
         Assert.Equal(0, await Api.NoBancoAsync(db => db.Auditoria.CountAsync(a => a.Acao != "PERMISSAO_NEGADA")));
     }
 
-    [Fact]
-    public async Task Comum_com_dados_validos_recebe_403_sem_nenhum_efeito_de_negocio()
+    [Theory]
+    [MemberData(nameof(Origens))]
+    public async Task Comum_com_dados_validos_recebe_403_sem_nenhum_efeito_de_negocio(string origem)
     {
+        var cliente = await ComumAsync(origem);
         var cenario = await SemearAsync();
         var estadoAntes = await EstadoNegocioAsync();
         var contagensAntes = await ContarAsync();
-        var cliente = Comum();
 
         foreach (var (rota, op) in ExigemAdmin)
         {
@@ -156,26 +213,29 @@ public class PerfilAdminTests(ApiFactory api) : TesteApi(api)
         Assert.Equal(0, await Api.NoBancoAsync(db => db.Auditoria.CountAsync(a => a.Acao != "PERMISSAO_NEGADA")));
     }
 
-    [Fact]
-    public async Task Admin_com_dados_validos_tem_sucesso_em_toda_operacao_de_administrador()
+    [Theory]
+    [MemberData(nameof(Origens))]
+    public async Task Admin_com_dados_validos_tem_sucesso_em_toda_operacao_de_administrador(string origem)
     {
         var falhas = new List<string>();
         foreach (var (rota, op) in ExigemAdmin)
         {
             await Api.LimparAsync();
+            var admin = await AdminAsync(origem);
             var (url, corpo) = op.Valida(await SemearAsync());
-            var r = await Admin().SendAsync(Requisicao(rota, url, corpo));
+            var r = await admin.SendAsync(Requisicao(rota, url, corpo));
             if (r.StatusCode != op.Sucesso) falhas.Add($"{rota} → {(int)r.StatusCode} {await r.Content.ReadAsStringAsync()}");
             if (await Api.NoBancoAsync(db => db.Auditoria.AnyAsync(a => a.Acao == "PERMISSAO_NEGADA"))) falhas.Add($"{rota} gravou PERMISSAO_NEGADA");
         }
         Assert.Empty(falhas);
     }
 
-    [Fact]
-    public async Task Comum_envia_convite_e_consulta_todas_as_rotas_de_leitura()
+    [Theory]
+    [MemberData(nameof(Origens))]
+    public async Task Comum_envia_convite_e_consulta_todas_as_rotas_de_leitura(string origem)
     {
+        var cliente = await ComumAsync(origem);
         var c = await SemearAsync();
-        var cliente = Comum();
 
         var convite = await cliente.PostAsync($"/api/fluig/empresas/{c.Empresa.Id}/convites", null);
         Assert.Equal(HttpStatusCode.Created, convite.StatusCode);
@@ -188,7 +248,9 @@ public class PerfilAdminTests(ApiFactory api) : TesteApi(api)
             ["tipoDocumentoId"] = c.Tipo.Id,
             ["envioId"] = c.EnvioAprovar.Id,
         };
-        var leituras = Rota.Registradas(Api).Where(r => r.Padrao.StartsWith("/api/fluig/", StringComparison.Ordinal) && r.Metodo == "GET").ToList();
+        var leituras = Rota.Registradas(Api)
+            .Where(r => r.Padrao.StartsWith("/api/fluig/", StringComparison.Ordinal) && r.Metodo == "GET" && !ExigemAdmin.ContainsKey(r))
+            .ToList();
         Assert.True(leituras.Count >= 14, $"esperava as rotas GET do contrato, achou {leituras.Count}");
 
         var falhas = new List<string>();

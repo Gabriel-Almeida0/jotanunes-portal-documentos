@@ -18,16 +18,30 @@ public static class Esquemas
 {
     public const string Fluig = "Fluig";
     public const string Portal = "Portal";
+    /// <summary>Token do login próprio da área Jotanunes (<c>iss = jotanunes-docs</c>, segredo próprio; research R17).</summary>
+    public const string LoginLocal = "LoginLocal";
+    /// <summary>
+    /// Seletor da área Jotanunes: lê (sem validar) o <c>iss</c> do Bearer e encaminha para <see cref="LoginLocal"/>
+    /// (<c>jotanunes-docs</c>, com o login próprio ligado) ou para <see cref="Fluig"/> (qualquer outro). Quem valida é
+    /// sempre o esquema escolhido, com a própria chave e o próprio emissor.
+    /// </summary>
+    public const string AreaJotanunes = "AreaJotanunes";
 }
 
 public static class Politicas
 {
+    /// <summary>
+    /// Área Jotanunes (token do Fluig ou do login próprio) com a senha local já definida: token local com
+    /// <c>troca_senha=true</c> → 403 TROCA_SENHA_OBRIGATORIA.
+    /// </summary>
     public const string Fluig = "Fluig";
+    /// <summary>Área Jotanunes autenticada, sem exigir a troca de senha: <c>GET /me</c>, trocar senha e sair.</summary>
+    public const string FluigSessao = "FluigSessao";
     public const string Portal = "Portal";
     /// <summary>Exige troca_senha=false; falha → 403 TROCA_SENHA_OBRIGATORIA.</summary>
     public const string PortalCompleto = "PortalCompleto";
     /// <summary>
-    /// Token Fluig com o papel admin. Aplicada às operações <c>x-requer-admin</c> do contrato; falha → 403
+    /// Token da área Jotanunes (Fluig ou login próprio) com o papel admin. Aplicada às operações <c>x-requer-admin</c> do contrato; falha → 403
     /// SEM_PERMISSAO (antes de ler o corpo ou o banco) e linha PERMISSAO_NEGADA na auditoria.
     /// </summary>
     public const string FluigAdmin = "FluigAdmin";
@@ -67,7 +81,10 @@ public static class AutenticacaoExtensions
 
         services.AddAuthentication()
             .AddJwtBearer(Esquemas.Fluig)
-            .AddJwtBearer(Esquemas.Portal);
+            .AddJwtBearer(Esquemas.Portal)
+            .AddJwtBearer(Esquemas.LoginLocal)
+            .AddPolicyScheme(Esquemas.AreaJotanunes, "Área Jotanunes (Fluig ou login próprio)", o =>
+                o.ForwardDefaultSelector = EscolherEsquemaAreaJotanunes);
 
         // Configuração PREGUIÇOSA: lida do container quando o esquema é usado (respeita overrides de teste).
         services.AddOptions<JwtBearerOptions>(Esquemas.Fluig)
@@ -77,6 +94,14 @@ public static class AutenticacaoExtensions
                 Comum(o, relogio, f.Issuer, f.Audience, new SymmetricSecurityKey(Encoding.UTF8.GetBytes(f.Secret)));
                 o.TokenValidationParameters.NameClaimType = "name";
                 o.Events.OnTokenValidated = ValidarTokenFluig;
+            });
+
+        services.AddOptions<JwtBearerOptions>(Esquemas.LoginLocal)
+            .Configure<IOptions<OpcoesLoginLocal>, TimeProvider>((o, local, relogio) =>
+            {
+                Comum(o, relogio, OpcoesLoginLocal.Emissor, OpcoesLoginLocal.Audiencia, ClaimsLoginLocal.Chave(local.Value.Secret));
+                o.TokenValidationParameters.NameClaimType = "name";
+                o.Events.OnTokenValidated = ValidarTokenLoginLocalAsync;
             });
 
         services.AddOptions<JwtBearerOptions>(Esquemas.Portal)
@@ -89,15 +114,18 @@ public static class AutenticacaoExtensions
 
         services.AddAuthorization(o =>
         {
-            o.AddPolicy(Politicas.Fluig, p => p.AddAuthenticationSchemes(Esquemas.Fluig).RequireAuthenticatedUser());
+            o.AddPolicy(Politicas.Fluig, p => p.AddAuthenticationSchemes(Esquemas.AreaJotanunes).RequireAuthenticatedUser()
+                .AddRequirements(new SenhaLocalDefinidaRequirement()));
+            o.AddPolicy(Politicas.FluigSessao, p => p.AddAuthenticationSchemes(Esquemas.AreaJotanunes).RequireAuthenticatedUser());
             o.AddPolicy(Politicas.Portal, p => p.AddAuthenticationSchemes(Esquemas.Portal).RequireAuthenticatedUser());
             o.AddPolicy(Politicas.PortalCompleto, p => p.AddAuthenticationSchemes(Esquemas.Portal).RequireAuthenticatedUser()
                 .AddRequirements(new TrocaSenhaConcluidaRequirement()));
-            o.AddPolicy(Politicas.FluigAdmin, p => p.AddAuthenticationSchemes(Esquemas.Fluig).RequireAuthenticatedUser()
+            o.AddPolicy(Politicas.FluigAdmin, p => p.AddAuthenticationSchemes(Esquemas.AreaJotanunes).RequireAuthenticatedUser()
                 .AddRequirements(new PapelAdminRequirement()));
         });
         services.AddSingleton<IAuthorizationHandler, TrocaSenhaConcluidaHandler>();
         services.AddSingleton<IAuthorizationHandler, PapelAdminHandler>();
+        services.AddSingleton<IAuthorizationHandler, SenhaLocalDefinidaHandler>();
         services.AddSingleton<IAuthorizationMiddlewareResultHandler, ResultadoAutorizacaoHandler>();
 
         services.AddHttpContextAccessor();
@@ -142,6 +170,58 @@ public static class AutenticacaoExtensions
                 if (!ctx.Response.HasStarted) await Problemas.EscreverAsync(ctx.HttpContext, CodigoErro.NAO_AUTENTICADO);
             },
         };
+    }
+
+    /// <summary>
+    /// Escolhe o esquema pelo <c>iss</c> do Bearer, lido SEM validar (a validação é do esquema escolhido). Com o login
+    /// próprio desligado, nada vai para <see cref="Esquemas.LoginLocal"/>: um token local cai no esquema do Fluig → 401.
+    /// </summary>
+    internal static string EscolherEsquemaAreaJotanunes(HttpContext ctx)
+    {
+        var cabecalho = ctx.Request.Headers.Authorization.ToString();
+        if (!cabecalho.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) return Esquemas.Fluig;
+        var token = cabecalho["Bearer ".Length..].Trim();
+        var habilitado = ctx.RequestServices.GetRequiredService<IOptions<OpcoesLoginLocal>>().Value.Habilitado;
+        return habilitado && EmissorSemValidar(token) == OpcoesLoginLocal.Emissor ? Esquemas.LoginLocal : Esquemas.Fluig;
+    }
+
+    private static string? EmissorSemValidar(string token)
+    {
+        try
+        {
+            return new JsonWebTokenHandler().CanReadToken(token) ? new JsonWebToken(token).Issuer : null;
+        }
+        catch (Exception)
+        {
+            // Qualquer texto ilegível vai para o esquema do Fluig, que recusa com 401.
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Mesmas exigências do token Fluig (<c>sub</c>, <c>name</c>, <c>iat</c>, validade ≤ 8 h) e mais <c>uid</c>, <c>ver</c> e
+    /// <c>troca_senha</c>; revogação imediata: o usuário existe, está ativo, <c>login = sub</c> e <c>versao_credencial = ver</c>.
+    /// </summary>
+    private static async Task ValidarTokenLoginLocalAsync(TokenValidatedContext ctx)
+    {
+        await ValidarTokenFluig(ctx);
+        if (ctx.Result is { Failure: not null }) return;
+        var principal = ctx.Principal;
+        var uid = principal?.FindFirst(ClaimsLoginLocal.UsuarioId)?.Value;
+        var ver = principal?.FindFirst(ClaimsLoginLocal.Versao)?.Value;
+        var troca = principal?.FindFirst(ClaimsLoginLocal.TrocaSenha)?.Value;
+        if (!Guid.TryParse(uid, out var usuarioId) || !int.TryParse(ver, out var versao) || !bool.TryParse(troca, out _))
+        {
+            ctx.Fail("claims ausentes");
+            return;
+        }
+        var usuarios = ctx.HttpContext.RequestServices.GetRequiredService<IUsuarioInternoRepositorio>();
+        var usuario = await usuarios.ObterAsync(usuarioId, ctx.HttpContext.RequestAborted);
+        if (usuario is null || !usuario.Ativo || usuario.VersaoCredencial != versao
+            || !string.Equals(usuario.Login, principal!.FindFirst(ClaimsLoginLocal.Sub)?.Value, StringComparison.Ordinal))
+        {
+            ctx.Fail("credencial revogada");
+        }
     }
 
     private static Task ValidarTokenFluig(TokenValidatedContext ctx)
@@ -194,6 +274,33 @@ public sealed class TrocaSenhaConcluidaHandler : AuthorizationHandler<TrocaSenha
     }
 }
 
+/// <summary>
+/// Login próprio com troca de senha pendente (<c>troca_senha=true</c>) só acessa <c>GET /me</c>, trocar senha e sair.
+/// Passa para token do Fluig e para token local com <c>troca_senha=false</c>.
+/// </summary>
+public sealed class SenhaLocalDefinidaRequirement : IAuthorizationRequirement;
+
+public sealed class SenhaLocalDefinidaHandler : AuthorizationHandler<SenhaLocalDefinidaRequirement>
+{
+    protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, SenhaLocalDefinidaRequirement requirement)
+    {
+        if (!SessaoLocal.Eh(context.User)
+            || string.Equals(context.User.FindFirst(ClaimsLoginLocal.TrocaSenha)?.Value, "false", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Succeed(requirement);
+        }
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>Sessão aberta pelo login próprio: o único esquema que aceita <c>iss = jotanunes-docs</c> é o LoginLocal.</summary>
+public static class SessaoLocal
+{
+    public static bool Eh(ClaimsPrincipal? usuario) =>
+        usuario?.Identity?.IsAuthenticated == true
+        && string.Equals(usuario.FindFirst("iss")?.Value, OpcoesLoginLocal.Emissor, StringComparison.Ordinal);
+}
+
 public sealed class PapelAdminRequirement : IAuthorizationRequirement;
 
 public sealed class PapelAdminHandler : AuthorizationHandler<PapelAdminRequirement>
@@ -206,8 +313,10 @@ public sealed class PapelAdminHandler : AuthorizationHandler<PapelAdminRequireme
 }
 
 /// <summary>
-/// 403 das políticas → problem+json do contrato: <see cref="PapelAdminRequirement"/> → SEM_PERMISSAO (e a tentativa
-/// na auditoria, o único registro gravado); <see cref="TrocaSenhaConcluidaRequirement"/> (portal) → TROCA_SENHA_OBRIGATORIA.
+/// 403 das políticas → problem+json do contrato: <see cref="SenhaLocalDefinidaRequirement"/> (login próprio) →
+/// TROCA_SENHA_OBRIGATORIA com precedência e sem auditoria (o usuário ainda nem definiu a senha);
+/// <see cref="PapelAdminRequirement"/> → SEM_PERMISSAO (e a tentativa na auditoria, o único registro gravado);
+/// <see cref="TrocaSenhaConcluidaRequirement"/> (portal) → TROCA_SENHA_OBRIGATORIA.
 /// </summary>
 public sealed class ResultadoAutorizacaoHandler : IAuthorizationMiddlewareResultHandler
 {
@@ -220,6 +329,11 @@ public sealed class ResultadoAutorizacaoHandler : IAuthorizationMiddlewareResult
         if (result.Forbidden)
         {
             var falhas = result.AuthorizationFailure?.FailedRequirements ?? [];
+            if (falhas.OfType<SenhaLocalDefinidaRequirement>().Any())
+            {
+                await Problemas.EscreverAsync(context, CodigoErro.TROCA_SENHA_OBRIGATORIA);
+                return;
+            }
             if (falhas.OfType<PapelAdminRequirement>().Any())
             {
                 await RegistrarPermissaoNegadaAsync(context);
@@ -252,6 +366,9 @@ public sealed class UsuarioFluigAtualDeClaims(IHttpContextAccessor acessor) : IU
     public string Nome => Usuario.FindFirst("name")?.Value ?? throw new ErroAplicacao(CodigoErro.NAO_AUTENTICADO);
     public string Email => Usuario.FindFirst("email")?.Value ?? string.Empty;
     public bool EhAdmin => PapeisFluig.EhAdmin(acessor.HttpContext?.User);
+    public bool EhLoginLocal => SessaoLocal.Eh(acessor.HttpContext?.User);
+    public Guid? UsuarioInternoId =>
+        EhLoginLocal && Guid.TryParse(acessor.HttpContext!.User.FindFirst(ClaimsLoginLocal.UsuarioId)?.Value, out var id) ? id : null;
 }
 
 public sealed class EmpresaPortalAtualDeClaims(IHttpContextAccessor acessor) : IEmpresaPortalAtual

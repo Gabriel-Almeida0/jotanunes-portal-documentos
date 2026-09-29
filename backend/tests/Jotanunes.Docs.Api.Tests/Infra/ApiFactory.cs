@@ -24,7 +24,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public const string SegredoFluig = "segredo-fluig-de-TESTE-com-mais-de-32-bytes-0001";
     public const string SegredoPortal = "segredo-portal-de-TESTE-com-mais-de-32-bytes-0002";
+    public const string SegredoLoginLocal = "segredo-login-local-de-TESTE-com-mais-de-32-bytes-0003";
     public const string PortalBaseUrl = "http://portal.teste";
+    public const string FluigAppBaseUrl = "http://fluig.teste";
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .WithDatabase("jotanunes_docs_testes")
@@ -46,6 +48,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             ["ConnectionStrings:Default"] = ConnectionString,
             ["Auth:Fluig:Secret"] = SegredoFluig,
             ["Auth:Portal:Secret"] = SegredoPortal,
+            ["Auth:LoginLocal:Secret"] = SegredoLoginLocal,
+            ["Auth:LoginLocal:Habilitado"] = "true",
+            ["FluigApp:BaseUrl"] = FluigAppBaseUrl,
             ["Database:MigrateOnStartup"] = "true",
             // Desligado por padrão: os testes existentes contam os tipos que eles mesmos criam (research R15).
             // Os testes do catálogo ligam com ComCatalogoPadrao().
@@ -82,6 +87,13 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             ["Catalogo:SemearTiposPadrao"] = semear ? "true" : "false",
         })));
 
+    /// <summary>Outro host sobre o MESMO banco com o login próprio ligado ou desligado (<c>Auth:LoginLocal:Habilitado</c>).</summary>
+    public WebApplicationFactory<Program> ComLoginLocal(bool habilitado) =>
+        WithWebHostBuilder(b => b.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Auth:LoginLocal:Habilitado"] = habilitado ? "true" : "false",
+        })));
+
     public new async Task DisposeAsync()
     {
         await base.DisposeAsync();
@@ -111,7 +123,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         _ = Services; // garante host iniciado (migrations aplicadas)
         await NoBancoAsync(db => db.Database.ExecuteSqlRawAsync(
-            "TRUNCATE auditoria, tentativas_login, envios_documento, convites, obra_empresas, tipos_documento, empresas, obras RESTART IDENTITY CASCADE"));
+            "TRUNCATE auditoria, tentativas_login, usuarios_internos, envios_documento, convites, obra_empresas, tipos_documento, empresas, obras RESTART IDENTITY CASCADE"));
         Emails.Limpar();
         Logs.Limpar();
     }
@@ -138,6 +150,9 @@ public abstract class TesteApi(ApiFactory api) : IAsyncLifetime
         Api.Cliente(token: Tokens.Fluig(Api, login, nome));
 
     protected HttpClient Anonimo(string? ip = null) => Api.Cliente(ip);
+
+    /// <summary>Cliente com o token do login próprio do usuário interno informado (versão atual do banco).</summary>
+    protected HttpClient Local(Domain.UsuariosInternos.UsuarioInterno usuario) => Api.Cliente(token: Tokens.Local(Api, usuario));
 }
 
 /// <summary>Permite ao teste definir o IP remoto (header X-Test-Ip). Só existe no projeto de testes.</summary>

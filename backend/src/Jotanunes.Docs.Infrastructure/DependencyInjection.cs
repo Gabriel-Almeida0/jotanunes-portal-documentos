@@ -34,12 +34,15 @@ public static class DependencyInjection
         services.AddOptions<OpcoesResend>().BindConfiguration("Resend");
         services.AddOptions<OpcoesArmazenamento>().BindConfiguration("Storage");
         services.AddOptions<ConfiguracaoPortal>().BindConfiguration("Portal");
+        services.AddOptions<OpcoesLoginLocal>().BindConfiguration("Auth:LoginLocal");
+        services.AddOptions<ConfiguracaoAreaJotanunes>().BindConfiguration("FluigApp");
 
         services.AddScoped<IUnidadeTrabalho, UnidadeTrabalhoEf>();
         services.AddScoped<IBloqueioExclusivo, BloqueioExclusivoPostgres>();
         services.AddScoped<IObraRepositorio, ObraRepositorio>();
         services.AddScoped<IEmpresaRepositorio, EmpresaRepositorio>();
         services.AddScoped<ITentativasLoginRepositorio, TentativasLoginRepositorio>();
+        services.AddScoped<IUsuarioInternoRepositorio, UsuarioInternoRepositorio>();
         services.AddScoped<ITipoDocumentoRepositorio, TipoDocumentoRepositorio>();
         services.AddScoped<IConviteRepositorio, ConviteRepositorio>();
         services.AddScoped<IEnvioRepositorio, EnvioRepositorio>();
@@ -49,6 +52,7 @@ public static class DependencyInjection
         services.AddSingleton<IHasherSenha, BCryptHasherSenha>();
         services.AddSingleton<IGeradorSegredos, GeradorSegredos>();
         services.AddSingleton<IEmissorTokenPortal, EmissorTokenPortal>();
+        services.AddSingleton<IEmissorTokenJotanunes, EmissorTokenJotanunes>();
         services.AddSingleton<IDetectorFormato, DetectorFormato>();
         services.AddSingleton<IArmazenamentoArquivos, ArmazenamentoDiscoLocal>();
 

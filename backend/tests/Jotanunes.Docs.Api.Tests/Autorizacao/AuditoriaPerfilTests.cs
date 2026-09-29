@@ -87,4 +87,32 @@ public class AuditoriaPerfilTests(ApiFactory api) : TesteApi(api)
         // O convite do fluxo foi enviado pelo token padrão dos testes (administrador).
         Assert.True((await AuditoriaTeste.UnicaAsync(Api, "CONVITE_ENVIADO")).AtorAdmin);
     }
+
+    [Fact]
+    public async Task Comum_do_login_proprio_grava_permissao_negada_como_LOCAL()
+    {
+        var comum = await Semente.UsuarioInternoAsync("rita.comum", "Rita Comum");
+        var r = await Local(comum).PostAsJsonAsync("/api/fluig/obras", new { nome = "Obra do comum", cidade = "Aracaju", uf = "SE" });
+        Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode);
+
+        var linha = await AuditoriaTeste.UnicaAsync(Api, "PERMISSAO_NEGADA");
+        Assert.Equal("LOCAL", linha.AtorTipo);
+        Assert.Equal("rita.comum", linha.AtorId);
+        Assert.False(linha.AtorAdmin);
+        Assert.Equal("fluigCriarObra", linha.RecursoId);
+    }
+
+    [Fact]
+    public async Task Acoes_do_admin_do_login_proprio_gravam_LOCAL_com_ator_admin_true()
+    {
+        var admin = await Semente.UsuarioInternoAsync("beto.admin", "Beto Admin", admin: true);
+        var empresa = await Semente.EmpresaAsync();
+        var envio = await Semente.EnvioAsync(empresa, await Semente.TipoAsync());
+        Assert.Equal(HttpStatusCode.OK, (await Local(admin).PostAsync($"/api/fluig/envios/{envio.Id}/aprovar", null)).StatusCode);
+
+        var linha = await AuditoriaTeste.UnicaAsync(Api, "ENVIO_APROVADO");
+        Assert.Equal("LOCAL", linha.AtorTipo);
+        Assert.Equal("beto.admin", linha.AtorId);
+        Assert.True(linha.AtorAdmin);
+    }
 }

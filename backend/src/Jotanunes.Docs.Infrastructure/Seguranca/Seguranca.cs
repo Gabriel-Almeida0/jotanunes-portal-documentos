@@ -99,3 +99,56 @@ public sealed class EmissorTokenPortal(IOptions<OpcoesAuthPortal> opcoes, TimePr
         return new TokenPortal(token, expira);
     }
 }
+
+/// <summary>Claims do token do login próprio que não existem no token do Fluig (research R17).</summary>
+public static class ClaimsLoginLocal
+{
+    public const string Sub = "sub";
+    public const string Nome = "name";
+    public const string Email = "email";
+    public const string Papeis = "roles";
+    public const string UsuarioId = "uid";
+    public const string Versao = "ver";
+    public const string TrocaSenha = "troca_senha";
+    public const string PapelAdmin = "admin";
+
+    /// <summary>Chave HS256 do segredo configurado (segredo vazio — login desligado — vira uma chave aleatória inútil).</summary>
+    public static SymmetricSecurityKey Chave(string segredo) =>
+        new(string.IsNullOrEmpty(segredo) ? RandomNumberGenerator.GetBytes(32) : Encoding.UTF8.GetBytes(segredo));
+}
+
+/// <summary>
+/// Token do login próprio da área Jotanunes: HS256 com <c>Auth:LoginLocal:Secret</c>, <c>iss = jotanunes-docs</c>,
+/// <c>aud = jotanunes-docs-api</c>, 8 h; mesmas claims <c>sub</c>/<c>name</c>/<c>email</c>/<c>roles</c> do Fluig
+/// (<c>roles</c> omitida para usuário comum) e mais <c>uid</c>, <c>ver</c> e <c>troca_senha</c>.
+/// </summary>
+public sealed class EmissorTokenJotanunes(IOptions<OpcoesLoginLocal> opcoes, TimeProvider relogio) : IEmissorTokenJotanunes
+{
+    public TokenJotanunes Emitir(Domain.UsuariosInternos.UsuarioInterno usuario)
+    {
+        var agora = relogio.GetUtcNow();
+        var expira = agora + OpcoesLoginLocal.Validade;
+        var claims = new Dictionary<string, object>
+        {
+            [ClaimsLoginLocal.Sub] = usuario.Login,
+            [ClaimsLoginLocal.Nome] = usuario.Nome,
+            [ClaimsLoginLocal.Email] = usuario.Email,
+            [ClaimsLoginLocal.UsuarioId] = usuario.Id.ToString(),
+            [ClaimsLoginLocal.Versao] = usuario.VersaoCredencial,
+            [ClaimsLoginLocal.TrocaSenha] = usuario.TrocaSenhaObrigatoria,
+        };
+        if (usuario.Admin) claims[ClaimsLoginLocal.Papeis] = new[] { ClaimsLoginLocal.PapelAdmin };
+        var descritor = new SecurityTokenDescriptor
+        {
+            Issuer = OpcoesLoginLocal.Emissor,
+            Audience = OpcoesLoginLocal.Audiencia,
+            IssuedAt = agora.UtcDateTime,
+            NotBefore = agora.UtcDateTime,
+            Expires = expira.UtcDateTime,
+            Claims = claims,
+            SigningCredentials = new SigningCredentials(ClaimsLoginLocal.Chave(opcoes.Value.Secret), SecurityAlgorithms.HmacSha256),
+        };
+        var token = new JsonWebTokenHandler { SetDefaultTimesOnTokenCreation = false }.CreateToken(descritor);
+        return new TokenJotanunes(token, expira);
+    }
+}

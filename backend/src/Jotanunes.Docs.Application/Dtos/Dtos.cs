@@ -3,12 +3,66 @@ using Jotanunes.Docs.Domain.Empresas;
 using Jotanunes.Docs.Domain.Envios;
 using Jotanunes.Docs.Domain.Obras;
 using Jotanunes.Docs.Domain.TiposDocumento;
+using Jotanunes.Docs.Domain.UsuariosInternos;
 
 namespace Jotanunes.Docs.Application.Dtos;
 
 // Espelham os schemas de contracts/openapi.yaml (serializados em camelCase; enums pelo nome).
 
-public sealed record UsuarioFluigDto(string Login, string Nome, string Email, bool Admin);
+/// <summary>Usuário atual da área Jotanunes (schema <c>UsuarioFluig</c>: Fluig ou login próprio).</summary>
+public sealed record UsuarioFluigDto(string Login, string Nome, string Email, bool Admin, OrigemSessao Origem, bool TrocaSenhaObrigatoria);
+
+/// <summary><c>FLUIG</c> = token emitido pelo Fluig; <c>LOGIN_LOCAL</c> = login próprio.</summary>
+public enum OrigemSessao
+{
+    FLUIG,
+    LOGIN_LOCAL,
+}
+
+// ── Login próprio da área Jotanunes (research R17) ──
+public sealed record ConfiguracaoAcessoDto(bool LoginLocalHabilitado);
+
+public sealed class LoginJotanunesInput
+{
+    public string? Login { get; set; }
+    public string? Senha { get; set; }
+}
+
+public sealed record SessaoJotanunesDto(string AccessToken, DateTimeOffset ExpiraEm, UsuarioFluigDto Usuario)
+{
+    public static SessaoJotanunesDto De(Portas.TokenJotanunes token, UsuarioInterno u) =>
+        new(token.AccessToken, token.ExpiraEm,
+            new UsuarioFluigDto(u.Login, u.Nome, u.Email, u.Admin, OrigemSessao.LOGIN_LOCAL, u.TrocaSenhaObrigatoria));
+}
+
+// ── Usuários internos ──
+public sealed class UsuarioInternoInput
+{
+    public string? Login { get; set; }
+    public string? Nome { get; set; }
+    public string? Email { get; set; }
+    public bool? Admin { get; set; }
+}
+
+public sealed class UsuarioInternoAtualizacao
+{
+    public string? Nome { get; set; }
+    public string? Email { get; set; }
+    public bool? Admin { get; set; }
+    public bool? Ativo { get; set; }
+}
+
+public sealed record UsuarioInternoDto(Guid Id, string Login, string Nome, string Email, bool Admin, bool Ativo,
+    SituacaoUsuarioInterno Situacao, DateTimeOffset? SenhaProvisoriaExpiraEm, DateTimeOffset? BloqueadoAte, DateTimeOffset? UltimoAcessoEm,
+    DateTimeOffset CriadoEm, string CriadoPor, DateTimeOffset? AtualizadoEm)
+{
+    /// <summary><c>bloqueadoAte</c> só enquanto o bloqueio por tentativas estiver valendo.</summary>
+    public static UsuarioInternoDto De(UsuarioInterno u, DateTimeOffset agora) =>
+        new(u.Id, u.Login, u.Nome, u.Email, u.Admin, u.Ativo, u.Situacao(agora),
+            u.TrocaSenhaObrigatoria ? u.SenhaProvisoriaExpiraEm : null,
+            u.EstaBloqueado(agora) ? u.BloqueadoAte : null,
+            u.UltimoAcessoEm, u.CriadoEm, u.CriadoPorLogin, u.AtualizadoEm);
+}
 
 public sealed record AutorFluigDto(string Login, string Nome);
 

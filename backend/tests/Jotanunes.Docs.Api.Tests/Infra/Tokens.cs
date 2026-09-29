@@ -79,6 +79,59 @@ public static class Tokens
         return $"{B64(new { alg = "none", typ = "JWT" })}.{B64(payload)}.";
     }
 
+    // ── Login próprio da área Jotanunes (research R17) ──
+
+    public const string EmissorLocal = "jotanunes-docs";
+
+    /// <summary>Payload válido do token local para o usuário (versão, papel e troca pendente do cadastro).</summary>
+    public static Dictionary<string, object?> PayloadLocal(ApiFactory api, Domain.UsuariosInternos.UsuarioInterno u,
+        TimeSpan? validade = null, TimeSpan? emitidoHa = null)
+    {
+        var iat = api.Relogio.GetUtcNow() - (emitidoHa ?? TimeSpan.Zero);
+        var exp = iat + (validade ?? TimeSpan.FromHours(8));
+        var payload = new Dictionary<string, object?>
+        {
+            ["iss"] = EmissorLocal,
+            ["aud"] = "jotanunes-docs-api",
+            ["sub"] = u.Login,
+            ["name"] = u.Nome,
+            ["email"] = u.Email,
+            ["uid"] = u.Id.ToString(),
+            ["ver"] = u.VersaoCredencial,
+            ["troca_senha"] = u.TrocaSenhaObrigatoria,
+            ["iat"] = iat.ToUnixTimeSeconds(),
+            ["nbf"] = iat.ToUnixTimeSeconds(),
+            ["exp"] = exp.ToUnixTimeSeconds(),
+        };
+        if (u.Admin) payload["roles"] = new[] { PapelAdmin };
+        return payload;
+    }
+
+    /// <summary>Token local válido, igual ao que a API emite no login (use o usuário recarregado do banco).</summary>
+    public static string Local(ApiFactory api, Domain.UsuariosInternos.UsuarioInterno u) => Assinar(PayloadLocal(api, u), ApiFactory.SegredoLoginLocal);
+
+    /// <summary>
+    /// Token local forjado: parte do payload válido de <paramref name="u"/> e aplica <paramref name="ajustar"/> (trocar ou
+    /// remover claims). <paramref name="segredo"/> padrão = segredo do login próprio; <paramref name="algNone"/> = sem assinatura.
+    /// </summary>
+    public static string LocalBruto(ApiFactory api, Domain.UsuariosInternos.UsuarioInterno u, Action<Dictionary<string, object?>>? ajustar = null,
+        string? segredo = null, bool algNone = false, TimeSpan? validade = null, TimeSpan? emitidoHa = null)
+    {
+        var payload = PayloadLocal(api, u, validade, emitidoHa);
+        ajustar?.Invoke(payload);
+        return algNone
+            ? $"{B64(new { alg = "none", typ = "JWT" })}.{B64(payload)}."
+            : Assinar(payload, segredo ?? ApiFactory.SegredoLoginLocal);
+    }
+
+    /// <summary>Semeia um usuário interno comum (senha já definida) e devolve o token local dele.</summary>
+    public static async Task<string> LocalComumAsync(ApiFactory api, string login = "carla.comum", string nome = "Carla Comum") =>
+        Local(api, await new Semente(api).UsuarioInternoAsync(login, nome, admin: false));
+
+    /// <summary>Semeia um usuário interno administrador (senha já definida) e devolve o token local dele.</summary>
+    public static async Task<string> LocalAdminAsync(ApiFactory api, string login = "lucas.admin", string nome = "Lucas Admin") =>
+        Local(api, await new Semente(api).UsuarioInternoAsync(login, nome, admin: true));
+
     private static string Assinar(Dictionary<string, object?> payload, string segredo)
     {
         var dados = $"{B64(new { alg = "HS256", typ = "JWT" })}.{B64(payload)}";

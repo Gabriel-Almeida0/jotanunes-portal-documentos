@@ -4,6 +4,7 @@ using Jotanunes.Docs.Domain.Empresas;
 using Jotanunes.Docs.Domain.Envios;
 using Jotanunes.Docs.Domain.Obras;
 using Jotanunes.Docs.Domain.TiposDocumento;
+using Jotanunes.Docs.Domain.UsuariosInternos;
 using Microsoft.EntityFrameworkCore;
 
 namespace Jotanunes.Docs.Infrastructure.Persistencia;
@@ -15,6 +16,7 @@ public sealed class DocsDbContext(DbContextOptions<DocsDbContext> options) : DbC
     public const string IndiceNomeTipo = "ix_tipos_documento_nome_lower";
     public const string IndiceEnvioVivo = "ix_envios_documento_vivo";
     public const string IndiceTokenConvite = "ix_convites_token_hash";
+    public const string IndiceLoginUsuario = "ix_usuarios_internos_login_lower";
 
     public DbSet<Obra> Obras => Set<Obra>();
     public DbSet<Empresa> Empresas => Set<Empresa>();
@@ -24,6 +26,7 @@ public sealed class DocsDbContext(DbContextOptions<DocsDbContext> options) : DbC
     public DbSet<EnvioDocumento> Envios => Set<EnvioDocumento>();
     public DbSet<RegistroAuditoria> Auditoria => Set<RegistroAuditoria>();
     public DbSet<TentativasLoginCnpj> TentativasLogin => Set<TentativasLoginCnpj>();
+    public DbSet<UsuarioInterno> UsuariosInternos => Set<UsuarioInterno>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -145,6 +148,24 @@ public sealed class DocsDbContext(DbContextOptions<DocsDbContext> options) : DbC
             e.ToTable("tentativas_login");
             e.HasKey(x => x.Chave);
             e.Property(x => x.Chave).HasColumnType("char(64)").ValueGeneratedNever();
+        });
+
+        b.Entity<UsuarioInterno>(e =>
+        {
+            // data-model §10. Índice único lower(login): criado por SQL na migration UsuariosInternos (IndiceLoginUsuario).
+            e.ToTable("usuarios_internos");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Ignore(x => x.EhAdministradorAtivo);
+            e.Property(x => x.Login).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Nome).HasMaxLength(150).IsRequired();
+            e.Property(x => x.Email).HasMaxLength(254).IsRequired();
+            e.Property(x => x.SenhaHash).HasMaxLength(100).IsRequired();
+            e.Property(x => x.CriadoPorLogin).HasMaxLength(100).IsRequired();
+            e.Property(x => x.AtualizadoPorLogin).HasMaxLength(100);
+            // Contagem de administradores ativos (regra do último administrador).
+            e.HasIndex(x => new { x.Admin, x.Ativo }).HasFilter("admin AND ativo").HasDatabaseName("ix_usuarios_internos_admin_ativo");
+            e.HasIndex(x => x.Nome);
         });
     }
 }

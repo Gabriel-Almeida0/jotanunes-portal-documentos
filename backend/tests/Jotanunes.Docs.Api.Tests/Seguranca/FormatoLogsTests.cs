@@ -58,6 +58,8 @@ public class FormatoLogsTests(ApiFactory api) : TesteApi(api)
             {
                 ["ConnectionStrings:Default"] = connectionString,
                 ["Auth:Fluig:Secret"] = ApiFactory.SegredoFluig,
+                ["Auth:LoginLocal:Secret"] = ApiFactory.SegredoLoginLocal,
+                ["FluigApp:BaseUrl"] = ApiFactory.FluigAppBaseUrl,
                 ["Auth:Portal:Secret"] = ApiFactory.SegredoPortal,
                 ["Database:MigrateOnStartup"] = "false",
                 ["Resend:ApiKey"] = "re_teste_nao_usada",

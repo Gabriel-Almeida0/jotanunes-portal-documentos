@@ -52,6 +52,10 @@ systemctl daemon-reload
 systemctl enable -q jotanunes-docs-api
 systemctl restart jotanunes-docs-api
 
+# Atalho do comando criar-admin (primeiro administrador do login próprio). Nunca roda sozinho: precisa dos dados da
+# pessoa e mostra a senha provisória só no terminal de quem executa (ver deploy/criar-admin.sh).
+install -m 0750 -o root -g root $ORIGEM/criar-admin.sh /usr/local/sbin/jotanunes-docs-criar-admin
+
 # nginx: 3 sites (HTTP). Só cria na primeira instalação; depois o Certbot acrescenta o HTTPS e o arquivo é preservado.
 if [ ! -f /etc/nginx/sites-enabled/jotanunes-docs.conf ]; then
 cat > /etc/nginx/sites-enabled/jotanunes-docs.conf <<NGX
@@ -90,4 +94,12 @@ server {
 NGX
 fi
 nginx -t && systemctl reload nginx
+
+# Lembrete do primeiro administrador: espera a API aplicar as migrations e conta os administradores internos ativos.
+for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:5080/health >/dev/null 2>&1 && break; sleep 1; done
+ADMINS=$(sudo -u postgres psql -qtAd jotanunes_docs -c "select count(*) from usuarios_internos where admin and ativo" 2>/dev/null || true)
+if [ "${ADMINS:-0}" = "0" ]; then
+  echo "LEMBRETE: ainda não há administrador do login próprio da área Jotanunes. Crie o primeiro na VPS com:"
+  echo "  jotanunes-docs-criar-admin --login <login> --nome \"<nome>\" --email <email>"
+fi
 echo "INSTALADO"

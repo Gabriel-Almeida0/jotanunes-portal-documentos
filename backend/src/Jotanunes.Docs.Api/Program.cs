@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Jotanunes.Docs.Api.Autenticacao;
+using Jotanunes.Docs.Api.Comandos;
 using Jotanunes.Docs.Api.Configuracao;
 using Jotanunes.Docs.Api.Endpoints.Fluig;
 using Jotanunes.Docs.Api.Endpoints.Portal;
@@ -11,7 +12,21 @@ using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Http.Json;
 
-var builder = WebApplication.CreateBuilder(args);
+// `criar-admin ...` (research R17): mesma composição e configuração da API, sem subir o servidor HTTP. Os argumentos
+// do comando não vão para a configuração (senão --login/--nome/--email virariam chaves de configuração).
+var comando = ComandoCriarAdmin.EhComando(args);
+var builder = WebApplication.CreateBuilder(comando ? [] : args);
+if (comando)
+{
+    // Terminal limpo: só avisos do framework (o comando escreve direto no terminal, nunca no log).
+    builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+    {
+        ["Logging:LogLevel:Microsoft"] = "Warning",
+        ["Logging:LogLevel:Microsoft.AspNetCore"] = "Warning",
+        ["Logging:LogLevel:Microsoft.EntityFrameworkCore"] = "Warning",
+        ["Logging:LogLevel:Jotanunes.Docs.Application.TiposDocumento"] = "Warning",
+    });
+}
 
 // Composição. Nada aqui lê configuração de forma antecipada: tudo é resolvido pelo container
 // (IOptions/IConfiguration), então variáveis de ambiente e overrides de teste sempre valem.
@@ -46,6 +61,12 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
     await app.Services.AplicarMigrationsAsync();
 }
+if (comando)
+{
+    var codigo = await ComandoCriarAdmin.ExecutarAsync(app.Services, args, Console.Out, Console.Error);
+    await app.DisposeAsync();
+    return codigo;
+}
 // Catálogo padrão de tipos de documento (research R15): depois das migrations, ou sozinho quando elas são
 // aplicadas por script. Idempotente e seguro com várias instâncias subindo juntas.
 if (app.Configuration.GetValue("Catalogo:SemearTiposPadrao", true))
@@ -73,6 +94,11 @@ app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).AllowAnonymous().WithName("health");
 
+// Sessão (GET /me, trocar senha, sair) e rotas anônimas do login próprio: sem exigir a troca de senha (R17).
+app.MapGroup("/api/fluig")
+    .RequireAuthorization(Politicas.FluigSessao)
+    .MapSessaoJotanunes();
+
 app.MapGroup("/api/fluig")
     .RequireAuthorization(Politicas.Fluig)
     .MapSessaoFluig()
@@ -80,12 +106,14 @@ app.MapGroup("/api/fluig")
     .MapEmpresas()
     .MapConvites()
     .MapTiposDocumento()
-    .MapAnalise();
+    .MapAnalise()
+    .MapUsuariosInternos();
 
 app.MapGroup("/api/portal")
     .MapAcessoPortal()
     .MapDocumentosPortal();
 
 await app.RunAsync();
+return 0;
 
 public partial class Program;
