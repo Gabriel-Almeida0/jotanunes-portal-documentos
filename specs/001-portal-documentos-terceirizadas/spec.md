@@ -60,9 +60,9 @@ organiza esse ciclo em duas partes:
   produto) em 2026-09-29** — ver Session 2026-09-29.
 - Q: Os documentos são exigidos por empresa ou por empresa + obra? → A: Por empresa. Um envio
   aprovado vale para todas as obras em que a empresa atua; o vínculo com a obra serve para a
-  Jotanunes organizar e filtrar. **Decisão assumida (a validar com Gustavo/Jotanunes)** — o áudio
-  descreve "obra, empresas e das empresas os documentos", com os mesmos tipos para todas; documentos
-  como cartão CNPJ e certidões são da empresa, e pedir de novo por obra geraria retrabalho.
+  Jotanunes organizar e filtrar. ~~Decisão assumida (a validar com Gustavo/Jotanunes)~~ →
+  **VALIDADA pelo usuário (dono do produto) em 2026-09-29** — "tem várias empresas por obra e
+  documentos por empresa".
 - Q: Quais tipos de documento são exigidos de cada empresa? → A: Todos os tipos de documento ativos
   do catálogo são exigidos de todas as empresas ativas; não há seleção por empresa na v1.
   ~~Decisão assumida (a validar com Gustavo/Jotanunes)~~ → **VALIDADA pelo usuário (dono do
@@ -100,8 +100,9 @@ organiza esse ciclo em duas partes:
   Estadual, CND Municipal, CRF do FGTS, CNDT, PGR, PCMSO, ART/RRT), com instruções curtas em
   português. Se já existir qualquer tipo (ativo ou inativo), não cria nada. O administrador ajusta
   depois pela tela. **VALIDADA**.
-- A pergunta "documentos por empresa, não por obra" continua **Decisão assumida (a validar com
-  Gustavo/Jotanunes)**: o usuário ainda não respondeu.
+- Q: Os documentos são por empresa ou por empresa + obra? → A: Uma obra tem várias empresas e os
+  documentos são **por empresa** (um envio vale para todas as obras da empresa). **VALIDADA** (fecha
+  a 2ª pergunta da sessão anterior).
 
 ## User Scenarios & Testing *(mandatory)*
 
