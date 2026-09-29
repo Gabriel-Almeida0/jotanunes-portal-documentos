@@ -19,3 +19,5 @@ backend/.data/
 
 # Credenciais da VPS (nunca commitar)
 vps.env
+# Segredos de produção (VPS)
+producao.env
