@@ -135,6 +135,7 @@ public class ContratoOpenApiTests(ApiFactory api) : TesteApi(api)
         { typeof(ObraInput), "ObraAtualizacao" },
         { typeof(EmpresaInput), "EmpresaAtualizacao" },
         { typeof(TipoDocumentoInput), "TipoDocumentoAtualizacao" },
+        { typeof(ConviteValidacaoInput), "ConviteValidacaoInput" },
         { typeof(LoginInput), "LoginInput" },
         { typeof(TrocaSenhaInput), "TrocaSenhaInput" },
         { typeof(RejeicaoInput), "Rejeicao" },

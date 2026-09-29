@@ -1,6 +1,7 @@
 import { delay, http, HttpResponse } from 'msw';
 import type {
   ConviteValidacao,
+  ConviteValidacaoInput,
   EmpresaPortal,
   LoginInput,
   SessaoPortal,
@@ -32,9 +33,12 @@ function senhaForte(senha: string): boolean {
 
 /** Handlers de "Portal - Acesso" (convite, login, troca de senha, empresa atual). */
 export const handlersAcesso = [
-  http.get<{ token: string }>('*/api/portal/convites/:token', async ({ params }) => {
+  http.post('*/api/portal/convites/validar', async ({ request }) => {
     await delay();
-    const empresaId = banco.convites.get(params.token);
+    const corpo = (await request.json().catch(() => null)) as Partial<ConviteValidacaoInput> | null;
+    if (corpo === null || typeof corpo !== 'object') return problema(400, 'VALIDACAO');
+    const token = typeof corpo.token === 'string' ? corpo.token : '';
+    const empresaId = banco.convites.get(token);
     const emp = banco.empresas.find((e) => e.empresa.id === empresaId);
     if (!emp || !emp.empresa.trocaSenhaObrigatoria) return problema(404, 'CONVITE_INVALIDO');
     return HttpResponse.json<ConviteValidacao>({

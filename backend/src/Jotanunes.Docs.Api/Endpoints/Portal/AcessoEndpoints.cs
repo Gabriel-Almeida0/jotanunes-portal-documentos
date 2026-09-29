@@ -9,8 +9,9 @@ public static class AcessoEndpoints
 {
     public static RouteGroupBuilder MapAcessoPortal(this RouteGroupBuilder g)
     {
-        g.MapGet("/convites/{token}", async (string token, ValidarConvite uc, CancellationToken ct) =>
-                Results.Ok(await uc.ExecutarAsync(token, ct)))
+        // O token do convite é segredo: vem no corpo (nunca no caminho/query), para não cair em logs de proxy/servidor.
+        g.MapPost("/convites/validar", async (ConviteValidacaoInput entrada, ValidarConvite uc, CancellationToken ct) =>
+                Results.Ok(await uc.ExecutarAsync(entrada.Token, ct)))
             .AllowAnonymous().RequireRateLimiting(LimiteRequisicoes.PoliticaAnonima).WithName("portalValidarConvite");
 
         g.MapPost("/auth/login", async (LoginInput entrada, LoginPortal uc, CancellationToken ct) =>

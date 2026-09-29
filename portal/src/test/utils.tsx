@@ -9,7 +9,7 @@ import { guardarSessao } from '../auth/armazenamento';
 function RotaAtual() {
   const local = useLocation();
   return (
-    <output data-testid="rota-atual" hidden>
+    <output data-testid="rota-atual" data-busca={local.search} hidden>
       {local.pathname}
     </output>
   );
@@ -20,7 +20,10 @@ export function renderizarPortal(rota = '/') {
   // applyAccept: false → deixa o componente validar arquivos fora do `accept` (ex.: .exe).
   const user = userEvent.setup({ applyAccept: false });
   const resultado = render(
-    <MemoryRouter initialEntries={[rota]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter
+      initialEntries={[rota]}
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <Rotas />
       <RotaAtual />
     </MemoryRouter>,
@@ -30,6 +33,11 @@ export function renderizarPortal(rota = '/') {
 
 export function rotaAtual(): string {
   return document.querySelector('[data-testid="rota-atual"]')?.textContent ?? '';
+}
+
+/** Query string atual do roteador (ex.: `?x=1`; vazia quando não há). */
+export function buscaAtual(): string {
+  return document.querySelector('[data-testid="rota-atual"]')?.getAttribute('data-busca') ?? '';
 }
 
 /** Faz login no mock e guarda a sessão como se a empresa já estivesse conectada. */

@@ -179,7 +179,7 @@ partir de `docs/design.md` §10, para que nenhuma área precise editar arquivos 
 | Grupo | Esquema | Política | Observação |
 |---|---|---|---|
 | `/api/fluig/*` | `Fluig` (JwtBearer HS256, segredo Fluig) | `Fluig` | identidade → `IUsuarioFluigAtual` |
-| `/api/portal/auth/login`, `/api/portal/convites/{token}` | — | anônimo + rate limit | |
+| `/api/portal/auth/login`, `/api/portal/convites/validar` | — | anônimo + rate limit | |
 | `/api/portal/me`, `/api/portal/auth/trocar-senha` | `Portal` | `Portal` | aceita `troca_senha=true` |
 | demais `/api/portal/*` | `Portal` | `PortalCompleto` | exige `troca_senha=false` |
 

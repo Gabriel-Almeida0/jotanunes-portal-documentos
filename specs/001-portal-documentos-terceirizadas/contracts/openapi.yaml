@@ -589,25 +589,30 @@ paths:
               schema: { $ref: '#/components/schemas/Problema' }
 
   # ───────────────────────────── PORTAL ─────────────────────────────
-  /api/portal/convites/{token}:
-    parameters:
-      - name: token
-        in: path
-        required: true
-        description: Token do link do convite (base64url, 43 caracteres).
-        schema: { type: string, minLength: 20, maxLength: 100 }
-    get:
+  /api/portal/convites/validar:
+    post:
       tags: [Portal - Acesso]
       operationId: portalValidarConvite
       summary: Valida o link do convite e devolve dados para pré-preencher a tela de acesso
-      description: Anônimo, com limite de 10 requisições/min por IP.
+      description: |
+        Anônimo, com limite de 10 requisições/min por IP.
+        O token do convite é um segredo de acesso: vai no CORPO da requisição (nunca no caminho nem na
+        query string), para não aparecer em logs de proxy/servidor, histórico ou cabeçalhos `Referer`.
+        Token ausente, vazio ou fora do tamanho → 404 `CONVITE_INVALIDO` (mesma resposta de um token inexistente);
+        400 `VALIDACAO` só quando o corpo não é um JSON legível.
       security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConviteValidacaoInput' }
       responses:
         '200':
           description: Convite válido
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ConviteValidacao' }
+        '400': { $ref: '#/components/responses/Validacao' }
         '404':
           description: '`CONVITE_INVALIDO` (inexistente, expirado, usado ou substituído)'
           content:
@@ -1202,6 +1207,13 @@ components:
         usadoEm: { type: string, format: date-time, nullable: true }
         enviadoPor: { $ref: '#/components/schemas/AutorFluig' }
         situacao: { $ref: '#/components/schemas/SituacaoConvite' }
+    ConviteValidacaoInput:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: Token do link do convite (base64url, 43 caracteres), lido de `?convite=` no portal.
     ConviteValidacao:
       type: object
       required: [cnpj, razaoSocial, expiraEm]

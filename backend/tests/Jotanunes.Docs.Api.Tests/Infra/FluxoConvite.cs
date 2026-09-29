@@ -20,6 +20,10 @@ public static partial class FluxoConvite
         return new ConviteRecebido(email, token, senha, link);
     }
 
+    /// <summary>Valida o convite como o portal faz: token no corpo JSON (nunca na URL).</summary>
+    public static async Task<HttpResponseMessage> ValidarAsync(ApiFactory api, string? token, string? ip = null) =>
+        await api.Cliente(ip).PostAsJsonAsync("/api/portal/convites/validar", new { token });
+
     public static async Task<HttpResponseMessage> LoginAsync(ApiFactory api, string cnpj, string senha, string? ip = null) =>
         await api.Cliente(ip).PostAsJsonAsync("/api/portal/auth/login", new { cnpj, senha });
 

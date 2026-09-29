@@ -9,7 +9,7 @@ public class AcessoTests(ApiFactory api) : TesteApi(api)
     {
         var empresa = await Semente.EmpresaAsync("Alfa Engenharia Ltda", "11222333000181");
         var convite = await FluxoConvite.ConvidarAsync(Api, empresa.Id);
-        var r = await Anonimo().GetAsync($"/api/portal/convites/{convite.Token}");
+        var r = await FluxoConvite.ValidarAsync(Api, convite.Token);
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         var j = await r.LerAsync();
         Assert.Equal("11222333000181", j.Str("cnpj"));
@@ -23,10 +23,40 @@ public class AcessoTests(ApiFactory api) : TesteApi(api)
         var empresa = await Semente.EmpresaAsync();
         var convite = await FluxoConvite.ConvidarAsync(Api, empresa.Id);
         var adulterado = (convite.Token[0] == 'A' ? "B" : "A") + convite.Token[1..];
-        var r = await Anonimo().GetAsync($"/api/portal/convites/{adulterado}");
+        var r = await FluxoConvite.ValidarAsync(Api, adulterado);
         Assert.Equal(HttpStatusCode.NotFound, r.StatusCode);
         Assert.Equal("CONVITE_INVALIDO", await r.CodigoAsync());
         Assert.Equal("Este link não é mais válido.", (await r.LerAsync()).Str("title"));
+    }
+
+    [Fact]
+    public async Task Token_ausente_vazio_ou_fora_do_tamanho_e_convite_invalido()
+    {
+        foreach (var corpo in new object[] { new { }, new { token = (string?)null }, new { token = "" }, new { token = "curto" }, new { token = new string('a', 101) } })
+        {
+            var r = await Anonimo().PostAsJsonAsync("/api/portal/convites/validar", corpo);
+            Assert.Equal(HttpStatusCode.NotFound, r.StatusCode);
+            Assert.Equal("CONVITE_INVALIDO", await r.CodigoAsync());
+        }
+    }
+
+    [Fact]
+    public async Task Corpo_ilegivel_devolve_validacao()
+    {
+        var r = await Anonimo().PostAsync("/api/portal/convites/validar",
+            new StringContent("{\"token\":", System.Text.Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
+        Assert.Equal("VALIDACAO", await r.CodigoAsync());
+    }
+
+    [Fact]
+    public async Task Rota_antiga_com_token_na_url_nao_existe()
+    {
+        var empresa = await Semente.EmpresaAsync();
+        var convite = await FluxoConvite.ConvidarAsync(Api, empresa.Id);
+        var r = await Anonimo().GetAsync($"/api/portal/convites/{convite.Token}");
+        Assert.NotEqual(HttpStatusCode.OK, r.StatusCode);
+        Assert.DoesNotContain(empresa.Cnpj, await r.Content.ReadAsStringAsync());
     }
 
     [Fact]
@@ -35,11 +65,11 @@ public class AcessoTests(ApiFactory api) : TesteApi(api)
         var empresa = await Semente.EmpresaAsync();
         var primeiro = await FluxoConvite.ConvidarAsync(Api, empresa.Id);
         var segundo = await FluxoConvite.ConvidarAsync(Api, empresa.Id);
-        Assert.Equal("CONVITE_INVALIDO", await (await Anonimo().GetAsync($"/api/portal/convites/{primeiro.Token}")).CodigoAsync());
+        Assert.Equal("CONVITE_INVALIDO", await (await FluxoConvite.ValidarAsync(Api, primeiro.Token)).CodigoAsync());
 
         var sessao = await (await FluxoConvite.LoginAsync(Api, empresa.Cnpj, segundo.Senha)).LerAsync();
         await Api.Cliente(token: sessao.Str("accessToken")).PostAsJsonAsync("/api/portal/auth/trocar-senha", new { senhaAtual = segundo.Senha, novaSenha = "Alfa2026ok" });
-        var r = await Anonimo().GetAsync($"/api/portal/convites/{segundo.Token}");
+        var r = await FluxoConvite.ValidarAsync(Api, segundo.Token);
         Assert.Equal(HttpStatusCode.NotFound, r.StatusCode);
         Assert.Equal("CONVITE_INVALIDO", await r.CodigoAsync());
     }
@@ -96,7 +126,7 @@ public class AcessoTests(ApiFactory api) : TesteApi(api)
         var convite = await FluxoConvite.ConvidarAsync(Api, empresa.Id);
         Api.Relogio.Advance(TimeSpan.FromDays(7) + TimeSpan.FromMinutes(1));
 
-        var link = await Anonimo().GetAsync($"/api/portal/convites/{convite.Token}");
+        var link = await FluxoConvite.ValidarAsync(Api, convite.Token);
         Assert.Equal(HttpStatusCode.NotFound, link.StatusCode);
         Assert.Equal("CONVITE_INVALIDO", await link.CodigoAsync());
 
@@ -156,13 +186,13 @@ public class AcessoTests(ApiFactory api) : TesteApi(api)
             var ok = await Anonimo(ip).PostAsJsonAsync("/api/portal/auth/login", new { cnpj = "11222333000181", senha = "x" });
             Assert.NotEqual(HttpStatusCode.TooManyRequests, ok.StatusCode);
         }
-        var r = await Anonimo(ip).GetAsync($"/api/portal/convites/{new string('x', 43)}");
+        var r = await FluxoConvite.ValidarAsync(Api, new string('x', 43), ip);
         Assert.Equal(HttpStatusCode.TooManyRequests, r.StatusCode);
         Assert.Equal("LIMITE_REQUISICOES", await r.CodigoAsync());
         Assert.True(r.Headers.Contains("Retry-After"));
 
         // outro IP não é afetado
-        Assert.NotEqual(HttpStatusCode.TooManyRequests, (await Anonimo("203.0.113.78").GetAsync($"/api/portal/convites/{new string('x', 43)}")).StatusCode);
+        Assert.NotEqual(HttpStatusCode.TooManyRequests, (await FluxoConvite.ValidarAsync(Api, new string('x', 43), "203.0.113.78")).StatusCode);
     }
 
     [Fact]

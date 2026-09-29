@@ -85,7 +85,7 @@ public class ConvitesTests(ApiFactory api) : TesteApi(api)
         Assert.True(lista[0].GetProperty("enviadoEm").GetDateTimeOffset() > lista[1].GetProperty("enviadoEm").GetDateTimeOffset());
 
         // o link anterior deixa de valer
-        var r = await Anonimo().GetAsync($"/api/portal/convites/{primeiro.Token}");
+        var r = await FluxoConvite.ValidarAsync(Api, primeiro.Token);
         Assert.Equal(HttpStatusCode.NotFound, r.StatusCode);
     }
 

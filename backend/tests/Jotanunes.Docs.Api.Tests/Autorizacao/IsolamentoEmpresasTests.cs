@@ -45,7 +45,7 @@ public class IsolamentoEmpresasTests(ApiFactory api) : TesteApi(api)
     [Fact]
     public async Task Todas_as_rotas_autenticadas_do_portal_recusam_sem_token_e_com_token_fluig()
     {
-        var anonimas = new[] { "/api/portal/auth/login", "/api/portal/convites/{token}" };
+        var anonimas = new[] { "/api/portal/auth/login", "/api/portal/convites/validar" };
         var rotas = Rota.Registradas(Api)
             .Where(r => r.Padrao.StartsWith("/api/portal/", StringComparison.Ordinal) && !anonimas.Contains(r.Padrao))
             .ToList();

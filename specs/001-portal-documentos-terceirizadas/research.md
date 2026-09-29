@@ -88,8 +88,11 @@ este documento resolve os detalhes em aberto.
   SHA-256 hex; (2) nova senha temporária (hash BCrypt na empresa, `troca_senha_obrigatoria=true`,
   `senha_temporaria_expira_em = agora + 7 dias`); (3) incrementa `versao_credencial`; (4) marca
   convites anteriores como `substituido_em = agora`. Link: `{Portal__BaseUrl}/acesso?convite=<token>`.
-  - `GET /api/portal/convites/{token}` (anônimo, com rate limit) devolve CNPJ e razão social para
-    pré-preencher a tela, ou `404 CONVITE_INVALIDO` se não existe/expirou/usado/substituído.
+  - `POST /api/portal/convites/validar` com `{ "token": "..." }` no corpo (anônimo, com rate limit)
+    devolve CNPJ e razão social para pré-preencher a tela, ou `404 CONVITE_INVALIDO` se não
+    existe/expirou/usado/substituído. O token é segredo de acesso: nunca vai no caminho nem na query
+    da API (acabaria em logs de proxy/servidor). O portal lê `?convite=` do link, tira o parâmetro da
+    barra de endereço na hora (`history.replaceState`) e envia o token só no corpo do POST.
   - O convite é marcado `usado_em` quando a empresa troca a senha pela primeira vez.
   - Login com senha temporária vencida → `401 CONVITE_EXPIRADO`.
   - Ordem transacional: grava convite e credenciais → envia e-mail → commit. Se o envio falhar,
@@ -187,7 +190,7 @@ este documento resolve os detalhes em aberto.
 ## R11. Proteções de borda
 
 - **Decision**: `Microsoft.AspNetCore.RateLimiting` (nativo): janela fixa de 10 req/min por IP em
-  `POST /api/portal/auth/login` e `GET /api/portal/convites/{token}` → `429 LIMITE_REQUISICOES`.
+  `POST /api/portal/auth/login` e `POST /api/portal/convites/validar` → `429 LIMITE_REQUISICOES`.
   CORS com origens de `Cors__Origins` (dev: `http://localhost:5173,http://localhost:5174`), só
   header `Authorization`/`Content-Type`, sem credenciais. Headers de segurança padrão na API.
 - **Fluig em iframe**: em produção, o servidor que hospedar o `fluig-app` deve enviar

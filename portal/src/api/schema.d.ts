@@ -355,23 +355,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/portal/convites/{token}': {
+  '/api/portal/convites/validar': {
     parameters: {
       query?: never;
       header?: never;
-      path: {
-        /** @description Token do link do convite (base64url, 43 caracteres). */
-        token: string;
-      };
+      path?: never;
       cookie?: never;
     };
+    get?: never;
+    put?: never;
     /**
      * Valida o link do convite e devolve dados para pré-preencher a tela de acesso
      * @description Anônimo, com limite de 10 requisições/min por IP.
+     *     O token do convite é um segredo de acesso: vai no CORPO da requisição (nunca no caminho nem na
+     *     query string), para não aparecer em logs de proxy/servidor, histórico ou cabeçalhos `Referer`.
+     *     Token ausente, vazio ou fora do tamanho → 404 `CONVITE_INVALIDO` (mesma resposta de um token inexistente);
+     *     400 `VALIDACAO` só quando o corpo não é um JSON legível.
      */
-    get: operations['portalValidarConvite'];
-    put?: never;
-    post?: never;
+    post: operations['portalValidarConvite'];
     delete?: never;
     options?: never;
     head?: never;
@@ -758,6 +759,10 @@ export interface components {
       usadoEm?: string | null;
       enviadoPor: components['schemas']['AutorFluig'];
       situacao: components['schemas']['SituacaoConvite'];
+    };
+    ConviteValidacaoInput: {
+      /** @description Token do link do convite (base64url, 43 caracteres), lido de `?convite=` no portal. */
+      token: string;
     };
     ConviteValidacao: {
       cnpj: string;
@@ -1714,13 +1719,14 @@ export interface operations {
     parameters: {
       query?: never;
       header?: never;
-      path: {
-        /** @description Token do link do convite (base64url, 43 caracteres). */
-        token: string;
-      };
+      path?: never;
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ConviteValidacaoInput'];
+      };
+    };
     responses: {
       /** @description Convite válido */
       200: {
@@ -1731,6 +1737,7 @@ export interface operations {
           'application/json': components['schemas']['ConviteValidacao'];
         };
       };
+      400: components['responses']['Validacao'];
       /** @description `CONVITE_INVALIDO` (inexistente, expirado, usado ou substituído) */
       404: {
         headers: {

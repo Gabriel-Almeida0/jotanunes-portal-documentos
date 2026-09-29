@@ -124,6 +124,11 @@ public sealed class RejeicaoInput
 public sealed record DocumentoSituacaoDto(TipoDocumentoRefDto TipoDocumento, SituacaoDocumento Situacao, EnvioDto? EnvioAtual, int QuantidadeEnvios);
 
 // ── Portal ──
+public sealed class ConviteValidacaoInput
+{
+    public string? Token { get; set; }
+}
+
 public sealed class LoginInput
 {
     public string? Cnpj { get; set; }

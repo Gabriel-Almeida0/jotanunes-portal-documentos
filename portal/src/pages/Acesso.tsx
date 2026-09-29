@@ -33,7 +33,8 @@ export function Acesso() {
   const navigate = useNavigate();
   const local = useLocation();
   const [parametros] = useSearchParams();
-  const tokenConvite = parametros.get('convite');
+  // O token do convite é segredo: lido uma única vez da URL e guardado só em memória.
+  const [tokenConvite] = useState(() => parametros.get('convite'));
 
   const [cnpj, setCnpj] = useState('');
   const [senha, setSenha] = useState('');
@@ -46,6 +47,20 @@ export function Acesso() {
 
   const refCnpj = useRef<HTMLInputElement>(null);
   const refSenha = useRef<HTMLInputElement>(null);
+
+  // Antes de qualquer outra coisa (inclusive a chamada à API, que é o efeito seguinte), tira o `convite` da
+  // URL: assim o token não fica no histórico, em favoritos nem vai no `Referer`. `navigate(..., { replace: true })`
+  // chama `history.replaceState` na hora (BrowserRouter) e mantém o roteador sincronizado com a barra de endereço.
+  // É `useEffect` (e não `useLayoutEffect`) porque o roteador só passa a ouvir o histórico no layout effect dele,
+  // que roda depois dos filhos; efeitos comuns rodam depois de todos os layout effects.
+  useEffect(() => {
+    if (!parametros.has('convite')) return;
+    const limpos = new URLSearchParams(parametros);
+    limpos.delete('convite');
+    const busca = limpos.toString();
+    const destino = `${local.pathname}${busca ? `?${busca}` : ''}${local.hash}`;
+    navigate(destino, { replace: true, state: local.state });
+  }, [parametros, local.pathname, local.hash, local.state, navigate]);
 
   useEffect(() => {
     document.title = 'Acesso · Portal de documentos Jotanunes';

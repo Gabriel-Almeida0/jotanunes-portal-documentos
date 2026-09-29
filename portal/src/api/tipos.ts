@@ -7,6 +7,7 @@ export type EmpresaPortal = S['EmpresaPortal'];
 export type EnvioPortal = S['EnvioPortal'];
 export type DocumentoSituacaoPortal = S['DocumentoSituacaoPortal'];
 export type ConviteValidacao = S['ConviteValidacao'];
+export type ConviteValidacaoInput = S['ConviteValidacaoInput'];
 export type LoginInput = S['LoginInput'];
 export type TrocaSenhaInput = S['TrocaSenhaInput'];
 export type Problema = S['Problema'];

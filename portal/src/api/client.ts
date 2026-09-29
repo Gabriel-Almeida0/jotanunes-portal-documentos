@@ -2,6 +2,7 @@ import { MENSAGENS, MENSAGEM_FALHA_REDE } from './mensagens';
 import type {
   CodigoErro,
   ConviteValidacao,
+  ConviteValidacaoInput,
   DocumentoSituacaoPortal,
   EmpresaPortal,
   EnvioPortal,
@@ -182,8 +183,11 @@ const segmento = (valor: string) => encodeURIComponent(valor);
 
 /** Operações do portal (contrato `openapi.yaml`, tags "Portal - *"). */
 export const api = {
+  /** O token do convite é segredo: vai no corpo, nunca na URL (caminho/query acabam em logs). */
   validarConvite: (token: string) =>
-    requisitarJson<ConviteValidacao>(`/api/portal/convites/${segmento(token)}`, {
+    requisitarJson<ConviteValidacao>('/api/portal/convites/validar', {
+      metodo: 'POST',
+      corpo: { token } satisfies ConviteValidacaoInput,
       autenticada: false,
     }),
 
