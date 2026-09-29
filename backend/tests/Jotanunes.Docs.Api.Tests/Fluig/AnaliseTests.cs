@@ -134,6 +134,30 @@ public class AnaliseTests(ApiFactory api) : TesteApi(api)
     }
 
     [Fact]
+    public async Task Rejeitar_registra_envio_rejeitado_na_auditoria()
+    {
+        var empresa = await Semente.EmpresaAsync();
+        var envio = await Semente.EnvioAsync(empresa, await Semente.TipoAsync());
+        var c = Api.Cliente(ip: "198.51.100.40", token: Tokens.Fluig(Api, "joana.dark", "Joana Dark"));
+        var r = await c.PostAsJsonAsync($"/api/fluig/envios/{envio.Id}/rejeitar", new { motivo = "Documento vencido em 2025" });
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+
+        var linha = await Api.NoBancoAsync(db => db.Auditoria.AsNoTracking().SingleAsync(a => a.Acao == "ENVIO_REJEITADO"));
+        Assert.Equal("FLUIG", linha.AtorTipo);
+        Assert.Equal("joana.dark", linha.AtorId);
+        Assert.Equal("ENVIO", linha.RecursoTipo);
+        Assert.Equal(envio.Id.ToString(), linha.RecursoId);
+        Assert.Equal("198.51.100.40", linha.Ip);
+        Assert.Equal(0, await Api.NoBancoAsync(db => db.Auditoria.CountAsync(a => a.Acao == "ENVIO_APROVADO")));
+        // nem o motivo (texto livre), nem o token, nem o conteúdo do arquivo vão para a trilha
+        await AuditoriaTeste.SemSegredosAsync(Api, ["Documento vencido", c.DefaultRequestHeaders.Authorization!.Parameter!, "%PDF"]);
+
+        // segunda decisão sobre o mesmo envio (409) não gera nova linha
+        Assert.Equal(HttpStatusCode.Conflict, (await c.PostAsJsonAsync($"/api/fluig/envios/{envio.Id}/rejeitar", new { motivo = "Outro motivo qualquer" })).StatusCode);
+        Assert.Equal(1, await Api.NoBancoAsync(db => db.Auditoria.CountAsync(a => a.Acao == "ENVIO_REJEITADO")));
+    }
+
+    [Fact]
     public async Task Falha_no_email_de_rejeicao_nao_desfaz_a_decisao()
     {
         var envio = await Semente.EnvioAsync(await Semente.EmpresaAsync(), await Semente.TipoAsync());

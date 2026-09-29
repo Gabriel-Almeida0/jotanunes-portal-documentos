@@ -75,6 +75,12 @@ public interface IDetectorFormato
 {
     /// <summary>Content type detectado pela assinatura de bytes (PDF, PNG, JPEG) ou null.</summary>
     string? Detectar(ReadOnlySpan<byte> inicio);
+
+    /// <summary>
+    /// Checagem estrutural mínima do arquivo inteiro já detectado (fim de arquivo presente: PDF com <c>%%EOF</c>,
+    /// PNG com o chunk <c>IEND</c>, JPEG com <c>FF D9</c>). False indica arquivo truncado/corrompido.
+    /// </summary>
+    bool EstaIntegro(string formato, ReadOnlySpan<byte> conteudo);
 }
 
 public interface IRegistroAuditoria

@@ -38,8 +38,9 @@ public sealed class EnviarDocumento(
         }
         if (buffer.Length == 0) throw new ErroAplicacao(CodigoErro.ARQUIVO_INVALIDO);
 
-        var (formatoDetectado, sha256) = Analisar(buffer);
+        var (formatoDetectado, integro, sha256) = Analisar(buffer);
         var formato = formatoDetectado ?? throw new ErroAplicacao(CodigoErro.ARQUIVO_TIPO_NAO_SUPORTADO);
+        if (!integro) throw new ErroAplicacao(CodigoErro.ARQUIVO_INVALIDO); // truncado/corrompido
 
         if (await envios.ExisteVivoAsync(empresaId, tipoDocumentoId, ct)) throw new ErroAplicacao(CodigoErro.ENVIO_NAO_PERMITIDO);
 
@@ -63,10 +64,12 @@ public sealed class EnviarDocumento(
         return EnvioPortalDto.De(envio);
     }
 
-    private (string? Formato, string Sha256) Analisar(MemoryStream buffer)
+    private (string? Formato, bool Integro, string Sha256) Analisar(MemoryStream buffer)
     {
         var bytes = buffer.GetBuffer().AsSpan(0, (int)buffer.Length);
-        return (detector.Detectar(bytes), Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());
+        var formato = detector.Detectar(bytes);
+        var integro = formato is not null && detector.EstaIntegro(formato, bytes);
+        return (formato, integro, Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());
     }
 }
 

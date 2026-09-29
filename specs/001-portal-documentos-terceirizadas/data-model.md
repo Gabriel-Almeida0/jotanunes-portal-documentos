@@ -16,6 +16,7 @@ obras 1───* obra_empresas *───1 empresas 1───* convites
                                    │
 tipos_documento 1───────* envios_documento *───(1 empresa)
 auditoria (independente)
+tentativas_login (independente; chave derivada do CNPJ digitado)
 ```
 
 ---
@@ -169,6 +170,26 @@ podeEnviar = situação ∈ {PENDENTE_ENVIO, REJEITADO} e empresa ativa e tipo a
 | ip | varchar(45) null | |
 
 Nunca contém senha, token ou conteúdo de arquivo.
+
+## 8. Tentativas de login por CNPJ (`tentativas_login`)
+
+Contador de falhas para CNPJ informado no login que **não** corresponde a uma empresa com senha
+(CNPJ inexistente, inválido ou empresa nunca convidada). Aplica a mesma regra de `empresas`
+(5 falhas seguidas → `bloqueado_ate = agora + 15 min`, contador volta a 0), para que a sequência
+401×5 → 423 seja igual à de um CNPJ existente (FR-006, FR-062). Empresas com senha continuam usando
+`empresas.tentativas_falhas`/`bloqueado_ate`.
+
+| Campo | Tipo | Regras |
+|---|---|---|
+| chave | char(64) PK | HMAC-SHA256 hex do CNPJ normalizado, com chave derivada de `Auth__Portal__Secret`; o CNPJ digitado não é guardado aqui |
+| tentativas_falhas | int | falhas seguidas desde o último bloqueio |
+| bloqueado_ate | timestamptz null | agora + 15 min ao atingir 5 falhas |
+| ultima_falha_em | timestamptz null | |
+
+Linha criada na 1ª falha (`INSERT … ON CONFLICT DO NOTHING`, seguro sob concorrência). Sem limpeza
+automática na v1: linhas com `tentativas_falhas = 0` e `bloqueado_ate` vencido equivalem a "sem
+linha" e podem ser apagadas a qualquer momento sem mudar o comportamento. Trocar o segredo do portal
+apenas zera esses contadores.
 
 ## Mapeamento para a API
 

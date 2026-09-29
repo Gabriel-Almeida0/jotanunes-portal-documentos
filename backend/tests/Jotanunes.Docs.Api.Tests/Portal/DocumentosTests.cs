@@ -77,7 +77,7 @@ public class DocumentosTests(ApiFactory api) : TesteApi(api)
         var t2 = await Semente.TipoAsync();
         var png = await (await c.PostAsync($"/api/portal/documentos/{t1.Id}/envios", ArquivosTeste.Form(ArquivosTeste.Png(), "foto.png", contentType: "image/png"))).LerAsync();
         Assert.Equal("image/png", png.Str("formato"));
-        var jpg = await (await c.PostAsync($"/api/portal/documentos/{t2.Id}/envios", ArquivosTeste.Form([0xFF, 0xD8, 0xFF, 0xE0, 1, 2], "foto.jpg", contentType: "image/jpeg"))).LerAsync();
+        var jpg = await (await c.PostAsync($"/api/portal/documentos/{t2.Id}/envios", ArquivosTeste.Form(ArquivosTeste.Jpeg(), "foto.jpg", contentType: "image/jpeg"))).LerAsync();
         Assert.Equal("image/jpeg", jpg.Str("formato"));
     }
 
@@ -126,6 +126,48 @@ public class DocumentosTests(ApiFactory api) : TesteApi(api)
         Assert.Equal(HttpStatusCode.UnsupportedMediaType, r.StatusCode);
         Assert.Equal("ARQUIVO_TIPO_NAO_SUPORTADO", await r.CodigoAsync());
         Assert.Equal("Envie um arquivo PDF, JPG ou PNG.", (await r.LerAsync()).Str("title"));
+    }
+
+    [Fact]
+    public async Task Arquivo_truncado_com_cabecalho_valido_devolve_400_arquivo_invalido()
+    {
+        var (empresa, c) = await EmpresaLogadaAsync();
+        var tipo = await Semente.TipoAsync();
+        var truncados = new (byte[] Conteudo, string Nome, string Tipo)[]
+        {
+            (ArquivosTeste.Truncar(ArquivosTeste.Pdf(5000), 3000), "cortado.pdf", "application/pdf"),
+            (ArquivosTeste.Truncar(ArquivosTeste.Png(), 50), "cortado.png", "image/png"),
+            (ArquivosTeste.Truncar(ArquivosTeste.Jpeg(), 20), "cortado.jpg", "image/jpeg"),
+        };
+        foreach (var (conteudo, nome, tipoConteudo) in truncados)
+        {
+            var r = await c.PostAsync($"/api/portal/documentos/{tipo.Id}/envios", ArquivosTeste.Form(conteudo, nome, contentType: tipoConteudo));
+            Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
+            Assert.Equal("ARQUIVO_INVALIDO", await r.CodigoAsync());
+            Assert.Equal("Não conseguimos ler este arquivo.", (await r.LerAsync()).Str("title"));
+        }
+
+        // nada gravado: nem registro, nem arquivo em disco, nem auditoria de envio
+        Assert.Equal(0, await Api.NoBancoAsync(db => db.Envios.CountAsync(e => e.EmpresaId == empresa.Id)));
+        Assert.False(Directory.Exists(Path.Combine(Api.DiretorioArquivos, "empresas", empresa.Id.ToString("N"))));
+        Assert.Equal(0, await Api.NoBancoAsync(db => db.Auditoria.CountAsync(a => a.Acao == "DOCUMENTO_ENVIADO")));
+
+        // o arquivo inteiro continua aceito, e assinatura desconhecida continua 415
+        Assert.Equal(HttpStatusCode.Created, (await c.PostAsync($"/api/portal/documentos/{tipo.Id}/envios", ArquivosTeste.Form(ArquivosTeste.Pdf(5000)))).StatusCode);
+        var exe = await c.PostAsync($"/api/portal/documentos/{(await Semente.TipoAsync()).Id}/envios", ArquivosTeste.Form(ArquivosTeste.Exe(), "documento.pdf"));
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, exe.StatusCode);
+    }
+
+    [Fact]
+    public async Task Pdf_com_atualizacao_incremental_e_bytes_apos_eof_e_aceito()
+    {
+        var (_, c) = await EmpresaLogadaAsync();
+        var tipo = await Semente.TipoAsync();
+        var pdf = System.Text.Encoding.ASCII.GetBytes(
+            "%PDF-1.7\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n2 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\r\n\0\0 ");
+        var r = await c.PostAsync($"/api/portal/documentos/{tipo.Id}/envios", ArquivosTeste.Form(pdf));
+        Assert.Equal(HttpStatusCode.Created, r.StatusCode);
+        Assert.Equal("application/pdf", (await r.LerAsync()).Str("formato"));
     }
 
     [Fact]

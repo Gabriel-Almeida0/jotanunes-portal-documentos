@@ -140,4 +140,33 @@ public class AcessoEmpresaTests
         e.TrocarSenha("n", Agora);
         Assert.False(e.SenhaTemporariaExpirada(Agora.AddDays(30)));
     }
+
+    [Fact]
+    public void Tentativas_por_cnpj_bloqueiam_na_quinta_falha_como_a_empresa()
+    {
+        var t = new TentativasLoginCnpj(new string('a', 64));
+        var e = NovaEmpresa();
+        e.RegistrarConvite("hash", Agora);
+        for (var i = 1; i <= 4; i++)
+        {
+            Assert.False(t.RegistrarFalha(Agora));
+            Assert.False(e.RegistrarFalhaLogin(Agora));
+            Assert.Equal(i, t.TentativasFalhas);
+        }
+        Assert.True(t.RegistrarFalha(Agora));
+        Assert.True(e.RegistrarFalhaLogin(Agora));
+        Assert.Equal(e.BloqueadoAte, t.BloqueadoAte);
+        Assert.Equal(Agora.AddMinutes(15), t.BloqueadoAte);
+        Assert.Equal(0, t.TentativasFalhas);
+        Assert.Equal(Agora, t.UltimaFalhaEm);
+        Assert.True(t.EstaBloqueada(Agora.AddMinutes(14)));
+        Assert.False(t.EstaBloqueada(Agora.AddMinutes(15)));
+    }
+
+    [Fact]
+    public void Tentativas_por_cnpj_exigem_chave()
+    {
+        Assert.Throws<ArgumentException>(() => new TentativasLoginCnpj(" "));
+        Assert.False(new TentativasLoginCnpj("k").EstaBloqueada(Agora));
+    }
 }

@@ -23,6 +23,7 @@ public sealed class DocsDbContext(DbContextOptions<DocsDbContext> options) : DbC
     public DbSet<Convite> Convites => Set<Convite>();
     public DbSet<EnvioDocumento> Envios => Set<EnvioDocumento>();
     public DbSet<RegistroAuditoria> Auditoria => Set<RegistroAuditoria>();
+    public DbSet<TentativasLoginCnpj> TentativasLogin => Set<TentativasLoginCnpj>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -135,6 +136,14 @@ public sealed class DocsDbContext(DbContextOptions<DocsDbContext> options) : DbC
             e.Property(x => x.RecursoId).HasMaxLength(100);
             e.Property(x => x.Ip).HasMaxLength(45);
             e.HasIndex(x => x.OcorridoEm);
+        });
+
+        b.Entity<TentativasLoginCnpj>(e =>
+        {
+            // Chave = HMAC-SHA256 hex do CNPJ normalizado (o CNPJ digitado não é guardado em texto puro).
+            e.ToTable("tentativas_login");
+            e.HasKey(x => x.Chave);
+            e.Property(x => x.Chave).HasColumnType("char(64)").ValueGeneratedNever();
         });
     }
 }

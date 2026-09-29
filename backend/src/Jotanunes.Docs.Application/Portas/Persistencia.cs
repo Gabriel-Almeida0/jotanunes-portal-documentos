@@ -62,6 +62,16 @@ public interface IEmpresaRepositorio
     Task<PaginaResultado<Empresa>> ListarAsync(FiltroEmpresas filtro, Paginacao paginacao, CancellationToken ct = default);
 }
 
+/// <summary>
+/// Falhas de login por CNPJ sem empresa com senha (anti-enumeração, FR-062). O adaptador guarda só uma
+/// chave derivada do CNPJ (HMAC), nunca o CNPJ digitado em texto puro.
+/// </summary>
+public interface ITentativasLoginRepositorio
+{
+    /// <summary>Contador rastreado do CNPJ normalizado; criado (zerado) se ainda não existir. Seguro sob concorrência.</summary>
+    Task<TentativasLoginCnpj> ObterOuCriarAsync(string cnpjNormalizado, CancellationToken ct = default);
+}
+
 public interface ITipoDocumentoRepositorio
 {
     Task<TipoDocumento?> ObterAsync(Guid id, CancellationToken ct = default);

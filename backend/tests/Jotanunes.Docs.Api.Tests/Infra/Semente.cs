@@ -101,15 +101,27 @@ public static class CnpjTeste
 
 public static class ArquivosTeste
 {
+    /// <summary>PDF com o tamanho pedido: cabeçalho <c>%PDF-</c> e <c>%%EOF</c> no final (passa na checagem de integridade).</summary>
     public static byte[] Pdf(int tamanho = 1024)
     {
+        var fim = "\n%%EOF\n"u8;
         var b = new byte[Math.Max(tamanho, 16)];
         "%PDF-1.4\n"u8.CopyTo(b);
-        for (var i = 9; i < b.Length; i++) b[i] = (byte)('a' + i % 26);
+        for (var i = 9; i < b.Length - fim.Length; i++) b[i] = (byte)('a' + i % 26);
+        fim.CopyTo(b.AsSpan(b.Length - fim.Length));
         return b;
     }
 
-    public static byte[] Png() => [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3, 4];
+    /// <summary>PNG real de 1×1 pixel (assinatura, IHDR, IDAT e IEND).</summary>
+    public static byte[] Png() => Convert.FromBase64String(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
+
+    /// <summary>JPEG mínimo: SOI + APP0 (JFIF) + EOI.</summary>
+    public static byte[] Jpeg() =>
+        [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xFF, 0xD9];
+
+    /// <summary>Arquivo cortado no meio (perde o fim), como um upload interrompido.</summary>
+    public static byte[] Truncar(byte[] arquivo, int manter) => arquivo[..manter];
 
     public static byte[] Exe() => [0x4D, 0x5A, 0x90, 0x00, 0x03, 0x00, 0x00, 0x00, 1, 2, 3, 4];
 

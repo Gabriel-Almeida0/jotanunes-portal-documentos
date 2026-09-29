@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+
 namespace Jotanunes.Docs.Api.Tests.Portal;
 
 public class TrocaSenhaTests(ApiFactory api) : TesteApi(api)
@@ -88,6 +90,28 @@ public class TrocaSenhaTests(ApiFactory api) : TesteApi(api)
         var login = await FluxoConvite.LoginAsync(Api, empresa.Cnpj, "Alfa2026ok");
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
         Assert.False((await login.LerAsync()).GetProperty("empresa").GetProperty("trocaSenhaObrigatoria").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Troca_de_senha_registra_senha_trocada_na_auditoria_sem_segredos()
+    {
+        var (empresa, convite, token) = await LogadoComTrocaPendenteAsync();
+        var c = Api.Cliente(ip: "198.51.100.30", token: token);
+        Assert.Equal("SENHA_ATUAL_INCORRETA", await (await c.PostAsJsonAsync("/api/portal/auth/trocar-senha",
+            new { senhaAtual = "Errada123", novaSenha = "Alfa2026ok" })).CodigoAsync());
+        Assert.Equal(0, await Api.NoBancoAsync(db => db.Auditoria.CountAsync(a => a.Acao == "SENHA_TROCADA")));
+
+        var r = await c.PostAsJsonAsync("/api/portal/auth/trocar-senha", new { senhaAtual = convite.Senha, novaSenha = "Alfa2026ok" });
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        var novoToken = (await r.LerAsync()).Str("accessToken");
+
+        var linha = await Api.NoBancoAsync(db => db.Auditoria.AsNoTracking().SingleAsync(a => a.Acao == "SENHA_TROCADA"));
+        Assert.Equal("EMPRESA", linha.AtorTipo);
+        Assert.Equal(empresa.Id.ToString(), linha.AtorId);
+        Assert.Equal("EMPRESA", linha.RecursoTipo);
+        Assert.Equal(empresa.Id.ToString(), linha.RecursoId);
+        Assert.Equal("198.51.100.30", linha.Ip);
+        await AuditoriaTeste.SemSegredosAsync(Api, [convite.Senha, "Alfa2026ok", "Errada123", token, novoToken, convite.Token]);
     }
 
     [Fact]

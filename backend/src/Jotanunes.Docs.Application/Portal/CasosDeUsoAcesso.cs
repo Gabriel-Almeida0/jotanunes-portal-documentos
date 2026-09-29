@@ -25,6 +25,7 @@ public sealed class ValidarConvite(IConviteRepositorio convites, IEmpresaReposit
 
 public sealed class LoginPortal(
     IEmpresaRepositorio empresas,
+    ITentativasLoginRepositorio tentativas,
     IUnidadeTrabalho uow,
     IHasherSenha hasher,
     IEmissorTokenPortal emissor,
@@ -46,10 +47,7 @@ public sealed class LoginPortal(
 
         if (empresa?.SenhaHash is null)
         {
-            hasher.VerificarFicticio(senha);
-            auditoria.Registrar(AtorAuditoria.Anonimo, Limitar(cnpj), AcaoAuditoria.LoginFalha);
-            await uow.SalvarAsync(ct);
-            throw new ErroAplicacao(CodigoErro.CREDENCIAIS_INVALIDAS);
+            throw await RecusarSemEmpresaAsync(cnpj, senha, agora, ct);
         }
 
         if (empresa.EstaBloqueada(agora))
@@ -68,14 +66,45 @@ public sealed class LoginPortal(
             throw new ErroAplicacao(CodigoErro.CREDENCIAIS_INVALIDAS);
         }
 
-        if (!empresa.Ativa) throw new ErroAplicacao(CodigoErro.EMPRESA_INATIVA, status: 403);
-        if (empresa.SenhaTemporariaExpirada(agora)) throw new ErroAplicacao(CodigoErro.CONVITE_EXPIRADO);
+        // Senha certa, mas acesso recusado: a recusa também entra na trilha (FR-061) antes do erro.
+        if (!empresa.Ativa) throw await RecusarComSenhaCertaAsync(empresa, new ErroAplicacao(CodigoErro.EMPRESA_INATIVA, status: 403), ct);
+        if (empresa.SenhaTemporariaExpirada(agora)) throw await RecusarComSenhaCertaAsync(empresa, new ErroAplicacao(CodigoErro.CONVITE_EXPIRADO), ct);
 
         empresa.RegistrarLoginSucesso(agora);
         auditoria.Registrar(AtorAuditoria.Empresa, empresa.Id.ToString(), AcaoAuditoria.LoginSucesso, "EMPRESA", empresa.Id.ToString());
         await uow.SalvarAsync(ct);
         var token = emissor.Emitir(empresa);
         return new SessaoPortalDto(token.AccessToken, token.ExpiraEm, EmpresaPortalDto.De(empresa));
+    }
+
+    /// <summary>
+    /// CNPJ inexistente, inválido ou de empresa nunca convidada. Conta a falha por CNPJ com a mesma regra da
+    /// empresa (5 falhas → 423 por 15 min) e roda um BCrypt fictício quando uma empresa real rodaria o verdadeiro,
+    /// para que nem a sequência de respostas nem o tempo revelem se o CNPJ existe (FR-062).
+    /// </summary>
+    private async Task<ErroAplicacao> RecusarSemEmpresaAsync(string cnpj, string senha, DateTimeOffset agora, CancellationToken ct)
+    {
+        var contador = await tentativas.ObterOuCriarAsync(cnpj, ct);
+        if (contador.EstaBloqueada(agora))
+        {
+            auditoria.Registrar(AtorAuditoria.Anonimo, Limitar(cnpj), AcaoAuditoria.LoginBloqueado);
+            await uow.SalvarAsync(ct);
+            return new ErroAplicacao(CodigoErro.ACESSO_BLOQUEADO) { BloqueadoAte = contador.BloqueadoAte };
+        }
+
+        hasher.VerificarFicticio(senha);
+        var bloqueou = contador.RegistrarFalha(agora);
+        auditoria.Registrar(AtorAuditoria.Anonimo, Limitar(cnpj), AcaoAuditoria.LoginFalha);
+        if (bloqueou) auditoria.Registrar(AtorAuditoria.Anonimo, Limitar(cnpj), AcaoAuditoria.LoginBloqueado);
+        await uow.SalvarAsync(ct);
+        return new ErroAplicacao(CodigoErro.CREDENCIAIS_INVALIDAS);
+    }
+
+    private async Task<ErroAplicacao> RecusarComSenhaCertaAsync(Empresa empresa, ErroAplicacao erro, CancellationToken ct)
+    {
+        auditoria.Registrar(AtorAuditoria.Anonimo, empresa.Cnpj, AcaoAuditoria.LoginFalha, "EMPRESA", empresa.Id.ToString());
+        await uow.SalvarAsync(ct);
+        return erro;
     }
 
     private static string Limitar(string cnpj) => cnpj.Length > 100 ? cnpj[..100] : cnpj;

@@ -78,7 +78,13 @@ este documento resolve os detalhes em aberto.
   (`ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789`), garantindo letra e número. Política
   da nova senha: ≥ 8 e ≤ 128 caracteres, ao menos 1 letra e 1 número, diferente da atual.
 - **Bloqueio**: `tentativas_falhas` e `bloqueado_ate` na empresa; 5 falhas → bloqueio de 15 min;
-  sucesso zera. CNPJ inexistente executa um BCrypt "dummy" para igualar o tempo de resposta.
+  sucesso zera. CNPJ inexistente executa um BCrypt "dummy" (mesmo custo 12) para igualar o tempo de
+  resposta. Para não revelar se o CNPJ existe (FR-062), CNPJ sem empresa com senha (inexistente,
+  inválido ou nunca convidado) também conta falhas e bloqueia com a mesma regra, na tabela
+  `tentativas_login` (data-model §8). A chave é HMAC-SHA256 do CNPJ normalizado com chave derivada de
+  `Auth__Portal__Secret`: o CNPJ digitado não fica em texto puro e, ao contrário de um SHA-256 puro,
+  não pode ser revertido por força bruta sobre o espaço pequeno de CNPJs. (A trilha `auditoria`
+  continua gravando o CNPJ informado em `ator_id`, como já previsto no data-model §7.)
 - **Alternatives considered**: ASP.NET Identity `PasswordHasher` (PBKDF2) — válido, mas o usuário
   sugeriu BCrypt e Identity traz modelo de usuário que não usamos.
 
@@ -126,6 +132,11 @@ este documento resolve os detalhes em aberto.
 - **Formatos**: PDF, JPEG, PNG (decisão do clarify). Validação por **assinatura de bytes**:
   PDF `25 50 44 46 2D` (`%PDF-`), PNG `89 50 4E 47 0D 0A 1A 0A`, JPEG `FF D8 FF`. O content type
   gravado é o detectado, não o informado pelo cliente. Arquivo de 0 byte → `400 ARQUIVO_INVALIDO`.
+  Checagem estrutural mínima do fim do arquivo (arquivo truncado/corrompido → `400 ARQUIVO_INVALIDO`;
+  assinatura desconhecida continua `415`): PDF com `%%EOF`, PNG com o chunk `IEND` completo
+  (`00 00 00 00 49 45 4E 44 AE 42 60 82`) e JPEG com `FF D9`, procurados nos **últimos 1024 bytes**
+  (arquivos reais podem ter bytes após o marcador: quebra de linha depois de `%%EOF`, preenchimento de
+  câmeras após o `FF D9`; PDFs com atualização incremental têm vários `%%EOF`).
 - **Tamanho**: 10 MB (10.485.760 bytes). `[RequestSizeLimit(11 MB)]` + `MultipartBodyLengthLimit`
   no endpoint; acima → `413 ARQUIVO_MUITO_GRANDE`.
 - **Download**: só por endpoint autenticado, com `Content-Disposition: attachment; filename*=UTF-8''...`
@@ -201,7 +212,8 @@ este documento resolve os detalhes em aberto.
 - **Decision**: porta `IRegistroAuditoria`; tabela `auditoria` gravada na mesma transação do caso de
   uso. Ações: `LOGIN_SUCESSO`, `LOGIN_FALHA`, `LOGIN_BLOQUEADO`, `SENHA_TROCADA`, `CONVITE_ENVIADO`,
   `DOCUMENTO_ENVIADO`, `ARQUIVO_BAIXADO`, `ENVIO_APROVADO`, `ENVIO_REJEITADO`. Logs estruturados
-  (`ILogger`, console JSON em produção) sem senhas, tokens, corpo de e-mail em produção ou conteúdo de
+  (`ILogger`, console JSON fora de Development via `Logging:Console:FormatterName=json` em
+  `appsettings.json`, com scopes e timestamp UTC; `simple` em `appsettings.Development.json`) sem senhas, tokens, corpo de e-mail em produção ou conteúdo de
   arquivos. Não há tela de auditoria na v1 (consulta direta no banco).
 
 ## R13. Testes do backend

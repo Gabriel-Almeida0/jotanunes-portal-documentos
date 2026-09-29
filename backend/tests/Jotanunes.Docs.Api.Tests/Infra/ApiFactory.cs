@@ -98,7 +98,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         _ = Services; // garante host iniciado (migrations aplicadas)
         await NoBancoAsync(db => db.Database.ExecuteSqlRawAsync(
-            "TRUNCATE auditoria, envios_documento, convites, obra_empresas, tipos_documento, empresas, obras RESTART IDENTITY CASCADE"));
+            "TRUNCATE auditoria, tentativas_login, envios_documento, convites, obra_empresas, tipos_documento, empresas, obras RESTART IDENTITY CASCADE"));
         Emails.Limpar();
         Logs.Limpar();
     }
