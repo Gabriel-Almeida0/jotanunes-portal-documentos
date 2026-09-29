@@ -1,0 +1,1358 @@
+openapi: 3.0.3
+info:
+  title: API do Portal de Documentação de Terceirizadas Jotanunes
+  version: 1.0.0
+  license:
+    name: Proprietário — Jotanunes Construtora
+  description: |
+    Contrato ÚNICO entre `backend/`, `fluig-app/` e `portal/` (constituição, princípio II).
+    Qualquer mudança começa aqui.
+
+    ## Autenticação
+    - `/api/fluig/*` → esquema **fluigAuth**: JWT HS256 emitido pelo Fluig
+      (claims `iss`, `aud`, `sub`=login, `name`, `email`, `iat`, `exp`). Ver `fluig-identity.md`.
+    - `/api/portal/*` → esquema **portalAuth**: JWT HS256 emitido por `POST /api/portal/auth/login`
+      (claims `sub`=id da empresa, `cnpj`, `ver`, `troca_senha`).
+    - Um token de um esquema NUNCA é aceito no outro (→ 401 `NAO_AUTENTICADO`).
+    - Com `troca_senha=true`, somente `GET /api/portal/me` e `POST /api/portal/auth/trocar-senha`
+      respondem; as demais rotas do portal devolvem 403 `TROCA_SENHA_OBRIGATORIA`.
+
+    ## Convenções
+    - JSON em camelCase; enums em MAIÚSCULAS; datas ISO 8601 em UTC.
+    - Erros: `application/problem+json` (RFC 9457) com `code` estável (ver `CodigoErro`);
+      `title`/`detail` em português, prontos para exibir.
+    - Recurso de outra empresa → 404 `NAO_ENCONTRADO` (nunca 403).
+    - Listas paginadas: `pagina` (≥1, padrão 1) e `tamanhoPagina` (1–100, padrão 20).
+    - CNPJ na entrada: com ou sem máscara; na saída: sempre 14 caracteres sem máscara
+      (numérico ou alfanumérico), a máscara é aplicada pelo front.
+servers:
+  - url: http://localhost:5080
+    description: Desenvolvimento local
+tags:
+  - { name: 'Sistema', description: 'Saúde da API.' }
+  - { name: 'Fluig - Sessão', description: 'Usuário Fluig atual e painel.' }
+  - { name: 'Fluig - Obras', description: 'Cadastro de obras e vínculos com empresas.' }
+  - { name: 'Fluig - Empresas', description: 'Cadastro de empresas terceirizadas.' }
+  - { name: 'Fluig - Convites', description: 'Convite por e-mail para o portal.' }
+  - { name: 'Fluig - Tipos de documento', description: 'Catálogo de tipos de documento.' }
+  - { name: 'Fluig - Análise', description: 'Situação dos documentos, fila e decisões.' }
+  - { name: 'Portal - Acesso', description: 'Convite, login e troca de senha da empresa.' }
+  - { name: 'Portal - Documentos', description: 'Documentos exigidos, envios e downloads da empresa.' }
+
+paths:
+  /health:
+    get:
+      tags: [Sistema]
+      operationId: health
+      summary: Verifica se a API está no ar (sem autenticação)
+      security: []
+      responses:
+        '200':
+          description: API disponível
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [ok] }
+
+  # ───────────────────────────── FLUIG ─────────────────────────────
+  /api/fluig/me:
+    get:
+      tags: [Fluig - Sessão]
+      operationId: fluigObterUsuarioAtual
+      summary: Dados do usuário Fluig identificado pelo token
+      security: [{ fluigAuth: [] }]
+      responses:
+        '200':
+          description: Usuário atual
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsuarioFluig' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+
+  /api/fluig/painel:
+    get:
+      tags: [Fluig - Sessão]
+      operationId: fluigObterPainel
+      summary: Indicadores do painel inicial (US5)
+      security: [{ fluigAuth: [] }]
+      responses:
+        '200':
+          description: Indicadores
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Painel' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+
+  /api/fluig/obras:
+    get:
+      tags: [Fluig - Obras]
+      operationId: fluigListarObras
+      summary: Lista obras (ordenadas por nome)
+      security: [{ fluigAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/Busca' }
+        - name: ativa
+          in: query
+          description: Filtra por ativa/inativa. Omitido = todas.
+          schema: { type: boolean }
+        - { $ref: '#/components/parameters/Pagina' }
+        - { $ref: '#/components/parameters/TamanhoPagina' }
+      responses:
+        '200':
+          description: Página de obras
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginaObras' }
+        '400': { $ref: '#/components/responses/Validacao' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+    post:
+      tags: [Fluig - Obras]
+      operationId: fluigCriarObra
+      summary: Cadastra obra
+      security: [{ fluigAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ObraInput' }
+      responses:
+        '201':
+          description: Obra criada
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Obra' }
+        '400': { $ref: '#/components/responses/Validacao' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '409':
+          description: '`CODIGO_OBRA_DUPLICADO`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  /api/fluig/obras/{obraId}:
+    parameters:
+      - { $ref: '#/components/parameters/ObraId' }
+    get:
+      tags: [Fluig - Obras]
+      operationId: fluigObterObra
+      summary: Detalhe da obra com empresas vinculadas e contagem de documentos
+      security: [{ fluigAuth: [] }]
+      responses:
+        '200':
+          description: Obra
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ObraDetalhe' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+    put:
+      tags: [Fluig - Obras]
+      operationId: fluigAtualizarObra
+      summary: Atualiza obra (inclui ativar/desativar)
+      security: [{ fluigAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ObraAtualizacao' }
+      responses:
+        '200':
+          description: Obra atualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Obra' }
+        '400': { $ref: '#/components/responses/Validacao' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409':
+          description: '`CODIGO_OBRA_DUPLICADO`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  /api/fluig/obras/{obraId}/empresas/{empresaId}:
+    parameters:
+      - { $ref: '#/components/parameters/ObraId' }
+      - { $ref: '#/components/parameters/EmpresaId' }
+    put:
+      tags: [Fluig - Obras]
+      operationId: fluigVincularEmpresaObra
+      summary: Vincula a empresa à obra (idempotente)
+      security: [{ fluigAuth: [] }]
+      responses:
+        '204': { description: Vínculo existe (criado agora ou antes) }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+    delete:
+      tags: [Fluig - Obras]
+      operationId: fluigDesvincularEmpresaObra
+      summary: Remove o vínculo da empresa com a obra
+      security: [{ fluigAuth: [] }]
+      responses:
+        '204': { description: Vínculo removido }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /api/fluig/empresas:
+    get:
+      tags: [Fluig - Empresas]
+      operationId: fluigListarEmpresas
+      summary: Lista empresas (ordenadas por razão social)
+      security: [{ fluigAuth: [] }]
+      parameters:
+        - name: busca
+          in: query
+          description: Trecho da razão social, nome fantasia ou CNPJ (com ou sem máscara).
+          schema: { type: string, maxLength: 100 }
+        - name: obraId
+          in: query
+          description: Somente empresas vinculadas a esta obra.
+          schema: { type: string, format: uuid }
+        - name: situacaoAcesso
+          in: query
+          schema: { $ref: '#/components/schemas/SituacaoAcesso' }
+        - name: comPendencia
+          in: query
+          description: true = somente empresas com documento pendente de envio ou rejeitado.
+          schema: { type: boolean }
+        - { $ref: '#/components/parameters/Pagina' }
+        - { $ref: '#/components/parameters/TamanhoPagina' }
+      responses:
+        '200':
+          description: Página de empresas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginaEmpresas' }
+        '400': { $ref: '#/components/responses/Validacao' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+    post:
+      tags: [Fluig - Empresas]
+      operationId: fluigCriarEmpresa
+      summary: Cadastra empresa terceirizada
+      security: [{ fluigAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmpresaInput' }
+      responses:
+        '201':
+          description: Empresa criada (situação de acesso `NAO_CONVIDADA`)
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Empresa' }
+        '400': { $ref: '#/components/responses/Validacao' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '409':
+          description: '`CNPJ_DUPLICADO`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  /api/fluig/empresas/{empresaId}:
+    parameters:
+      - { $ref: '#/components/parameters/EmpresaId' }
+    get:
+      tags: [Fluig - Empresas]
+      operationId: fluigObterEmpresa
+      summary: Detalhe da empresa
+      security: [{ fluigAuth: [] }]
+      responses:
+        '200':
+          description: Empresa
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Empresa' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+    put:
+      tags: [Fluig - Empresas]
+      operationId: fluigAtualizarEmpresa
+      summary: Atualiza empresa (inclui ativar/desativar)
+      description: |
+        Desativar incrementa a versão da credencial (sessões do portal caem na hora).
+        Alterar o CNPJ depois do 1º convite → 409 `CNPJ_IMUTAVEL`.
+      security: [{ fluigAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmpresaAtualizacao' }
+      responses:
+        '200':
+          description: Empresa atualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Empresa' }
+        '400': { $ref: '#/components/responses/Validacao' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409':
+          description: '`CNPJ_DUPLICADO` ou `CNPJ_IMUTAVEL`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  /api/fluig/empresas/{empresaId}/convites:
+    parameters:
+      - { $ref: '#/components/parameters/EmpresaId' }
+    get:
+      tags: [Fluig - Convites]
+      operationId: fluigListarConvites
+      summary: Histórico de convites da empresa (mais recente primeiro)
+      security: [{ fluigAuth: [] }]
+      responses:
+        '200':
+          description: Convites
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Convite' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+    post:
+      tags: [Fluig - Convites]
+      operationId: fluigEnviarConvite
+      summary: Envia (ou reenvia) o convite por e-mail
+      description: |
+        Gera token de link (7 dias) e senha temporária, invalida convites anteriores, redefine o
+        acesso (troca de senha obrigatória) e envia o e-mail ao `emailContato`.
+        Se o e-mail falhar, nada é gravado (502 `EMAIL_FALHOU`).
+      security: [{ fluigAuth: [] }]
+      responses:
+        '201':
+          description: Convite enviado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Convite' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409':
+          description: '`EMPRESA_INATIVA`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '502':
+          description: '`EMAIL_FALHOU`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  /api/fluig/empresas/{empresaId}/documentos:
+    parameters:
+      - { $ref: '#/components/parameters/EmpresaId' }
+    get:
+      tags: [Fluig - Análise]
+      operationId: fluigListarDocumentosEmpresa
+      summary: Situação de cada tipo de documento ativo para a empresa (ordenado por nome do tipo)
+      security: [{ fluigAuth: [] }]
+      responses:
+        '200':
+          description: Documentos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DocumentoSituacao' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /api/fluig/empresas/{empresaId}/documentos/{tipoDocumentoId}/envios:
+    parameters:
+      - { $ref: '#/components/parameters/EmpresaId' }
+      - { $ref: '#/components/parameters/TipoDocumentoId' }
+    get:
+      tags: [Fluig - Análise]
+      operationId: fluigListarHistoricoEnvios
+      summary: Histórico de envios da empresa para o tipo (mais recente primeiro; inclui tipos inativos)
+      security: [{ fluigAuth: [] }]
+      responses:
+        '200':
+          description: Envios
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Envio' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /api/fluig/tipos-documento:
+    get:
+      tags: [Fluig - Tipos de documento]
+      operationId: fluigListarTiposDocumento
+      summary: Lista tipos de documento (ordenados por nome; sem paginação)
+      security: [{ fluigAuth: [] }]
+      parameters:
+        - name: ativo
+          in: query
+          description: Filtra por ativo/inativo. Omitido = todos.
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Tipos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TipoDocumento' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+    post:
+      tags: [Fluig - Tipos de documento]
+      operationId: fluigCriarTipoDocumento
+      summary: Cadastra tipo de documento (passa a ser exigido de todas as empresas ativas)
+      security: [{ fluigAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TipoDocumentoInput' }
+      responses:
+        '201':
+          description: Tipo criado
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TipoDocumento' }
+        '400': { $ref: '#/components/responses/Validacao' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '409':
+          description: '`NOME_DUPLICADO`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  /api/fluig/tipos-documento/{tipoDocumentoId}:
+    parameters:
+      - { $ref: '#/components/parameters/TipoDocumentoId' }
+    get:
+      tags: [Fluig - Tipos de documento]
+      operationId: fluigObterTipoDocumento
+      summary: Detalhe do tipo de documento
+      security: [{ fluigAuth: [] }]
+      responses:
+        '200':
+          description: Tipo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TipoDocumento' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+    put:
+      tags: [Fluig - Tipos de documento]
+      operationId: fluigAtualizarTipoDocumento
+      summary: Atualiza tipo de documento (inclui ativar/desativar)
+      security: [{ fluigAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TipoDocumentoAtualizacao' }
+      responses:
+        '200':
+          description: Tipo atualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TipoDocumento' }
+        '400': { $ref: '#/components/responses/Validacao' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409':
+          description: '`NOME_DUPLICADO`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  /api/fluig/envios:
+    get:
+      tags: [Fluig - Análise]
+      operationId: fluigListarEnvios
+      summary: Fila de análise / busca de envios
+      description: |
+        Padrão `status=EM_ANALISE`, ordenado do envio mais antigo para o mais novo.
+        Para `APROVADO`/`REJEITADO`, ordenado do mais recente para o mais antigo.
+      security: [{ fluigAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            allOf: [{ $ref: '#/components/schemas/StatusEnvio' }]
+            default: EM_ANALISE
+        - name: obraId
+          in: query
+          description: Envios de empresas vinculadas a esta obra.
+          schema: { type: string, format: uuid }
+        - name: empresaId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: tipoDocumentoId
+          in: query
+          schema: { type: string, format: uuid }
+        - { $ref: '#/components/parameters/Pagina' }
+        - { $ref: '#/components/parameters/TamanhoPagina' }
+      responses:
+        '200':
+          description: Página de envios
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginaEnvios' }
+        '400': { $ref: '#/components/responses/Validacao' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+
+  /api/fluig/envios/{envioId}:
+    parameters:
+      - { $ref: '#/components/parameters/EnvioId' }
+    get:
+      tags: [Fluig - Análise]
+      operationId: fluigObterEnvio
+      summary: Detalhe de um envio
+      security: [{ fluigAuth: [] }]
+      responses:
+        '200':
+          description: Envio
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvioFila' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /api/fluig/envios/{envioId}/arquivo:
+    parameters:
+      - { $ref: '#/components/parameters/EnvioId' }
+    get:
+      tags: [Fluig - Análise]
+      operationId: fluigBaixarArquivoEnvio
+      summary: Baixa o arquivo do envio (registra auditoria ARQUIVO_BAIXADO)
+      security: [{ fluigAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Arquivo' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /api/fluig/envios/{envioId}/aprovar:
+    parameters:
+      - { $ref: '#/components/parameters/EnvioId' }
+    post:
+      tags: [Fluig - Análise]
+      operationId: fluigAprovarEnvio
+      summary: Aprova um envio EM_ANALISE
+      security: [{ fluigAuth: [] }]
+      responses:
+        '200':
+          description: Envio aprovado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envio' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409':
+          description: '`ENVIO_JA_ANALISADO`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  /api/fluig/envios/{envioId}/rejeitar:
+    parameters:
+      - { $ref: '#/components/parameters/EnvioId' }
+    post:
+      tags: [Fluig - Análise]
+      operationId: fluigRejeitarEnvio
+      summary: Rejeita um envio EM_ANALISE com motivo (envia e-mail de aviso à empresa)
+      security: [{ fluigAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Rejeicao' }
+      responses:
+        '200':
+          description: Envio rejeitado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envio' }
+        '400': { $ref: '#/components/responses/Validacao' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409':
+          description: '`ENVIO_JA_ANALISADO`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  # ───────────────────────────── PORTAL ─────────────────────────────
+  /api/portal/convites/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        description: Token do link do convite (base64url, 43 caracteres).
+        schema: { type: string, minLength: 20, maxLength: 100 }
+    get:
+      tags: [Portal - Acesso]
+      operationId: portalValidarConvite
+      summary: Valida o link do convite e devolve dados para pré-preencher a tela de acesso
+      description: Anônimo, com limite de 10 requisições/min por IP.
+      security: []
+      responses:
+        '200':
+          description: Convite válido
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConviteValidacao' }
+        '404':
+          description: '`CONVITE_INVALIDO` (inexistente, expirado, usado ou substituído)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '429': { $ref: '#/components/responses/LimiteRequisicoes' }
+
+  /api/portal/auth/login:
+    post:
+      tags: [Portal - Acesso]
+      operationId: portalLogin
+      summary: Acesso da empresa por CNPJ + senha
+      description: |
+        Anônimo, com limite de 10 requisições/min por IP.
+        5 falhas seguidas no mesmo CNPJ → bloqueio de 15 min (423 `ACESSO_BLOQUEADO`).
+        Mensagem de `CREDENCIAIS_INVALIDAS` não revela se o CNPJ existe.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginInput' }
+      responses:
+        '200':
+          description: Autenticado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessaoPortal' }
+        '400': { $ref: '#/components/responses/Validacao' }
+        '401':
+          description: '`CREDENCIAIS_INVALIDAS` ou `CONVITE_EXPIRADO` (senha temporária vencida)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '403':
+          description: '`EMPRESA_INATIVA` (credenciais corretas, empresa desativada)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '423':
+          description: '`ACESSO_BLOQUEADO` (extensão `bloqueadoAte` com a data/hora de liberação)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '429': { $ref: '#/components/responses/LimiteRequisicoes' }
+
+  /api/portal/auth/trocar-senha:
+    post:
+      tags: [Portal - Acesso]
+      operationId: portalTrocarSenha
+      summary: Troca a senha (obrigatória no primeiro acesso) e devolve nova sessão
+      description: |
+        Permitida com `troca_senha=true`. Marca o convite como usado, incrementa a versão da
+        credencial (tokens anteriores deixam de valer) e devolve novo token com `troca_senha=false`.
+      security: [{ portalAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TrocaSenhaInput' }
+      responses:
+        '200':
+          description: Senha trocada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessaoPortal' }
+        '400':
+          description: '`VALIDACAO`, `SENHA_FRACA` ou `SENHA_ATUAL_INCORRETA`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+
+  /api/portal/me:
+    get:
+      tags: [Portal - Acesso]
+      operationId: portalObterEmpresaAtual
+      summary: Dados da empresa autenticada (permitido com troca de senha pendente)
+      security: [{ portalAuth: [] }]
+      responses:
+        '200':
+          description: Empresa atual
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmpresaPortal' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+
+  /api/portal/documentos:
+    get:
+      tags: [Portal - Documentos]
+      operationId: portalListarDocumentos
+      summary: Documentos exigidos da empresa autenticada e a situação de cada um
+      description: Todos os tipos ativos, ordenados por situação (REJEITADO, PENDENTE_ENVIO, EM_ANALISE, APROVADO) e nome.
+      security: [{ portalAuth: [] }]
+      responses:
+        '200':
+          description: Documentos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DocumentoSituacaoPortal' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
+
+  /api/portal/documentos/{tipoDocumentoId}/envios:
+    parameters:
+      - { $ref: '#/components/parameters/TipoDocumentoId' }
+    get:
+      tags: [Portal - Documentos]
+      operationId: portalListarHistoricoEnvios
+      summary: Histórico de envios da própria empresa para o tipo (mais recente primeiro)
+      security: [{ portalAuth: [] }]
+      responses:
+        '200':
+          description: Envios
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EnvioPortal' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+    post:
+      tags: [Portal - Documentos]
+      operationId: portalEnviarDocumento
+      summary: Envia arquivo para o tipo de documento (PDF, JPEG ou PNG, até 10 MB)
+      description: |
+        Permitido somente quando a situação é `PENDENTE_ENVIO` ou `REJEITADO` e o tipo está ativo.
+        O formato é validado pelo conteúdo do arquivo (assinatura de bytes), não pela extensão.
+      security: [{ portalAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [arquivo]
+              properties:
+                arquivo:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Envio registrado (status `EM_ANALISE`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvioPortal' }
+        '400':
+          description: '`VALIDACAO` (campo ausente) ou `ARQUIVO_INVALIDO` (vazio/corrompido)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409':
+          description: '`ENVIO_NAO_PERMITIDO` (documento em análise ou aprovado)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '413':
+          description: '`ARQUIVO_MUITO_GRANDE`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '415':
+          description: '`ARQUIVO_TIPO_NAO_SUPORTADO`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  /api/portal/envios/{envioId}/arquivo:
+    parameters:
+      - { $ref: '#/components/parameters/EnvioId' }
+    get:
+      tags: [Portal - Documentos]
+      operationId: portalBaixarArquivoEnvio
+      summary: Baixa arquivo de um envio da própria empresa (outra empresa → 404)
+      security: [{ portalAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Arquivo' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+components:
+  securitySchemes:
+    fluigAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT HS256 emitido pelo Fluig. `iss`=Auth__Fluig__Issuer (padrão `fluig`),
+        `aud`=Auth__Fluig__Audience (padrão `jotanunes-docs-api`), `sub`=login, `name`, `email`,
+        `exp` ≤ 8 h após `iat`. Ver `contracts/fluig-identity.md`.
+    portalAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT HS256 emitido por `/api/portal/auth/login` ou `/api/portal/auth/trocar-senha`.
+        `iss`=`aud`=`jotanunes-docs-portal`, `sub`=id da empresa, `cnpj`, `ver`, `troca_senha`; 8 h.
+
+  parameters:
+    Pagina:
+      name: pagina
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    TamanhoPagina:
+      name: tamanhoPagina
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    Busca:
+      name: busca
+      in: query
+      description: Trecho do nome, código ou cidade (sem diferenciar maiúsculas/acentos).
+      schema: { type: string, maxLength: 100 }
+    ObraId:
+      name: obraId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    EmpresaId:
+      name: empresaId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    TipoDocumentoId:
+      name: tipoDocumentoId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    EnvioId:
+      name: envioId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    Validacao:
+      description: '`VALIDACAO` — dados inválidos; `errors` traz as mensagens por campo'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+          example:
+            type: https://jotanunes.com/problemas/validacao
+            title: Confira os dados informados.
+            status: 400
+            code: VALIDACAO
+            errors:
+              cnpj: [CNPJ inválido.]
+    NaoAutenticado:
+      description: '`NAO_AUTENTICADO` — token ausente, inválido, expirado, revogado ou do outro esquema'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    TrocaSenhaObrigatoria:
+      description: '`TROCA_SENHA_OBRIGATORIA` — a empresa precisa trocar a senha antes de continuar'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    NaoEncontrado:
+      description: '`NAO_ENCONTRADO` — recurso inexistente ou de outra empresa'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    LimiteRequisicoes:
+      description: '`LIMITE_REQUISICOES` — muitas tentativas; header Retry-After em segundos'
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+    Arquivo:
+      description: |
+        Conteúdo do arquivo. Headers: `Content-Disposition: attachment; filename*=UTF-8''<nome>`,
+        `X-Content-Type-Options: nosniff`, `Cache-Control: no-store`.
+      headers:
+        Content-Disposition: { schema: { type: string } }
+      content:
+        application/pdf:
+          schema: { type: string, format: binary }
+        image/jpeg:
+          schema: { type: string, format: binary }
+        image/png:
+          schema: { type: string, format: binary }
+
+  schemas:
+    # ── Erros e paginação ──
+    CodigoErro:
+      type: string
+      enum:
+        - VALIDACAO
+        - NAO_AUTENTICADO
+        - TROCA_SENHA_OBRIGATORIA
+        - NAO_ENCONTRADO
+        - CNPJ_DUPLICADO
+        - CNPJ_IMUTAVEL
+        - CODIGO_OBRA_DUPLICADO
+        - NOME_DUPLICADO
+        - EMPRESA_INATIVA
+        - CREDENCIAIS_INVALIDAS
+        - ACESSO_BLOQUEADO
+        - CONVITE_INVALIDO
+        - CONVITE_EXPIRADO
+        - SENHA_FRACA
+        - SENHA_ATUAL_INCORRETA
+        - ENVIO_NAO_PERMITIDO
+        - ENVIO_JA_ANALISADO
+        - ARQUIVO_INVALIDO
+        - ARQUIVO_MUITO_GRANDE
+        - ARQUIVO_TIPO_NAO_SUPORTADO
+        - EMAIL_FALHOU
+        - LIMITE_REQUISICOES
+        - ERRO_INTERNO
+      description: |
+        | code | status | mensagem padrão (title) |
+        |---|---|---|
+        | VALIDACAO | 400 | Confira os dados informados. |
+        | NAO_AUTENTICADO | 401 | Sua sessão expirou. Entre de novo. |
+        | TROCA_SENHA_OBRIGATORIA | 403 | Crie uma nova senha para continuar. |
+        | NAO_ENCONTRADO | 404 | Não encontramos o que você procurou. |
+        | CNPJ_DUPLICADO | 409 | Já existe uma empresa com este CNPJ. |
+        | CNPJ_IMUTAVEL | 409 | O CNPJ não pode ser alterado depois do convite. |
+        | CODIGO_OBRA_DUPLICADO | 409 | Já existe uma obra com este código. |
+        | NOME_DUPLICADO | 409 | Já existe um tipo de documento com este nome. |
+        | EMPRESA_INATIVA | 409 (Fluig) / 403 (login) | Esta empresa está desativada. |
+        | CREDENCIAIS_INVALIDAS | 401 | CNPJ ou senha incorretos. |
+        | ACESSO_BLOQUEADO | 423 | Muitas tentativas. Tente de novo em 15 minutos. |
+        | CONVITE_INVALIDO | 404 | Este link não é mais válido. |
+        | CONVITE_EXPIRADO | 401 | Seu convite expirou. Peça um novo convite à Jotanunes. |
+        | SENHA_FRACA | 400 | A senha precisa ter pelo menos 8 caracteres, com letras e números. |
+        | SENHA_ATUAL_INCORRETA | 400 | A senha atual não confere. |
+        | ENVIO_NAO_PERMITIDO | 409 | Este documento já está em análise ou aprovado. |
+        | ENVIO_JA_ANALISADO | 409 | Este envio já foi analisado. |
+        | ARQUIVO_INVALIDO | 400 | Não conseguimos ler este arquivo. |
+        | ARQUIVO_MUITO_GRANDE | 413 | O arquivo passa de 10 MB. |
+        | ARQUIVO_TIPO_NAO_SUPORTADO | 415 | Envie um arquivo PDF, JPG ou PNG. |
+        | EMAIL_FALHOU | 502 | Não conseguimos enviar o convite. Tente de novo em alguns minutos. |
+        | LIMITE_REQUISICOES | 429 | Muitas tentativas. Aguarde um pouco. |
+        | ERRO_INTERNO | 500 | Algo deu errado do nosso lado. Tente de novo. |
+    Problema:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, example: 'https://jotanunes.com/problemas/nao-encontrado' }
+        title: { type: string, description: Mensagem curta para o usuário (pt-BR). }
+        status: { type: integer }
+        detail: { type: string, nullable: true }
+        instance: { type: string, nullable: true }
+        code: { $ref: '#/components/schemas/CodigoErro' }
+        errors:
+          type: object
+          nullable: true
+          description: Somente em VALIDACAO. Chave = nome do campo (camelCase).
+          additionalProperties:
+            type: array
+            items: { type: string }
+        bloqueadoAte:
+          type: string
+          format: date-time
+          nullable: true
+          description: Somente em ACESSO_BLOQUEADO.
+        traceId: { type: string, nullable: true }
+    PaginaBase:
+      type: object
+      required: [total, pagina, tamanhoPagina]
+      properties:
+        total: { type: integer, minimum: 0 }
+        pagina: { type: integer, minimum: 1 }
+        tamanhoPagina: { type: integer, minimum: 1, maximum: 100 }
+
+    # ── Enums ──
+    Uf:
+      type: string
+      enum: [AC, AL, AP, AM, BA, CE, DF, ES, GO, MA, MT, MS, MG, PA, PB, PR, PE, PI, RJ, RN, RS, RO, RR, SC, SP, SE, TO]
+    SituacaoAcesso:
+      type: string
+      enum: [NAO_CONVIDADA, CONVIDADA, CONVITE_EXPIRADO, ATIVA, DESATIVADA]
+    SituacaoConvite:
+      type: string
+      enum: [VALIDO, USADO, EXPIRADO, SUBSTITUIDO]
+    StatusEnvio:
+      type: string
+      enum: [EM_ANALISE, APROVADO, REJEITADO]
+    SituacaoDocumento:
+      type: string
+      enum: [PENDENTE_ENVIO, EM_ANALISE, APROVADO, REJEITADO]
+    FormatoArquivo:
+      type: string
+      enum: [application/pdf, image/jpeg, image/png]
+
+    # ── Fluig: sessão ──
+    UsuarioFluig:
+      type: object
+      required: [login, nome, email]
+      properties:
+        login: { type: string }
+        nome: { type: string }
+        email: { type: string }
+    AutorFluig:
+      type: object
+      required: [login, nome]
+      properties:
+        login: { type: string }
+        nome: { type: string }
+    Painel:
+      type: object
+      required: [enviosEmAnalise, empresasComPendencia, empresasConvidadasSemAcesso, empresasAtivas, obrasAtivas]
+      properties:
+        enviosEmAnalise: { type: integer, minimum: 0 }
+        empresasComPendencia:
+          type: integer
+          minimum: 0
+          description: Empresas ativas com ao menos um documento PENDENTE_ENVIO ou REJEITADO.
+        empresasConvidadasSemAcesso:
+          type: integer
+          minimum: 0
+          description: Empresas com situação CONVIDADA ou CONVITE_EXPIRADO.
+        empresasAtivas: { type: integer, minimum: 0 }
+        obrasAtivas: { type: integer, minimum: 0 }
+
+    # ── Obras ──
+    ObraInput:
+      type: object
+      required: [nome, cidade, uf]
+      properties:
+        nome: { type: string, minLength: 3, maxLength: 150 }
+        codigo: { type: string, maxLength: 30, nullable: true }
+        cidade: { type: string, minLength: 2, maxLength: 100 }
+        uf: { $ref: '#/components/schemas/Uf' }
+    ObraAtualizacao:
+      allOf:
+        - $ref: '#/components/schemas/ObraInput'
+        - type: object
+          required: [ativa]
+          properties:
+            ativa: { type: boolean }
+    Obra:
+      type: object
+      required: [id, nome, cidade, uf, ativa, criadoEm]
+      properties:
+        id: { type: string, format: uuid }
+        nome: { type: string }
+        codigo: { type: string, nullable: true }
+        cidade: { type: string }
+        uf: { $ref: '#/components/schemas/Uf' }
+        ativa: { type: boolean }
+        criadoEm: { type: string, format: date-time }
+    ObraResumo:
+      allOf:
+        - $ref: '#/components/schemas/Obra'
+        - type: object
+          required: [quantidadeEmpresas]
+          properties:
+            quantidadeEmpresas: { type: integer, minimum: 0 }
+    ObraDetalhe:
+      allOf:
+        - $ref: '#/components/schemas/Obra'
+        - type: object
+          required: [empresas]
+          properties:
+            empresas:
+              type: array
+              description: Empresas vinculadas, ordenadas por razão social.
+              items: { $ref: '#/components/schemas/EmpresaNaObra' }
+    ObraRef:
+      type: object
+      required: [id, nome, cidade, uf]
+      properties:
+        id: { type: string, format: uuid }
+        nome: { type: string }
+        cidade: { type: string }
+        uf: { $ref: '#/components/schemas/Uf' }
+    PaginaObras:
+      allOf:
+        - $ref: '#/components/schemas/PaginaBase'
+        - type: object
+          required: [itens]
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/ObraResumo' }
+
+    # ── Empresas ──
+    EmpresaInput:
+      type: object
+      required: [razaoSocial, cnpj, emailContato]
+      properties:
+        razaoSocial: { type: string, minLength: 2, maxLength: 200 }
+        nomeFantasia: { type: string, maxLength: 200, nullable: true }
+        cnpj:
+          type: string
+          description: Com ou sem máscara; numérico ou alfanumérico; DV validado.
+          example: 12.345.678/0001-95
+          minLength: 14
+          maxLength: 18
+        emailContato: { type: string, format: email, maxLength: 254 }
+        nomeContato: { type: string, maxLength: 150, nullable: true }
+        telefone:
+          type: string
+          nullable: true
+          description: Com ou sem máscara; 10 ou 11 dígitos.
+          maxLength: 20
+    EmpresaAtualizacao:
+      allOf:
+        - $ref: '#/components/schemas/EmpresaInput'
+        - type: object
+          required: [ativa]
+          properties:
+            ativa: { type: boolean }
+    ContagemDocumentos:
+      type: object
+      required: [total, pendentes, emAnalise, aprovados, rejeitados]
+      properties:
+        total: { type: integer, minimum: 0, description: Tipos de documento ativos. }
+        pendentes: { type: integer, minimum: 0 }
+        emAnalise: { type: integer, minimum: 0 }
+        aprovados: { type: integer, minimum: 0 }
+        rejeitados: { type: integer, minimum: 0 }
+    EmpresaResumo:
+      type: object
+      required: [id, razaoSocial, cnpj, emailContato, ativa, situacaoAcesso, documentos]
+      properties:
+        id: { type: string, format: uuid }
+        razaoSocial: { type: string }
+        nomeFantasia: { type: string, nullable: true }
+        cnpj: { type: string, pattern: '^[0-9A-Z]{12}[0-9]{2}$', example: '12345678000195' }
+        emailContato: { type: string }
+        ativa: { type: boolean }
+        situacaoAcesso: { $ref: '#/components/schemas/SituacaoAcesso' }
+        documentos: { $ref: '#/components/schemas/ContagemDocumentos' }
+    Empresa:
+      allOf:
+        - $ref: '#/components/schemas/EmpresaResumo'
+        - type: object
+          required: [obras, cnpjEditavel, criadoEm]
+          properties:
+            nomeContato: { type: string, nullable: true }
+            telefone: { type: string, nullable: true, description: Só dígitos. }
+            obras:
+              type: array
+              items: { $ref: '#/components/schemas/ObraRef' }
+            cnpjEditavel:
+              type: boolean
+              description: false depois do primeiro convite.
+            ultimoConvite:
+              type: object
+              allOf: [{ $ref: '#/components/schemas/Convite' }]
+              nullable: true
+            ultimoAcessoEm: { type: string, format: date-time, nullable: true }
+            criadoEm: { type: string, format: date-time }
+    EmpresaNaObra:
+      type: object
+      required: [empresaId, razaoSocial, cnpj, situacaoAcesso, vinculadoEm, documentos]
+      properties:
+        empresaId: { type: string, format: uuid }
+        razaoSocial: { type: string }
+        cnpj: { type: string }
+        situacaoAcesso: { $ref: '#/components/schemas/SituacaoAcesso' }
+        vinculadoEm: { type: string, format: date-time }
+        documentos: { $ref: '#/components/schemas/ContagemDocumentos' }
+    EmpresaRef:
+      type: object
+      required: [id, razaoSocial, cnpj]
+      properties:
+        id: { type: string, format: uuid }
+        razaoSocial: { type: string }
+        cnpj: { type: string }
+    PaginaEmpresas:
+      allOf:
+        - $ref: '#/components/schemas/PaginaBase'
+        - type: object
+          required: [itens]
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/EmpresaResumo' }
+
+    # ── Convites ──
+    Convite:
+      type: object
+      description: Nunca contém o token nem a senha temporária.
+      required: [id, emailDestino, enviadoEm, expiraEm, enviadoPor, situacao]
+      properties:
+        id: { type: string, format: uuid }
+        emailDestino: { type: string }
+        enviadoEm: { type: string, format: date-time }
+        expiraEm: { type: string, format: date-time }
+        usadoEm: { type: string, format: date-time, nullable: true }
+        enviadoPor: { $ref: '#/components/schemas/AutorFluig' }
+        situacao: { $ref: '#/components/schemas/SituacaoConvite' }
+    ConviteValidacao:
+      type: object
+      required: [cnpj, razaoSocial, expiraEm]
+      properties:
+        cnpj: { type: string }
+        razaoSocial: { type: string }
+        expiraEm: { type: string, format: date-time }
+
+    # ── Tipos de documento ──
+    TipoDocumentoInput:
+      type: object
+      required: [nome]
+      properties:
+        nome: { type: string, minLength: 3, maxLength: 120 }
+        instrucoes: { type: string, maxLength: 1000, nullable: true }
+    TipoDocumentoAtualizacao:
+      allOf:
+        - $ref: '#/components/schemas/TipoDocumentoInput'
+        - type: object
+          required: [ativo]
+          properties:
+            ativo: { type: boolean }
+    TipoDocumento:
+      type: object
+      required: [id, nome, ativo, criadoEm]
+      properties:
+        id: { type: string, format: uuid }
+        nome: { type: string }
+        instrucoes: { type: string, nullable: true }
+        ativo: { type: boolean }
+        criadoEm: { type: string, format: date-time }
+    TipoDocumentoRef:
+      type: object
+      required: [id, nome]
+      properties:
+        id: { type: string, format: uuid }
+        nome: { type: string }
+        instrucoes: { type: string, nullable: true }
+
+    # ── Envios ──
+    Envio:
+      type: object
+      description: Visão da Jotanunes (inclui quem analisou).
+      required: [id, empresaId, tipoDocumentoId, nomeArquivo, formato, tamanhoBytes, enviadoEm, status]
+      properties:
+        id: { type: string, format: uuid }
+        empresaId: { type: string, format: uuid }
+        tipoDocumentoId: { type: string, format: uuid }
+        nomeArquivo: { type: string }
+        formato: { $ref: '#/components/schemas/FormatoArquivo' }
+        tamanhoBytes: { type: integer, minimum: 1, maximum: 10485760 }
+        enviadoEm: { type: string, format: date-time }
+        status: { $ref: '#/components/schemas/StatusEnvio' }
+        analisadoEm: { type: string, format: date-time, nullable: true }
+        analisadoPor:
+          type: object
+          allOf: [{ $ref: '#/components/schemas/AutorFluig' }]
+          nullable: true
+        motivoRejeicao: { type: string, nullable: true }
+    EnvioFila:
+      allOf:
+        - $ref: '#/components/schemas/Envio'
+        - type: object
+          required: [empresa, tipoDocumento]
+          properties:
+            empresa: { $ref: '#/components/schemas/EmpresaRef' }
+            tipoDocumento: { $ref: '#/components/schemas/TipoDocumentoRef' }
+    PaginaEnvios:
+      allOf:
+        - $ref: '#/components/schemas/PaginaBase'
+        - type: object
+          required: [itens]
+          properties:
+            itens:
+              type: array
+              items: { $ref: '#/components/schemas/EnvioFila' }
+    Rejeicao:
+      type: object
+      required: [motivo]
+      properties:
+        motivo: { type: string, minLength: 5, maxLength: 500, description: Espaços nas pontas são removidos antes de validar. }
+    DocumentoSituacao:
+      type: object
+      required: [tipoDocumento, situacao]
+      properties:
+        tipoDocumento: { $ref: '#/components/schemas/TipoDocumentoRef' }
+        situacao: { $ref: '#/components/schemas/SituacaoDocumento' }
+        envioAtual:
+          type: object
+          allOf: [{ $ref: '#/components/schemas/Envio' }]
+          nullable: true
+          description: Envio que define a situação (null se PENDENTE_ENVIO).
+        quantidadeEnvios: { type: integer, minimum: 0 }
+
+    # ── Portal ──
+    LoginInput:
+      type: object
+      required: [cnpj, senha]
+      properties:
+        cnpj: { type: string, minLength: 14, maxLength: 18 }
+        senha: { type: string, minLength: 1, maxLength: 128 }
+    TrocaSenhaInput:
+      type: object
+      required: [senhaAtual, novaSenha]
+      properties:
+        senhaAtual: { type: string, minLength: 1, maxLength: 128 }
+        novaSenha:
+          type: string
+          minLength: 8
+          maxLength: 128
+          description: Ao menos 1 letra e 1 número; diferente da atual.
+    EmpresaPortal:
+      type: object
+      required: [id, razaoSocial, cnpj, trocaSenhaObrigatoria]
+      properties:
+        id: { type: string, format: uuid }
+        razaoSocial: { type: string }
+        nomeFantasia: { type: string, nullable: true }
+        cnpj: { type: string }
+        trocaSenhaObrigatoria: { type: boolean }
+    SessaoPortal:
+      type: object
+      required: [accessToken, expiraEm, empresa]
+      properties:
+        accessToken: { type: string, description: JWT portalAuth. }
+        expiraEm: { type: string, format: date-time }
+        empresa: { $ref: '#/components/schemas/EmpresaPortal' }
+    EnvioPortal:
+      type: object
+      description: Visão da empresa (NÃO inclui quem analisou).
+      required: [id, tipoDocumentoId, nomeArquivo, formato, tamanhoBytes, enviadoEm, status]
+      properties:
+        id: { type: string, format: uuid }
+        tipoDocumentoId: { type: string, format: uuid }
+        nomeArquivo: { type: string }
+        formato: { $ref: '#/components/schemas/FormatoArquivo' }
+        tamanhoBytes: { type: integer, minimum: 1, maximum: 10485760 }
+        enviadoEm: { type: string, format: date-time }
+        status: { $ref: '#/components/schemas/StatusEnvio' }
+        analisadoEm: { type: string, format: date-time, nullable: true }
+        motivoRejeicao: { type: string, nullable: true }
+    DocumentoSituacaoPortal:
+      type: object
+      required: [tipoDocumento, situacao, podeEnviar]
+      properties:
+        tipoDocumento: { $ref: '#/components/schemas/TipoDocumentoRef' }
+        situacao: { $ref: '#/components/schemas/SituacaoDocumento' }
+        envioAtual:
+          type: object
+          allOf: [{ $ref: '#/components/schemas/EnvioPortal' }]
+          nullable: true
+        podeEnviar:
+          type: boolean
+          description: true quando situação é PENDENTE_ENVIO ou REJEITADO.

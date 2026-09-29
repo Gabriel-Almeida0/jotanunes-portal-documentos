@@ -1,50 +1,124 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report
+- Versão: (template sem versão) → 1.0.0 → 1.0.1 (PATCH, 2026-09-28: exceção explícita no princípio
+  III para o adaptador de e-mail de desenvolvimento que registra o e-mail no log — decisão do usuário
+  que conflitava com a regra de logs; apontada pelo /speckit-analyze)
+- Princípios definidos (novos): I. Arquitetura Hexagonal no Backend; II. Contrato de API como Fonte
+  de Verdade; III. Segurança, Isolamento e LGPD; IV. Testes Obrigatórios; V. Identidade Visual
+  Jotanunes sem Frameworks de CSS; VI. Simplicidade e Adaptadores Trocáveis
+- Seções adicionadas: Restrições Técnicas; Fluxo de Desenvolvimento e Portões de Qualidade; Governança
+- Seções removidas: nenhuma
+- Templates revisados: plan-template.md (✅ "Constitution Check" genérico, lido em tempo de execução),
+  spec-template.md (✅ sem alteração necessária), tasks-template.md (✅ sem alteração necessária)
+- TODOs pendentes: nenhum
+-->
+
+# Portal de Documentação de Terceirizadas Jotanunes — Constituição
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Arquitetura Hexagonal no Backend
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+O backend DEVE ser .NET 8 (ASP.NET Core) organizado em quatro projetos: `Domain`, `Application`,
+`Infrastructure` e `Api`.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+- `Domain` NÃO DEVE referenciar nenhum outro projeto nem pacotes de infraestrutura (EF Core, HTTP,
+  e-mail, armazenamento).
+- `Application` contém casos de uso e declara **portas** (interfaces) para tudo que é externo:
+  persistência, e-mail, armazenamento de arquivos, relógio, hash de senha, identidade Fluig.
+- `Infrastructure` implementa as portas (**adaptadores**): EF Core/Npgsql, Resend, disco local,
+  BCrypt, validação de token Fluig.
+- `Api` só faz composição (DI), autenticação/autorização, mapeamento HTTP ↔ casos de uso.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+Justificativa: integrações (Fluig, e-mail, storage) ainda vão mudar; a troca deve ser feita
+substituindo um adaptador, sem tocar regra de negócio.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### II. Contrato de API como Fonte de Verdade
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+O arquivo `contracts/openapi.yaml` da feature é o contrato ÚNICO entre `backend/`, `fluig-app/` e
+`portal/`.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+- Toda rota, schema, código de erro e esquema de autenticação DEVE estar no contrato antes de ser
+  implementado.
+- Mudança de contrato DEVE ser feita primeiro no `openapi.yaml` e comunicada às três áreas.
+- Os frontends DEVEM conseguir evoluir com mocks derivados do contrato, sem depender do backend.
+- Erros DEVEM seguir um formato único (`application/problem+json`, RFC 9457) com `code` estável.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+Justificativa: três agentes/equipes trabalham em paralelo, cada um restrito à sua pasta.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### III. Segurança, Isolamento e LGPD (INEGOCIÁVEL)
+
+- Uma empresa terceirizada DEVE ver e acessar SOMENTE os próprios dados e documentos. Todo acesso a
+  recurso de empresa DEVE filtrar pela empresa do token no servidor — nunca por parâmetro do cliente.
+- Rotas do lado Jotanunes DEVEM aceitar apenas a identidade Fluig; rotas do portal DEVEM aceitar
+  apenas o token do portal. Tokens de um esquema NÃO DEVEM funcionar no outro.
+- Senhas DEVEM ser armazenadas apenas como hash BCrypt (custo ≥ 11). Tokens de convite DEVEM ser
+  armazenados apenas como hash (SHA-256), ter expiração e uso único.
+- Arquivos enviados NÃO DEVEM ser servidos por URL pública/estática; download SÓ por endpoint
+  autenticado e autorizado.
+- Segredos (chave Resend, segredo JWT, senha do banco) DEVEM vir de variáveis de ambiente e NUNCA
+  ser commitados. Logs NÃO DEVEM conter senhas, tokens nem conteúdo de documentos.
+  Única exceção: o adaptador de e-mail de desenvolvimento (sem chave do Resend) PODE registrar no log
+  o corpo dos e-mails (link de convite e senha temporária), e DEVE estar habilitado somente no
+  ambiente `Development`; fora dele a aplicação não inicia sem chave do Resend.
+
+Justificativa: os documentos contêm dados pessoais de trabalhadores (LGPD).
+
+### IV. Testes Obrigatórios
+
+- Backend: xUnit. Regras de domínio DEVEM ter testes unitários; cada endpoint DEVE ter teste de
+  integração; isolamento entre empresas e separação dos esquemas de autenticação DEVEM ter testes de
+  autorização explícitos (casos negativos).
+- Frontends: Vitest + Testing Library para componentes e fluxos principais.
+- Uma tarefa só está concluída com testes passando localmente.
+
+Justificativa: regras de autorização quebradas são silenciosas; só testes negativos as pegam.
+
+### V. Identidade Visual Jotanunes sem Frameworks de CSS
+
+- Os frontends (`fluig-app/`, `portal/`) DEVEM ser React + Vite + TypeScript.
+- É PROIBIDO usar qualquer framework ou biblioteca de CSS/componentes visuais (Tailwind, Bootstrap,
+  MUI, Chakra, styled-components, Emotion, etc.). Apenas CSS puro com variáveis.
+- A UI DEVE seguir `docs/design.md`: tokens `--jn-*`, Montserrat, forma-assinatura `20px 0`,
+  contraste WCAG AA, status sempre com texto (nunca só cor), tom de voz próximo e direto.
+- O `fluig-app` NÃO DEVE ter cabeçalho de marca próprio e DEVE escopar seus estilos sob `.jn-app`
+  para não conflitar com o tema do Fluig.
+
+### VI. Simplicidade e Adaptadores Trocáveis
+
+- Começar pelo mais simples que atende à spec (YAGNI). Sem microserviços, filas ou cache sem
+  necessidade demonstrada.
+- Toda dependência externa (Fluig, Resend, armazenamento) DEVE ter um adaptador de desenvolvimento
+  que funcione sem credenciais (ex.: e-mail só no log, disco local, token de dev).
+- O ambiente local DEVE subir com `docker compose up` + comandos documentados no `quickstart.md`.
+
+## Restrições Técnicas
+
+- Backend: .NET 8, ASP.NET Core, EF Core + Npgsql, PostgreSQL 16, migrations versionadas.
+- Frontends: React + Vite + TypeScript, CSS puro; testes com Vitest + Testing Library.
+- E-mail: Resend (API HTTP). Armazenamento de arquivos atrás da porta `IFileStorage`.
+- Estrutura na raiz: `backend/`, `fluig-app/`, `portal/`, `compose.yaml`, `docs/`.
+- Idioma: interface, mensagens de erro para o usuário e documentação em português do Brasil.
+  Identificadores de código podem ser em inglês.
+
+## Fluxo de Desenvolvimento e Portões de Qualidade
+
+- Fluxo Spec Kit: constitution → specify → clarify → plan → tasks → analyze → implement.
+- Cada tarefa é rotulada com uma área (`[BACKEND]`, `[FLUIG]`, `[PORTAL]`, `[INFRA]`) e NÃO DEVE
+  exigir edição de arquivos de outra área.
+- Portões antes de concluir uma user story: build sem erros, testes da área passando, contrato
+  respeitado (respostas conferidas com `openapi.yaml`), checagem de contraste/tokens nas telas.
+- Decisões assumidas sem validação do cliente DEVEM ficar registradas na spec como
+  "Decisão assumida (a validar com Gustavo/Jotanunes)".
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+- Esta constituição prevalece sobre outras práticas do projeto. Planos e tarefas DEVEM passar pelo
+  "Constitution Check" do `plan.md`; violações exigem justificativa na tabela de Complexity Tracking.
+- Emendas: alteração proposta por escrito, aprovada pelo responsável técnico, com atualização do
+  Sync Impact Report e da versão.
+- Versionamento semântico: MAJOR para remoção/redefinição de princípio; MINOR para princípio ou
+  seção nova; PATCH para redação.
+- Revisões de código DEVEM verificar os princípios III (segurança) e V (sem framework de CSS).
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.1 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-09-28
