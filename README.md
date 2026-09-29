@@ -32,8 +32,13 @@ set -a; source .env; set +a
 export Auth__Fluig__Secret="$FLUIG_JWT_SECRET" Auth__Portal__Secret="$AUTH_PORTAL_SECRET"
 export ConnectionStrings__Default="Host=localhost;Port=5432;Database=jotanunes_docs;Username=${POSTGRES_USER:-jotanunes};Password=${POSTGRES_PASSWORD:-jotanunes}"
 (cd backend && dotnet run --project src/Jotanunes.Docs.Api)      # API em :5080
-node scripts/gerar-token-fluig-dev.mjs                           # token Fluig de dev (8 h)
+node scripts/gerar-token-fluig-dev.mjs --admin dev.admin "Admin Dev" admin@jotanunes.com   # token de administrador (8 h)
+node scripts/gerar-token-fluig-dev.mjs dev.analista "Analista Dev" analista@jotanunes.com   # token de usuário comum (8 h)
 ```
+
+Perfis na área Jotanunes: o papel vem só do token Fluig (claim `roles`, ver
+[`contracts/fluig-identity.md`](specs/001-portal-documentos-terceirizadas/contracts/fluig-identity.md)). Com `--admin` o
+usuário é **administrador** (cadastra, altera e analisa); sem a opção é **comum** (consulta tudo e envia convites).
 
 Os fronts apontam para a API com `VITE_API_URL=http://localhost:5080` (CORS liberado para as portas 5173 e
 5174). Sem chave do Resend, os e-mails de convite (link + senha temporária) aparecem no log da API.

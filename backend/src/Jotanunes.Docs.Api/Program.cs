@@ -5,6 +5,7 @@ using Jotanunes.Docs.Api.Endpoints.Fluig;
 using Jotanunes.Docs.Api.Endpoints.Portal;
 using Jotanunes.Docs.Api.Infra;
 using Jotanunes.Docs.Application.Comum;
+using Jotanunes.Docs.Application.TiposDocumento;
 using Jotanunes.Docs.Infrastructure;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Http.Json;
@@ -38,6 +39,13 @@ ValidacaoConfiguracao.GarantirValida(app.Configuration, app.Environment);
 if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
     await app.Services.AplicarMigrationsAsync();
+}
+// Catálogo padrão de tipos de documento (research R15): depois das migrations, ou sozinho quando elas são
+// aplicadas por script. Idempotente e seguro com várias instâncias subindo juntas.
+if (app.Configuration.GetValue("Catalogo:SemearTiposPadrao", true))
+{
+    await using var escopo = app.Services.CreateAsyncScope();
+    await escopo.ServiceProvider.GetRequiredService<SemearCatalogoTiposPadrao>().ExecutarAsync();
 }
 
 app.UseMiddleware<CabecalhosSegurancaMiddleware>();

@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddOptions<ConfiguracaoPortal>().BindConfiguration("Portal");
 
         services.AddScoped<IUnidadeTrabalho, UnidadeTrabalhoEf>();
+        services.AddScoped<IBloqueioExclusivo, BloqueioExclusivoPostgres>();
         services.AddScoped<IObraRepositorio, ObraRepositorio>();
         services.AddScoped<IEmpresaRepositorio, EmpresaRepositorio>();
         services.AddScoped<ITentativasLoginRepositorio, TentativasLoginRepositorio>();

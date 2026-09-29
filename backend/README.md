@@ -37,7 +37,14 @@ curl http://localhost:5080/health                     # {"status":"ok"}
   e `Database__MigrateOnStartup=true`. **Não contém segredos.**
 - Sem `Resend__ApiKey`, os e-mails (convite com link + senha temporária, rejeição) aparecem no **log da API**
   — somente em `Development`. Fora de Development a API não sobe sem `Resend:ApiKey`/`Resend:From`.
-- Token Fluig de desenvolvimento: `node scripts/gerar-token-fluig-dev.mjs [login] [nome] [email]` (na raiz).
+- Token Fluig de desenvolvimento (na raiz): `node scripts/gerar-token-fluig-dev.mjs --admin` (administrador,
+  `"roles": ["admin"]`) ou `node scripts/gerar-token-fluig-dev.mjs` (usuário comum, sem `roles`); aceita
+  `[--admin] [login] [nome] [email]`.
+- Perfis (US6): o papel vem só da claim `roles` do token Fluig (`contracts/fluig-identity.md`). As 10 operações
+  `x-requer-admin` do contrato têm a política `FluigAdmin`; usuário comum recebe 403 `SEM_PERMISSAO` antes de
+  qualquer validação ou leitura, e a tentativa fica na auditoria (`PERMISSAO_NEGADA`, coluna `ator_admin`).
+- Catálogo padrão (US7): ao subir, se `tipos_documento` estiver vazia (nenhum tipo, ativo ou inativo), a API cria os
+  10 tipos de `data-model.md` §4.1 com autor `sistema`; com qualquer tipo cadastrado não cria nem altera nada.
 
 ### Variáveis de ambiente
 
@@ -52,6 +59,7 @@ curl http://localhost:5080/health                     # {"status":"ok"}
 | `Storage__Root` | pasta dos arquivos (relativa à raiz de conteúdo da API) | `../../.data/uploads` |
 | `Cors__Origins` | origens permitidas (separadas por vírgula) | `http://localhost:5173,http://localhost:5174` |
 | `Database__MigrateOnStartup` | aplica migrations ao subir | `true` |
+| `Catalogo__SemearTiposPadrao` | cria o catálogo padrão de 10 tipos ao subir, só se não houver nenhum tipo (roda depois das migrations ou sozinho, quando elas são aplicadas por script) | `true` (padrão do `appsettings.json`) |
 | `RateLimit__PermitLimit` | req/min por IP nas rotas anônimas do portal | `10` |
 
 A API valida no startup: segredos Fluig e Portal com ≥ 32 bytes e diferentes; connection string presente.
@@ -69,7 +77,10 @@ dotnet test --filter "Categoria!=Desempenho"  # sem o teste de volume (SC-006)
 - `Jotanunes.Docs.Domain.Tests`: regras de domínio + teste de arquitetura (dependências entre camadas).
 - `Jotanunes.Docs.Application.Tests`: detector de formato, situação do documento, adaptador Resend.
 - `Jotanunes.Docs.Api.Tests`: integração ponta a ponta com Postgres real (Docker obrigatório), autorização
-  (`Autorizacao/*`: esquemas Fluig × Portal e isolamento entre empresas), contrato, desempenho e logs.
+  (`Autorizacao/*`: esquemas Fluig × Portal, isolamento entre empresas e perfis administrador × comum — o
+  `PerfilAdminTests` percorre todas as rotas de escrita `/api/fluig/*` e falha se aparecer rota sem classificação),
+  contrato, desempenho e logs. A `ApiFactory` desliga o catálogo padrão (`Catalogo:SemearTiposPadrao=false`); os
+  testes de `TiposDocumento/CatalogoPadraoTests` ligam com `ApiFactory.ComCatalogoPadrao()`.
   `Infra/ConfiguracaoTestesTests` prova que a API sob teste usa o banco do Testcontainers.
 
 ## Migrations

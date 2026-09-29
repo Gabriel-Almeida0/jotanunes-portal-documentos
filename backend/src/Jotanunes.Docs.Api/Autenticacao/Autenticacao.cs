@@ -1,7 +1,9 @@
+using System.Security.Claims;
 using System.Text;
 using Jotanunes.Docs.Api.Infra;
 using Jotanunes.Docs.Application.Erros;
 using Jotanunes.Docs.Application.Portas;
+using Jotanunes.Docs.Domain.Auditoria;
 using Jotanunes.Docs.Infrastructure.Seguranca;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -24,6 +26,26 @@ public static class Politicas
     public const string Portal = "Portal";
     /// <summary>Exige troca_senha=false; falha → 403 TROCA_SENHA_OBRIGATORIA.</summary>
     public const string PortalCompleto = "PortalCompleto";
+    /// <summary>
+    /// Token Fluig com o papel admin. Aplicada às operações <c>x-requer-admin</c> do contrato; falha → 403
+    /// SEM_PERMISSAO (antes de ler o corpo ou o banco) e linha PERMISSAO_NEGADA na auditoria.
+    /// </summary>
+    public const string FluigAdmin = "FluigAdmin";
+}
+
+/// <summary>Papéis reconhecidos na claim <c>roles</c> do token Fluig (contracts/fluig-identity.md).</summary>
+public static class PapeisFluig
+{
+    public const string Claim = "roles";
+    public const string Admin = "admin";
+
+    /// <summary>
+    /// Regra única do perfil: alguma claim <c>roles</c> do tipo texto igual a <c>admin</c> (comparação exata). Lista JSON
+    /// vira várias claims (MapInboundClaims=false); texto único vira uma. Booleano, número, objeto ou lista aninhada
+    /// chegam com outro tipo de valor e contam como usuário comum (sem recusar o token).
+    /// </summary>
+    public static bool EhAdmin(ClaimsPrincipal? usuario) =>
+        usuario?.FindAll(Claim).Any(c => c.ValueType == ClaimValueTypes.String && string.Equals(c.Value, Admin, StringComparison.Ordinal)) == true;
 }
 
 /// <summary>Configuração do token Fluig (seção Auth:Fluig).</summary>
@@ -71,8 +93,11 @@ public static class AutenticacaoExtensions
             o.AddPolicy(Politicas.Portal, p => p.AddAuthenticationSchemes(Esquemas.Portal).RequireAuthenticatedUser());
             o.AddPolicy(Politicas.PortalCompleto, p => p.AddAuthenticationSchemes(Esquemas.Portal).RequireAuthenticatedUser()
                 .AddRequirements(new TrocaSenhaConcluidaRequirement()));
+            o.AddPolicy(Politicas.FluigAdmin, p => p.AddAuthenticationSchemes(Esquemas.Fluig).RequireAuthenticatedUser()
+                .AddRequirements(new PapelAdminRequirement()));
         });
         services.AddSingleton<IAuthorizationHandler, TrocaSenhaConcluidaHandler>();
+        services.AddSingleton<IAuthorizationHandler, PapelAdminHandler>();
         services.AddSingleton<IAuthorizationMiddlewareResultHandler, ResultadoAutorizacaoHandler>();
 
         services.AddHttpContextAccessor();
@@ -169,19 +194,52 @@ public sealed class TrocaSenhaConcluidaHandler : AuthorizationHandler<TrocaSenha
     }
 }
 
-/// <summary>403 da política PortalCompleto → problem TROCA_SENHA_OBRIGATORIA.</summary>
+public sealed class PapelAdminRequirement : IAuthorizationRequirement;
+
+public sealed class PapelAdminHandler : AuthorizationHandler<PapelAdminRequirement>
+{
+    protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, PapelAdminRequirement requirement)
+    {
+        if (PapeisFluig.EhAdmin(context.User)) context.Succeed(requirement);
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>
+/// 403 das políticas → problem+json do contrato: <see cref="PapelAdminRequirement"/> → SEM_PERMISSAO (e a tentativa
+/// na auditoria, o único registro gravado); <see cref="TrocaSenhaConcluidaRequirement"/> (portal) → TROCA_SENHA_OBRIGATORIA.
+/// </summary>
 public sealed class ResultadoAutorizacaoHandler : IAuthorizationMiddlewareResultHandler
 {
+    public const string RecursoOperacao = "OPERACAO";
+
     private readonly AuthorizationMiddlewareResultHandler _padrao = new();
 
     public async Task HandleAsync(RequestDelegate next, HttpContext context, AuthorizationPolicy policy, PolicyAuthorizationResult result)
     {
         if (result.Forbidden)
         {
+            var falhas = result.AuthorizationFailure?.FailedRequirements ?? [];
+            if (falhas.OfType<PapelAdminRequirement>().Any())
+            {
+                await RegistrarPermissaoNegadaAsync(context);
+                await Problemas.EscreverAsync(context, CodigoErro.SEM_PERMISSAO);
+                return;
+            }
             await Problemas.EscreverAsync(context, CodigoErro.TROCA_SENHA_OBRIGATORIA);
             return;
         }
         await _padrao.HandleAsync(next, context, policy, result);
+    }
+
+    private static async Task RegistrarPermissaoNegadaAsync(HttpContext context)
+    {
+        var servicos = context.RequestServices;
+        var usuario = servicos.GetRequiredService<IUsuarioFluigAtual>();
+        var operacao = context.GetEndpoint()?.Metadata.GetMetadata<IEndpointNameMetadata>()?.EndpointName;
+        servicos.GetRequiredService<IRegistroAuditoria>()
+            .Registrar(AtorAuditoria.Fluig, usuario.Login, AcaoAuditoria.PermissaoNegada, RecursoOperacao, operacao);
+        await servicos.GetRequiredService<IUnidadeTrabalho>().SalvarAsync(context.RequestAborted);
     }
 }
 
@@ -193,6 +251,7 @@ public sealed class UsuarioFluigAtualDeClaims(IHttpContextAccessor acessor) : IU
     public string Login => Usuario.FindFirst("sub")?.Value ?? throw new ErroAplicacao(CodigoErro.NAO_AUTENTICADO);
     public string Nome => Usuario.FindFirst("name")?.Value ?? throw new ErroAplicacao(CodigoErro.NAO_AUTENTICADO);
     public string Email => Usuario.FindFirst("email")?.Value ?? string.Empty;
+    public bool EhAdmin => PapeisFluig.EhAdmin(acessor.HttpContext?.User);
 }
 
 public sealed class EmpresaPortalAtualDeClaims(IHttpContextAccessor acessor) : IEmpresaPortalAtual

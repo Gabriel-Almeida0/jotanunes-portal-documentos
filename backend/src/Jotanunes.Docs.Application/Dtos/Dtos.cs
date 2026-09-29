@@ -8,7 +8,7 @@ namespace Jotanunes.Docs.Application.Dtos;
 
 // Espelham os schemas de contracts/openapi.yaml (serializados em camelCase; enums pelo nome).
 
-public sealed record UsuarioFluigDto(string Login, string Nome, string Email);
+public sealed record UsuarioFluigDto(string Login, string Nome, string Email, bool Admin);
 
 public sealed record AutorFluigDto(string Login, string Nome);
 

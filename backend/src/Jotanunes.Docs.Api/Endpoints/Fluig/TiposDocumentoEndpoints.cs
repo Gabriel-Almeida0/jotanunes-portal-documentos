@@ -1,3 +1,4 @@
+using Jotanunes.Docs.Api.Autenticacao;
 using Jotanunes.Docs.Application.Dtos;
 using Jotanunes.Docs.Application.TiposDocumento;
 
@@ -14,13 +15,13 @@ public static class TiposDocumentoEndpoints
         {
             var t = await uc.ExecutarAsync(entrada, ct);
             return Results.Created($"/api/fluig/tipos-documento/{t.Id}", t);
-        }).WithName("fluigCriarTipoDocumento");
+        }).WithName("fluigCriarTipoDocumento").RequireAuthorization(Politicas.FluigAdmin);
 
         g.MapGet("/tipos-documento/{tipoDocumentoId}", async (Guid tipoDocumentoId, ObterTipo uc, CancellationToken ct) =>
             Results.Ok(await uc.ExecutarAsync(tipoDocumentoId, ct))).WithName("fluigObterTipoDocumento");
 
         g.MapPut("/tipos-documento/{tipoDocumentoId}", async (Guid tipoDocumentoId, TipoDocumentoInput entrada, AtualizarTipo uc, CancellationToken ct) =>
-            Results.Ok(await uc.ExecutarAsync(tipoDocumentoId, entrada, ct))).WithName("fluigAtualizarTipoDocumento");
+            Results.Ok(await uc.ExecutarAsync(tipoDocumentoId, entrada, ct))).WithName("fluigAtualizarTipoDocumento").RequireAuthorization(Politicas.FluigAdmin);
         return g;
     }
 }

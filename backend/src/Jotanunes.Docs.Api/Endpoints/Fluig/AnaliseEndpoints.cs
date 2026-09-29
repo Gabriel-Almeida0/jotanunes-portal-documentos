@@ -1,3 +1,4 @@
+using Jotanunes.Docs.Api.Autenticacao;
 using Jotanunes.Docs.Application.Dtos;
 using Jotanunes.Docs.Application.Envios;
 
@@ -19,10 +20,10 @@ public static class AnaliseEndpoints
             Arquivos.Baixar(ctx, await uc.ExecutarAsync(envioId, ct))).WithName("fluigBaixarArquivoEnvio");
 
         g.MapPost("/envios/{envioId}/aprovar", async (Guid envioId, AprovarEnvio uc, CancellationToken ct) =>
-            Results.Ok(await uc.ExecutarAsync(envioId, ct))).WithName("fluigAprovarEnvio");
+            Results.Ok(await uc.ExecutarAsync(envioId, ct))).WithName("fluigAprovarEnvio").RequireAuthorization(Politicas.FluigAdmin);
 
         g.MapPost("/envios/{envioId}/rejeitar", async (Guid envioId, RejeicaoInput entrada, RejeitarEnvio uc, CancellationToken ct) =>
-            Results.Ok(await uc.ExecutarAsync(envioId, entrada, ct))).WithName("fluigRejeitarEnvio");
+            Results.Ok(await uc.ExecutarAsync(envioId, entrada, ct))).WithName("fluigRejeitarEnvio").RequireAuthorization(Politicas.FluigAdmin);
 
         g.MapGet("/empresas/{empresaId}/documentos", async (Guid empresaId, ListarDocumentosEmpresa uc, CancellationToken ct) =>
             Results.Ok(await uc.ExecutarAsync(empresaId, ct))).WithName("fluigListarDocumentosEmpresa");

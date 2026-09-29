@@ -8,6 +8,8 @@ export const MENSAGENS: Record<CodigoErro, string> = {
   VALIDACAO: 'Confira os dados informados.',
   NAO_AUTENTICADO: 'Sua sessão expirou. Entre de novo.',
   TROCA_SENHA_OBRIGATORIA: 'Crie uma nova senha para continuar.',
+  // Só da área Jotanunes (perfil do Fluig); o portal nunca recebe este código.
+  SEM_PERMISSAO: 'Só administradores podem fazer isso. Se você precisa, fale com a TI.',
   NAO_ENCONTRADO: 'Não encontramos o que você procurou.',
   CNPJ_DUPLICADO: 'Já existe uma empresa com este CNPJ.',
   CNPJ_IMUTAVEL: 'O CNPJ não pode ser alterado depois do convite.',

@@ -131,6 +131,7 @@ public sealed class DocsDbContext(DbContextOptions<DocsDbContext> options) : DbC
             e.Property(x => x.Id).UseIdentityAlwaysColumn();
             e.Property(x => x.AtorTipo).HasMaxLength(10).IsRequired();
             e.Property(x => x.AtorId).HasMaxLength(100);
+            e.Property(x => x.AtorAdmin); // boolean null: perfil do usuário Fluig (FR-085)
             e.Property(x => x.Acao).HasMaxLength(40).IsRequired();
             e.Property(x => x.RecursoTipo).HasMaxLength(40);
             e.Property(x => x.RecursoId).HasMaxLength(100);

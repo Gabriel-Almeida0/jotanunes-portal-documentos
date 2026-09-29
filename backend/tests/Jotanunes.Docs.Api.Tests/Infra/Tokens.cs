@@ -7,9 +7,26 @@ namespace Jotanunes.Docs.Api.Tests.Infra;
 /// <summary>Gera JWTs HS256 manualmente (mesma forma do scripts/gerar-token-fluig-dev.mjs).</summary>
 public static class Tokens
 {
+    /// <summary>
+    /// Token Fluig de ADMINISTRADOR (<c>"roles": ["admin"]</c>): os testes de escrita existentes continuam como
+    /// administrador sem precisar mudar. Para outro perfil use a sobrecarga com <c>roles</c> ou <see cref="FluigComum"/>.
+    /// </summary>
     public static string Fluig(ApiFactory api, string login = "maria.silva", string nome = "Maria Silva", string? email = "maria@jotanunes.com",
         TimeSpan? validade = null, TimeSpan? emitidoHa = null, string? segredo = null, string iss = "fluig", string aud = "jotanunes-docs-api",
-        bool incluirIat = true)
+        bool incluirIat = true) =>
+        CriarFluig(api, login, nome, email, validade, emitidoHa, segredo, iss, aud, incluirIat, new[] { PapelAdmin });
+
+    /// <param name="roles">
+    /// Valor bruto da claim <c>roles</c>: <c>null</c> omite a claim (usuário comum); qualquer outro valor
+    /// (<c>new[] { "admin" }</c>, <c>"admin"</c>, <c>new[] { "Admin" }</c>, <c>true</c>, <c>1</c>, objeto) é serializado como está.
+    /// </param>
+    public static string Fluig(ApiFactory api, string login, string nome, string? email, object? roles) =>
+        CriarFluig(api, login, nome, email, null, null, null, "fluig", "jotanunes-docs-api", true, roles);
+
+    public const string PapelAdmin = "admin";
+
+    private static string CriarFluig(ApiFactory api, string login, string nome, string? email, TimeSpan? validade, TimeSpan? emitidoHa,
+        string? segredo, string iss, string aud, bool incluirIat, object? roles)
     {
         var iat = api.Relogio.GetUtcNow() - (emitidoHa ?? TimeSpan.Zero);
         var exp = iat + (validade ?? TimeSpan.FromHours(8));
@@ -23,8 +40,13 @@ public static class Tokens
         };
         if (email is not null) payload["email"] = email;
         if (incluirIat) payload["iat"] = iat.ToUnixTimeSeconds();
+        if (roles is not null) payload["roles"] = roles;
         return Assinar(payload, segredo ?? ApiFactory.SegredoFluig);
     }
+
+    /// <summary>Token Fluig de usuário comum (sem a claim <c>roles</c>).</summary>
+    public static string FluigComum(ApiFactory api, string login = "joao.comum", string nome = "João Comum") =>
+        Fluig(api, login, nome, $"{login}@jotanunes.com", roles: null);
 
     public static string Portal(ApiFactory api, Guid empresaId, string cnpj, int versao, bool trocaSenha, string? segredo = null,
         TimeSpan? validade = null, TimeSpan? emitidoHa = null)

@@ -26,6 +26,15 @@ public interface ITransacao : IAsyncDisposable
     Task DesfazerAsync(CancellationToken ct = default);
 }
 
+/// <summary>
+/// Bloqueio exclusivo entre instâncias da aplicação, mantido até o fim da transação atual da unidade de trabalho
+/// (exige transação aberta por <see cref="IUnidadeTrabalho.IniciarTransacaoAsync"/>).
+/// </summary>
+public interface IBloqueioExclusivo
+{
+    Task AdquirirAsync(long chave, CancellationToken ct = default);
+}
+
 public interface IObraRepositorio
 {
     Task<Obra?> ObterAsync(Guid id, CancellationToken ct = default);
@@ -80,6 +89,9 @@ public interface ITipoDocumentoRepositorio
 
     /// <summary>Ordenados por nome.</summary>
     Task<IReadOnlyList<TipoDocumento>> ListarAsync(bool? ativo, CancellationToken ct = default);
+
+    /// <summary>Existe qualquer tipo cadastrado (ativo ou inativo)?</summary>
+    Task<bool> ExisteAlgumAsync(CancellationToken ct = default);
 }
 
 public interface IConviteRepositorio

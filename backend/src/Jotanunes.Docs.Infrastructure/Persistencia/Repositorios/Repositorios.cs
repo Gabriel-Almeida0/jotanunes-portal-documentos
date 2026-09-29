@@ -125,6 +125,8 @@ public sealed class TipoDocumentoRepositorio(DocsDbContext db) : ITipoDocumentoR
         if (ativo is { } a) q = q.Where(t => t.Ativo == a);
         return await q.OrderBy(t => EF.Functions.Unaccent(t.Nome.ToLower())).ThenBy(t => t.Id).ToListAsync(ct);
     }
+
+    public Task<bool> ExisteAlgumAsync(CancellationToken ct = default) => db.TiposDocumento.AnyAsync(ct);
 }
 
 public sealed class ConviteRepositorio(DocsDbContext db) : IConviteRepositorio

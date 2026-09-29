@@ -11,5 +11,5 @@ public sealed class ObterPainel(IConsultaDocumentos consulta, TimeProvider relog
 
 public sealed class ObterUsuarioFluig(Portas.IUsuarioFluigAtual usuario) : ICasoDeUso
 {
-    public UsuarioFluigDto Executar() => new(usuario.Login, usuario.Nome, usuario.Email);
+    public UsuarioFluigDto Executar() => new(usuario.Login, usuario.Nome, usuario.Email, usuario.EhAdmin);
 }

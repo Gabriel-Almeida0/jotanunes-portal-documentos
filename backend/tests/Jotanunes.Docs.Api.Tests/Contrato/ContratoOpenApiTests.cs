@@ -1,4 +1,5 @@
 using System.Reflection;
+using Jotanunes.Docs.Api.Autenticacao;
 using Jotanunes.Docs.Api.Infra;
 using Jotanunes.Docs.Api.Tests.Autorizacao;
 using Jotanunes.Docs.Application.Dtos;
@@ -7,6 +8,7 @@ using Jotanunes.Docs.Domain.Convites;
 using Jotanunes.Docs.Domain.Empresas;
 using Jotanunes.Docs.Domain.Envios;
 using Jotanunes.Docs.Domain.Obras;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi.Any;
@@ -63,6 +65,24 @@ public class ContratoOpenApiTests(ApiFactory api) : TesteApi(api)
                 .Select(m => (Rota: new Rota(m, "/" + e.RoutePattern.RawText!.TrimStart('/')), Nome: e.Metadata.GetMetadata<IEndpointNameMetadata>()?.EndpointName)))
             .ToDictionary(x => x.Rota, x => x.Nome);
         foreach (var (rota, operationId) in RotasContrato()) Assert.Equal(operationId, nomes[rota]);
+    }
+
+    [Fact]
+    public void Operacoes_x_requer_admin_sao_exatamente_as_rotas_com_a_politica_FluigAdmin()
+    {
+        var contrato = Documento.Value.Paths.Values
+            .SelectMany(p => p.Operations.Values)
+            .Where(o => o.Extensions.TryGetValue("x-requer-admin", out var ext) && ext is OpenApiBoolean { Value: true })
+            .Select(o => o.OperationId)
+            .ToHashSet();
+        Assert.Equal(10, contrato.Count);
+
+        var api = Api.Services.GetRequiredService<EndpointDataSource>().Endpoints
+            .Where(e => e.Metadata.GetOrderedMetadata<IAuthorizeData>().Any(a => a.Policy == Politicas.FluigAdmin))
+            .Select(e => e.Metadata.GetMetadata<IEndpointNameMetadata>()?.EndpointName ?? e.DisplayName ?? "?")
+            .ToHashSet();
+
+        Assert.Equal(contrato.OrderBy(x => x), api.OrderBy(x => x));
     }
 
     private static string[] EnumContrato(string schema) =>

@@ -8,6 +8,12 @@ public interface IUsuarioFluigAtual
     string Login { get; }
     string Nome { get; }
     string Email { get; }
+
+    /// <summary>
+    /// Perfil administrador: o token traz a claim <c>roles</c> com <c>admin</c> (contracts/fluig-identity.md).
+    /// Qualquer outro caso é usuário comum. A autorização das operações de administrador é feita na Api.
+    /// </summary>
+    bool EhAdmin { get; }
 }
 
 /// <summary>Empresa autenticada no portal. O id vem SEMPRE do token, nunca do cliente.</summary>

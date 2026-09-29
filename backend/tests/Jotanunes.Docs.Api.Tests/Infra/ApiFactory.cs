@@ -47,6 +47,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             ["Auth:Fluig:Secret"] = SegredoFluig,
             ["Auth:Portal:Secret"] = SegredoPortal,
             ["Database:MigrateOnStartup"] = "true",
+            // Desligado por padrão: os testes existentes contam os tipos que eles mesmos criam (research R15).
+            // Os testes do catálogo ligam com ComCatalogoPadrao().
+            ["Catalogo:SemearTiposPadrao"] = "false",
             ["Storage:Root"] = DiretorioArquivos,
             ["Portal:BaseUrl"] = PortalBaseUrl,
             ["Resend:ApiKey"] = "",
@@ -68,6 +71,16 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     }
 
     public async Task InitializeAsync() => await _postgres.StartAsync();
+
+    /// <summary>
+    /// Outro host da API sobre o MESMO banco (simula um reinício ou uma segunda instância), com o semeador do catálogo
+    /// padrão ligado ou desligado. O host sobe no primeiro acesso a <c>Services</c>/<c>CreateClient</c>.
+    /// </summary>
+    public WebApplicationFactory<Program> ComCatalogoPadrao(bool semear = true) =>
+        WithWebHostBuilder(b => b.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Catalogo:SemearTiposPadrao"] = semear ? "true" : "false",
+        })));
 
     public new async Task DisposeAsync()
     {
