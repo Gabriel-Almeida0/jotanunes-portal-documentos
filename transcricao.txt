@@ -1,0 +1,80 @@
+Transcrição — WhatsApp Audio 2026-09-28 at 21.24.14.opus
+Duração: 4min15s
+(Nomes corrigidos manualmente: "JET News"→Jotanunes, "fluido"/"WIG"→Fluig, "esse IPJ"→CNPJ.)
+
+[00:00] Oi, aqui, ué.
+[00:01] Não, tá massa aqui, pode falar. Tá gravando.
+[00:04] Beleza? Então você pode ver aí, esses tipos de contratações, tá?
+[00:10] Então, o que a Jotanunes precisa?
+[00:13] Ela precisa de uma plataforma com que ela consiga acionar essas empresas
+[00:23] para que elas anexem os documentos que são necessários,
+[00:26] para que eles consigam analisar isso.
+[00:29] Beleza?
+[00:31] De forma geral, e bem direta, esse é o desafio.
+[00:36] E aí, existem dois caminhos aí dentro.
+[00:38] O primeiro caminho é o caminho de integração com o Fluig,
+[00:45] que seria o primeiro sistema, né?
+[00:47] Conversando, durante essas semanas,
+[00:49] pode pensar que são dois sistemas diferentes, né?
+[00:52] Então, o primeiro caminho seria o que vai ser integrado ao Fluig,
+[00:56] que é o que a Jotanunes vai ter acesso.
+[00:58] É através desse sistema que vai estar treinado ao Fluig
+[01:02] que ele vai cadastrar as empresas e vai cadastrar as obras
+[01:08] e vai dizer, ó, para essa obra eu tenho essa, essa e essas empresas.
+[01:13] Essa é essa empresa.
+[01:16] E para cada empresa, ela vai cadastrar quais são os documentos
+[01:21] que aquela empresa precisa enviar para eles.
+[01:26] No caso, a gente já sabe quais são os documentos
+[01:30] e a gente vai cadastrar quais vão ser os documentos a serem enviados.
+[01:34] Também, você pode fazer um cadastro de tipo de documento.
+[01:38] E a própria Jotanunes cadastra quais tipos de documentos
+[01:41] que ela quer usar essa informação.
+[01:43] Mas vai ser tipos de documentos diferentes para cada empresa
+[01:46] ou todas as empresas vão ter os mesmos tipos de documentos?
+[01:48] Os mesmos tipos.
+[01:52] Então é obra, empresas e das empresas os documentos.
+[01:57] Exatamente.
+[01:59] Certo?
+[02:00] Então esse é o primeiro caminho que você tem que fazer.
+[02:02] Que é satisfazer essa parte.
+[02:04] A Jotanunes gerencia isso.
+[02:06] Ah, também não pode esquecer a forma como você vai startar.
+[02:09] Como é que a Jotanunes vai falar assim para a empresa?
+[02:12] Ó, já fechamos o contrato, manda para os meus documentos.
+[02:16] A primeira forma é enviar um e-mail.
+[02:18] Então durante o cadastro da empresa você vai ter algum contato ali no e-mail
+[02:22] em que ele pode clicar em alguma coisinha e disparar esse e-mail
+[02:25] solicitando para a empresa esse cadastro.
+[02:28] Pode ser um linkzinho dele, clique, acessa o sistema, entendeu?
+[02:31] Então esse é o primeiro caminho.
+[02:34] A gente conversou que esse primeiro caminho para esse sistema
+[02:37] e gerenciamento da Jotanunes não necessariamente precisa-se de um e-mail.
+[02:43] Não precisa-se de um login.
+[02:45] Porque o próprio Fluig já tem esse contrato de perfil, não é isso?
+[02:48] E aí por lá ele já consegue controlar.
+[02:51] A pessoa que está acessando o Fluig, se ela tem acesso ou não a esse sistema aí.
+[02:56] Cadastrar a empresa, cadastrar as obras e desempenhar os documentos, tá?
+[03:00] Qual é o segundo caminho?
+[03:02] O segundo caminho é o que de fato precisa do login.
+[03:05] Ou seja, a empresa que entrar no link vai criar um login para ela.
+[03:10] Aí vocês escolhem como vocês querem fazer.
+[03:12] Se vai ser a Jotanunes que vai definir qual é o usuário e senha.
+[03:16] O combinado foi ser CNPJ e senha, não foi isso?
+[03:20] Então vai ser CNPJ e senha.
+[03:22] Aí vocês escolhem aí, vê o Gustavo, o que ele prefere.
+[03:25] A outra escolha ali vai fazer da seguinte forma.
+[03:29] Eles vão gerar uma senha para a empresa e ela vai trocar depois.
+[03:33] O primeiro login.
+[03:35] Então o segundo caminho é esse.
+[03:37] O segundo caminho é parar, é criar uma outra parte.
+[03:42] Que é onde a empresa que vai anexar os documentos vai utilizar.
+[03:46] E essa empresa vai ter o login senha, que seria CNPJ e a senha.
+[03:51] Vai entrar lá dentro e vai anexar os documentos que a Jotanunes está exigindo.
+[03:56] Cadastrado previamente no sistema do Fluig.
+[03:59] Que vai estar dentro do Fluig.
+[04:02] Beleza?
+[04:04] Beleza.
+[04:05] Como geral, é isso aí.
+[04:07] Olha, quatro minutos de áudio.
+[04:12] Pronto?
+[04:13] Pronto.
