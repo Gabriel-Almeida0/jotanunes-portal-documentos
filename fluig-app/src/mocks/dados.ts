@@ -153,6 +153,8 @@ export const IDS = {
   envioZetaAso: '44444444-4444-4444-8444-000000000004',
   envioZetaCnpj: '44444444-4444-4444-8444-000000000005',
   envioAlfaAso: '44444444-4444-4444-8444-000000000006',
+  envioAlfaAlvaraRejeitado: '44444444-4444-4444-8444-000000000007',
+  envioAlfaAlvaraAprovado: '44444444-4444-4444-8444-000000000008',
 } as const;
 
 function semear(): void {
@@ -205,6 +207,9 @@ function semear(): void {
     { id: IDS.envioAlfaPcmso, empresaId: IDS.empresaAlfa, tipoDocumentoId: IDS.tipoPcmso, nomeArquivo: 'PCMSO 2026 - Alfa Engenharia.pdf', formato: 'application/pdf' as FormatoArquivo, tamanhoBytes: 2_411_724, enviadoEm: ha(3, 6), status: 'EM_ANALISE' as StatusEnvio, analisadoEm: null, analisadoPor: null, motivoRejeicao: null },
     { id: IDS.envioZetaAso, empresaId: IDS.empresaZeta, tipoDocumentoId: IDS.tipoAso, nomeArquivo: 'aso-equipe-zeta.pdf', formato: 'application/pdf' as FormatoArquivo, tamanhoBytes: 734_003, enviadoEm: ha(2, 2), status: 'EM_ANALISE' as StatusEnvio, analisadoEm: null, analisadoPor: null, motivoRejeicao: null },
     { id: IDS.envioZetaCnpj, empresaId: IDS.empresaZeta, tipoDocumentoId: IDS.tipoCartaoCnpj, nomeArquivo: 'cartao_cnpj.png', formato: 'image/png' as FormatoArquivo, tamanhoBytes: 402_115, enviadoEm: ha(0, 4), status: 'EM_ANALISE' as StatusEnvio, analisadoEm: null, analisadoPor: null, motivoRejeicao: null },
+    // Envios de um tipo desativado depois (continuam no histórico — Edge Case da spec, T120).
+    { id: IDS.envioAlfaAlvaraRejeitado, empresaId: IDS.empresaAlfa, tipoDocumentoId: IDS.tipoAlvara, nomeArquivo: 'alvara-2025.jpg', formato: 'image/jpeg' as FormatoArquivo, tamanhoBytes: 655_360, enviadoEm: ha(35), status: 'REJEITADO' as StatusEnvio, analisadoEm: ha(34), analisadoPor: OUTRA_ANALISTA, motivoRejeicao: 'Alvará vencido.' },
+    { id: IDS.envioAlfaAlvaraAprovado, empresaId: IDS.empresaAlfa, tipoDocumentoId: IDS.tipoAlvara, nomeArquivo: 'alvara-2026.pdf', formato: 'application/pdf' as FormatoArquivo, tamanhoBytes: 212_992, enviadoEm: ha(33), status: 'APROVADO' as StatusEnvio, analisadoEm: ha(32), analisadoPor: analista, motivoRejeicao: null },
     { id: IDS.envioAlfaAso, empresaId: IDS.empresaAlfa, tipoDocumentoId: IDS.tipoAso, nomeArquivo: 'aso-alfa.pdf', formato: 'application/pdf' as FormatoArquivo, tamanhoBytes: 98_304, enviadoEm: ha(8), status: 'APROVADO' as StatusEnvio, analisadoEm: ha(7), analisadoPor: analista, motivoRejeicao: null },
   ]);
 }

@@ -9,7 +9,7 @@ import { Botao, BotaoLink } from '../../components/Botao';
 import { Carregando, EstadoErro, EstadoVazio } from '../../components/Estados';
 import { IconeAbrir, IconeSeta } from '../../components/icons';
 import { Modal } from '../../components/Modal';
-import { SeloSituacao } from '../../components/Selo';
+import { SeloAtivo, SeloSituacao } from '../../components/Selo';
 import { Tabela } from '../../components/Tabela';
 import { formatarDataHora } from '../../utils/datas';
 import { formatarTamanho } from '../../utils/formatos';
@@ -63,9 +63,63 @@ export function SecaoDocumentos({ empresaId }: { empresaId: string }) {
         </Tabela>
       )}
 
+      <TiposDesativados empresaId={empresaId} onHistorico={setHistorico} />
+
       {historico ? (
         <ModalHistorico empresaId={empresaId} tipo={historico} onFechar={() => setHistorico(null)} />
       ) : null}
+    </section>
+  );
+}
+
+/**
+ * Tipos desativados não aparecem na tabela acima (que só lista os exigidos hoje), mas os envios
+ * feitos enquanto estavam ativos continuam no histórico (Edge Case da spec, FR-046). O contrato não
+ * informa quais tipos inativos têm envio desta empresa, então listamos todos os inativos e o
+ * histórico é buscado só quando o analista abre — sem uma chamada por tipo ao carregar a página.
+ */
+function TiposDesativados({
+  empresaId,
+  onHistorico,
+}: {
+  empresaId: string;
+  onHistorico: (tipo: TipoDocumentoRef) => void;
+}) {
+  const consulta = useConsulta((sinal) => api.listarTipos({ ativo: false }, sinal), [empresaId]);
+  const tipos = consulta.dados ?? [];
+
+  if (consulta.carregando && !consulta.dados) return null;
+  if (!consulta.erro && tipos.length === 0) return null;
+
+  return (
+    <section className="jn-documentos__desativados" aria-labelledby="jn-tipos-desativados-titulo">
+      <h3 className="jn-documentos__desativados-titulo" id="jn-tipos-desativados-titulo">
+        Tipos desativados
+      </h3>
+      <p className="jn-secao__descricao">
+        Não são mais exigidos, mas os envios feitos antes da desativação continuam guardados.
+      </p>
+      {consulta.erro ? (
+        <EstadoErro erro={consulta.erro} onTentarDeNovo={consulta.recarregar} />
+      ) : (
+        <ul className="jn-lista-simples" aria-label="Tipos desativados">
+          {tipos.map((t) => (
+            <li key={t.id}>
+              <span className="jn-documentos__desativado-nome">
+                {t.nome} <SeloAtivo ativo={false} />
+              </span>
+              <Botao
+                variante="fantasma"
+                tamanho="pequeno"
+                onClick={() => onHistorico({ id: t.id, nome: t.nome, instrucoes: t.instrucoes })}
+                aria-label={`Ver histórico de ${t.nome}`}
+              >
+                Ver histórico
+              </Botao>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

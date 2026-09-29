@@ -107,3 +107,28 @@
   color: var(--jn-danger-fg);
   border-radius: var(--jn-radius-control);
 }
+
+.jn-app .jn-documentos__desativados {
+  margin-top: var(--jn-space-6);
+  padding-top: var(--jn-space-4);
+  border-top: 1px solid var(--jn-divider);
+}
+
+.jn-app .jn-documentos__desativados-titulo {
+  font: var(--jn-text-h3);
+  color: var(--jn-gray-900);
+}
+
+.jn-app .jn-documentos__desativados .jn-lista-simples {
+  margin-top: var(--jn-space-3);
+}
+
+.jn-app .jn-documentos__desativado-nome {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--jn-space-2);
+  min-width: 0;
+  font-weight: 500;
+  color: var(--jn-gray-900);
+}
