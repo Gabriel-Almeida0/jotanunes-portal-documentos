@@ -1,16 +1,18 @@
-import { render } from '@testing-library/react';
+import { act, render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate, type NavigateFunction } from 'react-router-dom';
 import { FUTURO_ROUTER, RotasApp } from '../App';
 import { definirTokenFluig } from '../api/client';
 import { ContextoUsuarioFluig } from '../auth/contexto';
 import { USUARIO_MOCK } from '../mocks/dados';
 
 let localAtual = '';
+let navegarAtual: NavigateFunction | null = null;
 
 function EspiaoLocal() {
   const location = useLocation();
   localAtual = location.pathname + location.search;
+  navegarAtual = useNavigate();
   return null;
 }
 
@@ -26,5 +28,11 @@ export function renderizarRota(caminho: string) {
       </MemoryRouter>
     </ContextoUsuarioFluig.Provider>,
   );
-  return { ...resultado, usuario, local: () => localAtual };
+  /** Troca a rota "por fora" (como editar a URL/usar um link), sem passar pela interface. */
+  function navegar(destino: string) {
+    act(() => {
+      void navegarAtual?.(destino);
+    });
+  }
+  return { ...resultado, usuario, local: () => localAtual, navegar };
 }
