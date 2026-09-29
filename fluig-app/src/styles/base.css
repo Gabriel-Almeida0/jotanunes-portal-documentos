@@ -1,0 +1,146 @@
+/*
+ * Reset mínimo e estilos globais — tudo escopado em `.jn-app` para não vazar para o Fluig
+ * nem herdar o tema dele.
+ */
+.jn-app {
+  box-sizing: border-box;
+  min-height: 100vh;
+  font: var(--jn-text-body);
+  color: var(--jn-gray-800);
+  background: var(--jn-white);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-wrap: anywhere;
+}
+
+.jn-app *,
+.jn-app *::before,
+.jn-app *::after {
+  box-sizing: inherit;
+}
+
+.jn-app h1,
+.jn-app h2,
+.jn-app h3,
+.jn-app h4,
+.jn-app p,
+.jn-app ul,
+.jn-app ol,
+.jn-app dl,
+.jn-app dd,
+.jn-app figure {
+  margin: 0;
+}
+
+.jn-app h1,
+.jn-app h2,
+.jn-app h3,
+.jn-app h4 {
+  color: var(--jn-gray-900);
+}
+
+.jn-app ul,
+.jn-app ol {
+  padding: 0;
+  list-style: none;
+}
+
+.jn-app button,
+.jn-app input,
+.jn-app select,
+.jn-app textarea {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+
+.jn-app button {
+  cursor: pointer;
+}
+
+.jn-app img,
+.jn-app svg {
+  display: inline-block;
+  vertical-align: middle;
+  max-width: 100%;
+}
+
+.jn-app a {
+  color: var(--jn-red-700);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.jn-app a:hover {
+  text-decoration: underline;
+}
+
+/* Foco visível e consistente em tudo que é interativo */
+.jn-app :focus {
+  outline: none;
+}
+
+.jn-app :focus-visible {
+  outline: none;
+  box-shadow: var(--jn-focus-ring);
+}
+
+.jn-app ::selection {
+  background: var(--jn-danger-bg);
+  color: var(--jn-gray-900);
+}
+
+/* Utilitários */
+.jn-app .jn-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.jn-app .jn-link-acao {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--jn-space-1);
+  color: var(--jn-red-700);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.jn-app .jn-texto-secundario {
+  color: var(--jn-gray-500);
+}
+
+.jn-app .jn-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+.jn-app .jn-secao {
+  margin-top: var(--jn-space-6);
+}
+
+.jn-app .jn-secao__titulo {
+  font: var(--jn-text-h2);
+  margin-bottom: var(--jn-space-4);
+}
+
+.jn-app .jn-cartao {
+  background: var(--jn-white);
+  border: var(--jn-border-card);
+  border-radius: var(--jn-radius-card);
+  padding: var(--jn-space-5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jn-app *,
+  .jn-app *::before,
+  .jn-app *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,35 @@
+.jn-app .jn-resumo-docs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 150px;
+}
+
+.jn-app .jn-resumo-docs__principal {
+  font-weight: 600;
+  color: var(--jn-gray-900);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.jn-app .jn-resumo-docs__barra {
+  display: block;
+  height: 6px;
+  border-radius: var(--jn-radius-pill);
+  background: var(--jn-gray-100);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+.jn-app .jn-resumo-docs__barra > span {
+  display: block;
+  height: 100%;
+  background: var(--jn-success-fg);
+  border-radius: inherit;
+}
+
+.jn-app .jn-resumo-docs__detalhe {
+  font: var(--jn-text-xs);
+  font-weight: 400;
+  color: var(--jn-gray-500);
+}

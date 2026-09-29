@@ -1,0 +1,46 @@
+.jn-app .jn-selo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 8px;
+  border-radius: var(--jn-radius-pill);
+  font: var(--jn-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.jn-app .jn-selo .jn-icone {
+  flex: none;
+}
+
+.jn-app .jn-selo[data-tom='sucesso'] {
+  color: var(--jn-success-fg);
+  background: var(--jn-success-bg);
+  border-color: color-mix(in srgb, var(--jn-success-fg) 20%, transparent);
+}
+
+.jn-app .jn-selo[data-tom='info'] {
+  color: var(--jn-info-fg);
+  background: var(--jn-info-bg);
+  border-color: color-mix(in srgb, var(--jn-info-fg) 20%, transparent);
+}
+
+.jn-app .jn-selo[data-tom='aviso'] {
+  color: var(--jn-warning-fg);
+  background: var(--jn-warning-bg);
+  border-color: color-mix(in srgb, var(--jn-warning-fg) 20%, transparent);
+}
+
+.jn-app .jn-selo[data-tom='perigo'] {
+  color: var(--jn-danger-fg);
+  background: var(--jn-danger-bg);
+  border-color: color-mix(in srgb, var(--jn-danger-fg) 20%, transparent);
+}
+
+.jn-app .jn-selo[data-tom='neutro'] {
+  color: var(--jn-neutral-fg);
+  background: var(--jn-neutral-bg);
+  border-color: color-mix(in srgb, var(--jn-neutral-fg) 12%, transparent);
+}

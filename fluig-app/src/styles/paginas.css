@@ -1,0 +1,194 @@
+/* Padrões de layout compartilhados pelas páginas (tudo sob .jn-app). */
+
+.jn-app .jn-pilha {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-4);
+}
+
+.jn-app .jn-grade-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--jn-space-4);
+}
+
+.jn-app .jn-grade-form > .jn-grade-form__inteiro {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 600px) {
+  .jn-app .jn-grade-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.jn-app .jn-grade-detalhe {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--jn-space-5);
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .jn-app .jn-grade-detalhe {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.jn-app .jn-painel-bloco {
+  background: var(--jn-white);
+  border: var(--jn-border-card);
+  border-radius: var(--jn-radius-card);
+  padding: var(--jn-space-5);
+  min-width: 0;
+}
+
+.jn-app .jn-painel-bloco--assinatura {
+  border-radius: var(--jn-radius-signature);
+}
+
+.jn-app .jn-painel-bloco__cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--jn-space-3);
+  margin-bottom: var(--jn-space-4);
+}
+
+.jn-app .jn-painel-bloco__titulo {
+  font: var(--jn-text-h3);
+}
+
+.jn-app .jn-secao__cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--jn-space-3);
+  margin-bottom: var(--jn-space-4);
+}
+
+.jn-app .jn-secao__cabecalho .jn-secao__titulo {
+  margin-bottom: 0;
+}
+
+.jn-app .jn-secao__descricao {
+  margin-top: var(--jn-space-1);
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-500);
+}
+
+/* Lista de dados (rótulo: valor) */
+.jn-app .jn-dados {
+  display: grid;
+  grid-template-columns: minmax(120px, max-content) minmax(0, 1fr);
+  gap: var(--jn-space-2) var(--jn-space-4);
+  font: var(--jn-text-sm);
+}
+
+.jn-app .jn-dados dt {
+  color: var(--jn-gray-500);
+}
+
+.jn-app .jn-dados dd {
+  color: var(--jn-gray-900);
+  font-weight: 500;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .jn-app .jn-dados {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .jn-app .jn-dados dd {
+    margin-bottom: var(--jn-space-2);
+  }
+}
+
+.jn-app .jn-local {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.jn-app .jn-local .jn-icone {
+  color: var(--jn-red-600);
+}
+
+.jn-app .jn-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-500);
+}
+
+.jn-app .jn-acoes-linha {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--jn-space-2);
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.jn-app .jn-avisos {
+  margin-bottom: var(--jn-space-4);
+}
+
+.jn-app .jn-lista-simples > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--jn-space-2);
+  padding: var(--jn-space-3) 0;
+  border-bottom: 1px solid var(--jn-divider);
+}
+
+.jn-app .jn-lista-simples > li:last-child {
+  border-bottom: 0;
+}
+
+.jn-app .jn-rodape-form {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--jn-space-2);
+  margin-top: var(--jn-space-4);
+}
+
+.jn-app .jn-caixa-marcacao {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--jn-space-2);
+  min-height: 42px;
+  font: 500 15px/1.35 var(--jn-font);
+  color: var(--jn-gray-800);
+  cursor: pointer;
+}
+
+.jn-app .jn-caixa-marcacao input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--jn-red-700);
+}
+
+.jn-app .jn-aviso-pagina {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--jn-space-2);
+}
+
+/* Linha secundária (sub-texto) em tabelas, listas e dados. */
+.jn-app .jn-tabela__sub {
+  display: block;
+  margin-top: 2px;
+  font: var(--jn-text-xs);
+  font-weight: 400;
+  color: var(--jn-gray-500);
+}

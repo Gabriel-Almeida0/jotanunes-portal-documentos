@@ -1,0 +1,9 @@
+.jn-app .jn-fila__arquivo {
+  display: block;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--jn-gray-900);
+}

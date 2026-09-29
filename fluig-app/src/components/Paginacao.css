@@ -1,0 +1,20 @@
+.jn-app .jn-paginacao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--jn-space-3);
+  margin-top: var(--jn-space-4);
+}
+
+.jn-app .jn-paginacao__info,
+.jn-app .jn-paginacao__atual {
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-500);
+}
+
+.jn-app .jn-paginacao__botoes {
+  display: flex;
+  align-items: center;
+  gap: var(--jn-space-3);
+}

@@ -1,0 +1,88 @@
+.jn-app .jn-botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--jn-space-2);
+  min-height: 42px;
+  padding: 8px 18px;
+  border: 1px solid transparent;
+  border-radius: var(--jn-radius-control);
+  font: 500 15px/1.2 var(--jn-font);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.jn-app a.jn-botao:hover {
+  text-decoration: none;
+}
+
+.jn-app .jn-botao--pequeno {
+  min-height: 34px;
+  padding: 5px 12px;
+  font-size: 14px;
+}
+
+.jn-app .jn-botao--primario {
+  background: var(--jn-red-500);
+  color: var(--jn-white);
+}
+
+.jn-app .jn-botao--primario:hover:not(:disabled) {
+  background: var(--jn-red-700);
+}
+
+.jn-app .jn-botao--secundario {
+  background: var(--jn-white);
+  border-color: var(--jn-red-500);
+  color: var(--jn-red-700);
+}
+
+.jn-app .jn-botao--secundario:hover:not(:disabled) {
+  background: var(--jn-danger-bg);
+}
+
+.jn-app .jn-botao--fantasma {
+  background: transparent;
+  color: var(--jn-gray-800);
+  border-color: var(--jn-gray-400);
+}
+
+.jn-app .jn-botao--fantasma:hover:not(:disabled) {
+  background: var(--jn-gray-100);
+  border-color: var(--jn-gray-500);
+}
+
+.jn-app .jn-botao--perigo {
+  background: var(--jn-danger-fg);
+  color: var(--jn-white);
+}
+
+.jn-app .jn-botao--perigo:hover:not(:disabled) {
+  background: var(--jn-danger-hover);
+}
+
+.jn-app .jn-botao:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.jn-app .jn-botao[aria-busy='true'] {
+  opacity: 0.85;
+  cursor: progress;
+}
+
+.jn-app .jn-botao__giro {
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: jn-giro 0.7s linear infinite;
+}
+
+@keyframes jn-giro {
+  to {
+    transform: rotate(360deg);
+  }
+}

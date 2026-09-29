@@ -1,0 +1,49 @@
+.jn-app.jn-app--centro {
+  display: grid;
+  place-items: center;
+  padding: var(--jn-space-4);
+  background: var(--jn-gray-50);
+}
+
+.jn-app .jn-acesso-negado {
+  width: 100%;
+  max-width: 480px;
+  padding: var(--jn-space-6) var(--jn-space-5);
+  background: var(--jn-white);
+  border: var(--jn-border-card);
+  border-radius: var(--jn-radius-signature);
+  text-align: center;
+}
+
+.jn-app .jn-acesso-negado__icone {
+  display: inline-grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--jn-danger-bg);
+  color: var(--jn-red-700);
+}
+
+.jn-app .jn-acesso-negado__barra {
+  display: block;
+  width: 50px;
+  height: 6px;
+  margin: var(--jn-space-5) auto var(--jn-space-3);
+  background: var(--jn-red-600);
+}
+
+.jn-app .jn-acesso-negado__titulo {
+  font: var(--jn-text-h2);
+}
+
+.jn-app .jn-acesso-negado__texto {
+  margin-top: var(--jn-space-3);
+  color: var(--jn-gray-800);
+}
+
+.jn-app .jn-acesso-negado__ajuda {
+  margin-top: var(--jn-space-4);
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-500);
+}

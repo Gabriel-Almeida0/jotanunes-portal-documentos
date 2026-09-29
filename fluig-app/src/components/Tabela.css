@@ -1,0 +1,75 @@
+.jn-app .jn-tabela-rolagem {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--jn-divider);
+  border-radius: var(--jn-radius-control);
+  background: var(--jn-white);
+  -webkit-overflow-scrolling: touch;
+}
+
+.jn-app .jn-tabela {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-800);
+}
+
+.jn-app .jn-tabela th,
+.jn-app .jn-tabela td {
+  padding: 11px 14px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--jn-divider);
+}
+
+.jn-app .jn-tabela thead th {
+  position: sticky;
+  top: 0;
+  background: var(--jn-gray-50);
+  color: var(--jn-gray-900);
+  font: 600 13px/1.3 var(--jn-font);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--jn-divider-forte);
+}
+
+.jn-app .jn-tabela tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.jn-app .jn-tabela tbody tr:hover td {
+  background: var(--jn-row-hover);
+}
+
+.jn-app .jn-tabela .jn-tabela__principal {
+  font-weight: 600;
+  color: var(--jn-gray-900);
+}
+
+.jn-app .jn-tabela .jn-tabela__sub {
+  display: block;
+  margin-top: 2px;
+  font: var(--jn-text-xs);
+  font-weight: 400;
+  color: var(--jn-gray-500);
+}
+
+.jn-app .jn-tabela .jn-tabela__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.jn-app .jn-tabela .jn-tabela__acoes {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.jn-app .jn-tabela .jn-tabela__nowrap {
+  white-space: nowrap;
+}
+
+.jn-app .jn-tabela tbody td:first-child {
+  min-width: 200px;
+}

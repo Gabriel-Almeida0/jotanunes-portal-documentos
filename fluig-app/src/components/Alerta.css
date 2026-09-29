@@ -1,0 +1,64 @@
+.jn-app .jn-alerta {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--jn-space-3);
+  padding: var(--jn-space-3) var(--jn-space-4);
+  border-radius: var(--jn-radius-control);
+  border-left: 4px solid currentColor;
+  font: var(--jn-text-sm);
+}
+
+.jn-app .jn-alerta[data-tom='erro'] {
+  color: var(--jn-danger-fg);
+  background: var(--jn-danger-bg);
+}
+
+.jn-app .jn-alerta[data-tom='sucesso'] {
+  color: var(--jn-success-fg);
+  background: var(--jn-success-bg);
+}
+
+.jn-app .jn-alerta[data-tom='info'] {
+  color: var(--jn-info-fg);
+  background: var(--jn-info-bg);
+}
+
+.jn-app .jn-alerta[data-tom='aviso'] {
+  color: var(--jn-warning-fg);
+  background: var(--jn-warning-bg);
+}
+
+.jn-app .jn-alerta__icone {
+  flex: none;
+  margin-top: 1px;
+}
+
+.jn-app .jn-alerta__texto {
+  flex: 1;
+  min-width: 0;
+  color: var(--jn-gray-900);
+}
+
+.jn-app .jn-alerta__titulo {
+  font-weight: 600;
+}
+
+.jn-app .jn-alerta__acao {
+  margin-top: var(--jn-space-2);
+}
+
+.jn-app .jn-alerta__fechar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--jn-gray-800);
+}
+
+.jn-app .jn-alerta__fechar:hover {
+  background: rgba(0, 0, 0, 0.06);
+}

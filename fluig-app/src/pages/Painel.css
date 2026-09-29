@@ -1,0 +1,79 @@
+.jn-app .jn-painel__grade {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--jn-space-5);
+}
+
+.jn-app .jn-painel__grade--dupla {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: calc((100% - 2 * var(--jn-space-5)) * 2 / 3 + var(--jn-space-5));
+}
+
+@media (max-width: 1000px) {
+  .jn-app .jn-painel__grade,
+  .jn-app .jn-painel__grade--dupla {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .jn-app .jn-painel__grade,
+  .jn-app .jn-painel__grade--dupla {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Card de indicador: inspirado nos cards "Porque a Jota?" (borda cinza, raio 20 px, ícone de linha). */
+.jn-app .jn-indicador {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--jn-space-3);
+  padding: var(--jn-space-6) var(--jn-space-4) var(--jn-space-5);
+  background: var(--jn-white);
+  border: var(--jn-border-card);
+  border-radius: var(--jn-radius-card);
+  text-align: center;
+  transition: box-shadow 0.15s ease;
+}
+
+.jn-app .jn-indicador:hover {
+  box-shadow: var(--jn-shadow-sm);
+}
+
+.jn-app .jn-indicador__icone {
+  color: var(--jn-gray-900);
+}
+
+.jn-app .jn-indicador--destaque .jn-indicador__icone {
+  color: var(--jn-red-600);
+}
+
+.jn-app .jn-indicador__valor {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--jn-space-1);
+}
+
+.jn-app .jn-indicador__numero {
+  font: 600 44px/1 var(--jn-font);
+  color: var(--jn-gray-900);
+  font-variant-numeric: tabular-nums;
+}
+
+.jn-app .jn-indicador__texto {
+  max-width: 28ch;
+  color: var(--jn-gray-500);
+  font: var(--jn-text-body);
+}
+
+.jn-app .jn-indicador__links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--jn-space-2) var(--jn-space-4);
+  margin-top: auto;
+  padding-top: var(--jn-space-2);
+}

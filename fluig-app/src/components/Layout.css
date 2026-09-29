@@ -1,0 +1,188 @@
+.jn-app .jn-layout {
+  display: grid;
+  grid-template-columns: var(--jn-sidebar-width) minmax(0, 1fr);
+  min-height: 100vh;
+  /* Fundo da coluna lateral acompanha páginas longas. */
+  background: linear-gradient(
+    to right,
+    var(--jn-gray-50) calc(var(--jn-sidebar-width) - 1px),
+    var(--jn-divider) calc(var(--jn-sidebar-width) - 1px),
+    var(--jn-divider) var(--jn-sidebar-width),
+    var(--jn-white) var(--jn-sidebar-width)
+  );
+}
+
+.jn-app .jn-layout__pular {
+  position: absolute;
+  left: var(--jn-space-2);
+  top: -60px;
+  z-index: 2000;
+  padding: var(--jn-space-2) var(--jn-space-4);
+  background: var(--jn-gray-900);
+  color: var(--jn-white);
+  border-radius: var(--jn-radius-control);
+}
+
+.jn-app .jn-layout__pular:focus {
+  top: var(--jn-space-2);
+}
+
+.jn-app .jn-layout__lateral {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--jn-gray-50);
+  border-right: 1px solid var(--jn-divider);
+}
+
+.jn-app .jn-layout__topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--jn-space-3);
+  padding: var(--jn-space-5) var(--jn-space-4) var(--jn-space-4) var(--jn-space-5);
+}
+
+.jn-app .jn-layout__sistema {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-2);
+  min-width: 0;
+}
+
+.jn-app .jn-layout__sistema-nome {
+  font: 600 13px/1.3 var(--jn-font);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--jn-gray-900);
+  padding-left: 10px;
+  border-left: 3px solid var(--jn-red-600);
+}
+
+.jn-app .jn-layout__usuario {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-500);
+  min-width: 0;
+}
+
+.jn-app .jn-layout__usuario span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jn-app .jn-layout__botao-menu {
+  display: none;
+}
+
+.jn-app .jn-layout__nav {
+  padding: var(--jn-space-2) 0 var(--jn-space-5);
+  overflow-y: auto;
+}
+
+.jn-app .jn-layout__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--jn-space-3);
+  padding: 12px var(--jn-space-5);
+  font: 500 15px/1.3 var(--jn-font);
+  color: var(--jn-gray-800);
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.jn-app .jn-layout__item:hover {
+  background: var(--jn-gray-100);
+  text-decoration: none;
+}
+
+.jn-app .jn-layout__item.active {
+  color: var(--jn-red-700);
+  font-weight: 600;
+  background: var(--jn-white);
+}
+
+.jn-app .jn-layout__item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  background: var(--jn-red-700);
+}
+
+.jn-app .jn-layout__item:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--jn-navy-800);
+}
+
+.jn-app .jn-layout__conteudo {
+  min-width: 0;
+  background: var(--jn-white);
+}
+
+.jn-app .jn-layout__conteudo:focus {
+  box-shadow: none;
+}
+
+.jn-app .jn-layout__container {
+  max-width: var(--jn-container);
+  margin: 0 auto;
+  padding: var(--jn-space-6) var(--jn-space-6) var(--jn-space-7);
+}
+
+@media (max-width: 900px) {
+  .jn-app .jn-layout {
+    grid-template-columns: minmax(0, 1fr);
+    background: var(--jn-white);
+  }
+
+  .jn-app .jn-layout__lateral {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--jn-divider);
+  }
+
+  .jn-app .jn-layout__topo {
+    padding: var(--jn-space-3) var(--jn-space-4);
+  }
+
+  .jn-app .jn-layout__botao-menu {
+    display: inline-flex;
+    flex: none;
+    white-space: nowrap;
+    align-items: center;
+    gap: var(--jn-space-2);
+    min-height: 40px;
+    padding: 6px 12px;
+    border: 1px solid var(--jn-gray-400);
+    border-radius: var(--jn-radius-control);
+    background: var(--jn-white);
+    color: var(--jn-gray-900);
+    font: 500 14px/1 var(--jn-font);
+  }
+
+  .jn-app .jn-layout__nav {
+    display: none;
+    padding-top: 0;
+    border-top: 1px solid var(--jn-divider);
+  }
+
+  .jn-app .jn-layout__nav--aberto {
+    display: block;
+  }
+
+  .jn-app .jn-layout__container {
+    padding: var(--jn-space-5) var(--jn-space-4) var(--jn-space-6);
+  }
+}

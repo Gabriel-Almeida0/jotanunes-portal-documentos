@@ -1,0 +1,71 @@
+.jn-app .jn-titulo-pagina {
+  margin-bottom: var(--jn-space-5);
+}
+
+.jn-app .jn-titulo-pagina__voltar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--jn-space-3);
+  font: 600 14px/1.3 var(--jn-font);
+}
+
+.jn-app .jn-titulo-pagina__linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--jn-space-4);
+}
+
+.jn-app .jn-titulo-pagina__textos {
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.jn-app .jn-titulo-pagina__barra {
+  display: block;
+  width: 50px;
+  height: 6px;
+  margin-bottom: var(--jn-space-3);
+  background: var(--jn-red-600);
+}
+
+.jn-app .jn-titulo-pagina__h1 {
+  font: var(--jn-text-h1);
+  color: var(--jn-gray-900);
+}
+
+.jn-app .jn-titulo-pagina__descricao {
+  margin-top: var(--jn-space-2);
+  color: var(--jn-gray-500);
+  max-width: 70ch;
+}
+
+.jn-app .jn-titulo-pagina__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--jn-space-2);
+}
+
+.jn-app .jn-titulo-pagina__extra {
+  margin-top: var(--jn-space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--jn-space-3);
+}
+
+@media (max-width: 600px) {
+  .jn-app .jn-titulo-pagina__h1 {
+    font-size: 24px;
+  }
+
+  .jn-app .jn-titulo-pagina__acoes {
+    width: 100%;
+  }
+
+  .jn-app .jn-titulo-pagina__acoes > * {
+    flex: 1 1 auto;
+  }
+}

@@ -1,0 +1,63 @@
+.jn-app .jn-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--jn-space-4) var(--jn-space-5);
+  padding: var(--jn-space-5);
+  margin-bottom: var(--jn-space-5);
+  background-color: var(--jn-gray-50);
+  background-image: radial-gradient(rgba(0, 0, 0, 0.07) 1px, transparent 1px);
+  background-size: 14px 14px;
+  border-radius: var(--jn-radius-signature);
+}
+
+.jn-app .jn-filtros__titulo {
+  flex: 0 0 auto;
+  align-self: center;
+  font: var(--jn-text-h3);
+  color: var(--jn-gray-900);
+}
+
+.jn-app .jn-filtros__campos {
+  flex: 1 1 420px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--jn-space-4);
+  min-width: 0;
+}
+
+.jn-app .jn-filtros__acoes {
+  display: flex;
+  gap: var(--jn-space-2);
+}
+
+.jn-app .jn-filtros--muitos .jn-filtros__titulo {
+  flex-basis: 100%;
+  margin-bottom: calc(-1 * var(--jn-space-2));
+}
+
+@media (max-width: 600px) {
+  .jn-app .jn-filtros {
+    padding: var(--jn-space-4);
+  }
+
+  .jn-app .jn-filtros__titulo {
+    display: none;
+  }
+
+  .jn-app .jn-filtros__campos {
+    flex-basis: 100%;
+  }
+
+  .jn-app .jn-filtros__acoes {
+    width: 100%;
+  }
+
+  .jn-app .jn-filtros__acoes > * {
+    flex: 1;
+  }
+}
+
+.jn-app .jn-filtros__campos .jn-caixa-marcacao {
+  align-self: end;
+}

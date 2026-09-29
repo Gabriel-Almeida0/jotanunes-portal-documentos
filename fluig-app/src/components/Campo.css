@@ -1,0 +1,104 @@
+.jn-app .jn-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.jn-app .jn-campo__topo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--jn-space-2);
+}
+
+.jn-app .jn-campo__rotulo {
+  font: 500 15px/1.35 var(--jn-font);
+  color: var(--jn-gray-800);
+}
+
+.jn-app .jn-campo__obrigatorio {
+  color: var(--jn-red-700);
+}
+
+.jn-app .jn-campo__complemento {
+  font: var(--jn-text-xs);
+  color: var(--jn-gray-500);
+  font-variant-numeric: tabular-nums;
+}
+
+.jn-app .jn-campo__controle {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 14px;
+  border: var(--jn-border-field);
+  border-radius: var(--jn-radius-control);
+  background: var(--jn-white);
+  color: var(--jn-gray-600);
+  font: var(--jn-text-body);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.jn-app .jn-campo__controle:hover {
+  border-color: var(--jn-gray-900);
+}
+
+.jn-app .jn-campo__controle:focus-visible {
+  border-color: var(--jn-navy-800);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--jn-navy-800) 25%, transparent);
+  color: var(--jn-gray-900);
+}
+
+.jn-app .jn-campo__controle:disabled,
+.jn-app .jn-campo__controle[readonly] {
+  background: var(--jn-gray-50);
+  color: var(--jn-gray-500);
+  cursor: not-allowed;
+}
+
+.jn-app .jn-campo__controle--selecao {
+  appearance: none;
+  padding-right: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23333333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  cursor: pointer;
+}
+
+.jn-app .jn-campo__controle--area {
+  min-height: 110px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.jn-app .jn-campo__ajuda {
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-500);
+}
+
+.jn-app .jn-campo__erro {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  font: 500 14px/1.4 var(--jn-font);
+  color: var(--jn-danger-fg);
+}
+
+.jn-app .jn-campo__erro::before {
+  content: '!';
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--jn-danger-fg);
+  color: var(--jn-white);
+  font: 600 11px/1 var(--jn-font);
+}
+
+.jn-app .jn-campo--erro .jn-campo__controle {
+  border-color: var(--jn-danger-fg);
+  box-shadow: inset 3px 0 0 var(--jn-danger-fg);
+}

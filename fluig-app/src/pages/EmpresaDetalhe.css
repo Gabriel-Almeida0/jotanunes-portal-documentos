@@ -1,0 +1,109 @@
+.jn-app .jn-empresa__lateral {
+  min-width: 0;
+}
+
+.jn-app .jn-acesso__explicacao {
+  margin-bottom: var(--jn-space-4);
+  color: var(--jn-gray-800);
+}
+
+.jn-app .jn-acesso__dados {
+  padding: var(--jn-space-4) 0;
+  border-top: 1px solid var(--jn-divider);
+  border-bottom: 1px solid var(--jn-divider);
+}
+
+.jn-app .jn-acesso__resultado {
+  margin-top: var(--jn-space-4);
+}
+
+.jn-app .jn-acesso__acoes {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--jn-space-2);
+  margin-top: var(--jn-space-4);
+}
+
+.jn-app .jn-acesso__nota {
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-500);
+}
+
+.jn-app .jn-acesso__historico {
+  margin-top: var(--jn-space-4);
+  padding-top: var(--jn-space-3);
+  border-top: 1px solid var(--jn-divider);
+}
+
+.jn-app .jn-acesso__historico summary {
+  cursor: pointer;
+  font: 600 14px/1.4 var(--jn-font);
+  color: var(--jn-red-700);
+  padding: var(--jn-space-1) 0;
+}
+
+.jn-app .jn-acesso__historico[open] summary {
+  margin-bottom: var(--jn-space-2);
+}
+
+.jn-app .jn-documentos__arquivo {
+  display: block;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--jn-gray-900);
+}
+
+.jn-app .jn-documentos__motivo {
+  display: block;
+  margin-top: 4px;
+  max-width: 280px;
+  font: var(--jn-text-xs);
+  font-weight: 500;
+  color: var(--jn-danger-fg);
+}
+
+.jn-app .jn-historico {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-3);
+}
+
+.jn-app .jn-historico__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-2);
+  padding: var(--jn-space-4);
+  border: 1px solid var(--jn-divider);
+  border-left: 3px solid var(--jn-gray-400);
+  border-radius: var(--jn-radius-control);
+}
+
+.jn-app .jn-historico__topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--jn-space-2);
+}
+
+.jn-app .jn-historico__arquivo {
+  font-weight: 600;
+  color: var(--jn-gray-900);
+}
+
+.jn-app .jn-historico__analise {
+  font: var(--jn-text-sm);
+}
+
+.jn-app .jn-historico__motivo {
+  font: var(--jn-text-sm);
+  font-weight: 500;
+  padding: var(--jn-space-2) var(--jn-space-3);
+  background: var(--jn-danger-bg);
+  color: var(--jn-danger-fg);
+  border-radius: var(--jn-radius-control);
+}

@@ -1,0 +1,63 @@
+.jn-app .jn-envio__arquivo {
+  display: flex;
+  align-items: center;
+  gap: var(--jn-space-4);
+  padding: var(--jn-space-4);
+  background: var(--jn-gray-50);
+  border: 1px solid var(--jn-divider);
+  border-radius: var(--jn-radius-control);
+}
+
+.jn-app .jn-envio__arquivo-icone {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--jn-radius-signature);
+  background: var(--jn-white);
+  border: var(--jn-border-card);
+  color: var(--jn-red-600);
+}
+
+.jn-app .jn-envio__arquivo-dados {
+  min-width: 0;
+}
+
+.jn-app .jn-envio__arquivo-nome {
+  font-weight: 600;
+  color: var(--jn-gray-900);
+  overflow-wrap: anywhere;
+}
+
+.jn-app .jn-envio__botoes-arquivo,
+.jn-app .jn-envio__decisao {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--jn-space-2);
+  margin: var(--jn-space-4) 0;
+}
+
+.jn-app .jn-envio__decisao > * {
+  flex: 1 1 140px;
+}
+
+.jn-app .jn-envio__subtitulo {
+  margin-top: var(--jn-space-5);
+  font: var(--jn-text-h3);
+  font-size: 16px;
+}
+
+.jn-app .jn-envio__instrucoes {
+  margin-top: var(--jn-space-2);
+  color: var(--jn-gray-800);
+  white-space: pre-line;
+}
+
+.jn-app .jn-envio__motivo {
+  padding: var(--jn-space-3);
+  background: var(--jn-danger-bg);
+  color: var(--jn-danger-fg);
+  border-radius: var(--jn-radius-control);
+  font: var(--jn-text-sm);
+}

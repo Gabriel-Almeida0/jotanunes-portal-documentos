@@ -1,0 +1,113 @@
+.jn-app .jn-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: var(--jn-space-4);
+  background: rgba(33, 37, 41, 0.55);
+  overflow-y: auto;
+  animation: jn-modal-fundo 0.15s ease-out;
+}
+
+.jn-app .jn-modal__caixa {
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  background: var(--jn-white);
+  border-radius: var(--jn-radius-signature);
+  box-shadow: var(--jn-shadow-lg);
+  animation: jn-modal-entrada 0.18s ease-out;
+}
+
+.jn-app .jn-modal__caixa--larga {
+  max-width: 760px;
+}
+
+.jn-app .jn-modal__cabecalho {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--jn-space-3);
+  padding: var(--jn-space-5) var(--jn-space-5) var(--jn-space-3);
+}
+
+.jn-app .jn-modal__titulo {
+  font: var(--jn-text-h2);
+  padding-top: 14px;
+  position: relative;
+}
+
+.jn-app .jn-modal__titulo::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 36px;
+  height: 4px;
+  background: var(--jn-red-600);
+}
+
+.jn-app .jn-modal__fechar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--jn-gray-800);
+}
+
+.jn-app .jn-modal__fechar:hover:not(:disabled) {
+  background: var(--jn-gray-100);
+}
+
+.jn-app .jn-modal__corpo {
+  padding: 0 var(--jn-space-5) var(--jn-space-5);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-4);
+}
+
+.jn-app .jn-modal__mensagem {
+  color: var(--jn-gray-800);
+}
+
+.jn-app .jn-modal__rodape {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--jn-space-2);
+  padding: var(--jn-space-4) var(--jn-space-5);
+  border-top: 1px solid var(--jn-divider);
+  background: var(--jn-gray-50);
+  border-bottom-right-radius: 20px;
+}
+
+@media (max-width: 480px) {
+  .jn-app .jn-modal {
+    padding: var(--jn-space-2);
+  }
+
+  .jn-app .jn-modal__rodape > * {
+    flex: 1 1 auto;
+  }
+}
+
+@keyframes jn-modal-fundo {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes jn-modal-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
