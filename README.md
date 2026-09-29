@@ -30,6 +30,7 @@ cp .env.example .env            # preencha FLUIG_JWT_SECRET e AUTH_PORTAL_SECRET
 docker compose up -d            # Postgres
 set -a; source .env; set +a
 export Auth__Fluig__Secret="$FLUIG_JWT_SECRET" Auth__Portal__Secret="$AUTH_PORTAL_SECRET"
+export ConnectionStrings__Default="Host=localhost;Port=5432;Database=jotanunes_docs;Username=${POSTGRES_USER:-jotanunes};Password=${POSTGRES_PASSWORD:-jotanunes}"
 (cd backend && dotnet run --project src/Jotanunes.Docs.Api)      # API em :5080
 node scripts/gerar-token-fluig-dev.mjs                           # token Fluig de dev (8 h)
 ```

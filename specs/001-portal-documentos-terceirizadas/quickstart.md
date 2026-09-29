@@ -25,6 +25,7 @@ compose e **não** contém segredos. Antes do `dotnet run`, exporte os segredos 
 ```bash
 set -a; source .env; set +a
 export Auth__Fluig__Secret="$FLUIG_JWT_SECRET" Auth__Portal__Secret="$AUTH_PORTAL_SECRET"
+export ConnectionStrings__Default="Host=localhost;Port=5432;Database=jotanunes_docs;Username=${POSTGRES_USER:-jotanunes};Password=${POSTGRES_PASSWORD:-jotanunes}"
 export Resend__ApiKey="$RESEND_API_KEY" Resend__From="$RESEND_FROM"   # opcionais
 ```
 

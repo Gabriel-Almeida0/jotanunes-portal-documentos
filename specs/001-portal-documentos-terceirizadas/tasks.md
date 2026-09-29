@@ -322,7 +322,7 @@ mostra os dois envios com analista, data e motivo (quickstart passos 21–25).
 
 ### INFRA
 
-- [ ] T116 [INFRA] Executar o roteiro E2E de `specs/001-portal-documentos-terceirizadas/quickstart.md` §6 com as três áreas integradas (`VITE_USE_MOCKS=false`) e registrar divergências de contrato para correção na área responsável
+- [X] T116 [INFRA] Executar o roteiro E2E de `specs/001-portal-documentos-terceirizadas/quickstart.md` §6 com as três áreas integradas (`VITE_USE_MOCKS=false`) e registrar divergências de contrato para correção na área responsável
 
 ---
 
