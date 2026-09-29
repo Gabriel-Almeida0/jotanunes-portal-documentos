@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: API do Portal de Documentação de Terceirizadas Jotanunes
-  version: 1.0.0
+  version: 1.1.0
   license:
     name: Proprietário — Jotanunes Construtora
   description: |
@@ -10,12 +10,24 @@ info:
 
     ## Autenticação
     - `/api/fluig/*` → esquema **fluigAuth**: JWT HS256 emitido pelo Fluig
-      (claims `iss`, `aud`, `sub`=login, `name`, `email`, `iat`, `exp`). Ver `fluig-identity.md`.
+      (claims `iss`, `aud`, `sub`=login, `name`, `email`, `iat`, `exp` e, opcional, `roles`).
+      Ver `fluig-identity.md`.
     - `/api/portal/*` → esquema **portalAuth**: JWT HS256 emitido por `POST /api/portal/auth/login`
       (claims `sub`=id da empresa, `cnpj`, `ver`, `troca_senha`).
     - Um token de um esquema NUNCA é aceito no outro (→ 401 `NAO_AUTENTICADO`).
     - Com `troca_senha=true`, somente `GET /api/portal/me` e `POST /api/portal/auth/trocar-senha`
       respondem; as demais rotas do portal devolvem 403 `TROCA_SENHA_OBRIGATORIA`.
+
+    ## Perfis na área Jotanunes (desde 1.1.0)
+    - **Administrador**: token Fluig com `roles` contendo `admin` (ver `fluig-identity.md`).
+      Sem a claim, ou sem `admin` nela, o usuário é **comum**.
+    - Operações marcadas com `x-requer-admin: true` (cadastrar/editar/ativar/desativar obras,
+      vínculos, empresas e tipos de documento; aprovar/rejeitar envios) exigem administrador.
+      Usuário comum → 403 `SEM_PERMISSAO`, verificado ANTES de validar corpo ou procurar o recurso
+      (sem efeito de negócio; só a tentativa fica na auditoria). As demais rotas `/api/fluig/*` (consultas, downloads e convites)
+      valem para os dois perfis.
+    - O perfil vem só do token atual: vale até o token expirar (máx. 8 h). `GET /api/fluig/me`
+      devolve `admin` para o front esconder as ações.
 
     ## Convenções
     - JSON em camelCase; enums em MAIÚSCULAS; datas ISO 8601 em UTC.
@@ -62,7 +74,7 @@ paths:
     get:
       tags: [Fluig - Sessão]
       operationId: fluigObterUsuarioAtual
-      summary: Dados do usuário Fluig identificado pelo token
+      summary: Dados do usuário Fluig identificado pelo token (inclui se é administrador)
       security: [{ fluigAuth: [] }]
       responses:
         '200':
@@ -113,6 +125,7 @@ paths:
       operationId: fluigCriarObra
       summary: Cadastra obra
       security: [{ fluigAuth: [] }]
+      x-requer-admin: true
       requestBody:
         required: true
         content:
@@ -128,6 +141,7 @@ paths:
               schema: { $ref: '#/components/schemas/Obra' }
         '400': { $ref: '#/components/responses/Validacao' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
         '409':
           description: '`CODIGO_OBRA_DUPLICADO`'
           content:
@@ -155,6 +169,7 @@ paths:
       operationId: fluigAtualizarObra
       summary: Atualiza obra (inclui ativar/desativar)
       security: [{ fluigAuth: [] }]
+      x-requer-admin: true
       requestBody:
         required: true
         content:
@@ -168,6 +183,7 @@ paths:
               schema: { $ref: '#/components/schemas/Obra' }
         '400': { $ref: '#/components/responses/Validacao' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
         '409':
           description: '`CODIGO_OBRA_DUPLICADO`'
@@ -184,18 +200,22 @@ paths:
       operationId: fluigVincularEmpresaObra
       summary: Vincula a empresa à obra (idempotente)
       security: [{ fluigAuth: [] }]
+      x-requer-admin: true
       responses:
         '204': { description: Vínculo existe (criado agora ou antes) }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
     delete:
       tags: [Fluig - Obras]
       operationId: fluigDesvincularEmpresaObra
       summary: Remove o vínculo da empresa com a obra
       security: [{ fluigAuth: [] }]
+      x-requer-admin: true
       responses:
         '204': { description: Vínculo removido }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
 
   /api/fluig/empresas:
@@ -235,6 +255,7 @@ paths:
       operationId: fluigCriarEmpresa
       summary: Cadastra empresa terceirizada
       security: [{ fluigAuth: [] }]
+      x-requer-admin: true
       requestBody:
         required: true
         content:
@@ -250,6 +271,7 @@ paths:
               schema: { $ref: '#/components/schemas/Empresa' }
         '400': { $ref: '#/components/responses/Validacao' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
         '409':
           description: '`CNPJ_DUPLICADO`'
           content:
@@ -280,6 +302,7 @@ paths:
         Desativar incrementa a versão da credencial (sessões do portal caem na hora).
         Alterar o CNPJ depois do 1º convite → 409 `CNPJ_IMUTAVEL`.
       security: [{ fluigAuth: [] }]
+      x-requer-admin: true
       requestBody:
         required: true
         content:
@@ -293,6 +316,7 @@ paths:
               schema: { $ref: '#/components/schemas/Empresa' }
         '400': { $ref: '#/components/responses/Validacao' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
         '409':
           description: '`CNPJ_DUPLICADO` ou `CNPJ_IMUTAVEL`'
@@ -323,6 +347,7 @@ paths:
       operationId: fluigEnviarConvite
       summary: Envia (ou reenvia) o convite por e-mail
       description: |
+        Permitido aos dois perfis (administrador e comum).
         Gera token de link (7 dias) e senha temporária, invalida convites anteriores, redefine o
         acesso (troca de senha obrigatória) e envia o e-mail ao `emailContato`.
         Se o e-mail falhar, nada é gravado (502 `EMAIL_FALHOU`).
@@ -410,6 +435,7 @@ paths:
       operationId: fluigCriarTipoDocumento
       summary: Cadastra tipo de documento (passa a ser exigido de todas as empresas ativas)
       security: [{ fluigAuth: [] }]
+      x-requer-admin: true
       requestBody:
         required: true
         content:
@@ -425,6 +451,7 @@ paths:
               schema: { $ref: '#/components/schemas/TipoDocumento' }
         '400': { $ref: '#/components/responses/Validacao' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
         '409':
           description: '`NOME_DUPLICADO`'
           content:
@@ -452,6 +479,7 @@ paths:
       operationId: fluigAtualizarTipoDocumento
       summary: Atualiza tipo de documento (inclui ativar/desativar)
       security: [{ fluigAuth: [] }]
+      x-requer-admin: true
       requestBody:
         required: true
         content:
@@ -465,6 +493,7 @@ paths:
               schema: { $ref: '#/components/schemas/TipoDocumento' }
         '400': { $ref: '#/components/responses/Validacao' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
         '409':
           description: '`NOME_DUPLICADO`'
@@ -546,6 +575,7 @@ paths:
       operationId: fluigAprovarEnvio
       summary: Aprova um envio EM_ANALISE
       security: [{ fluigAuth: [] }]
+      x-requer-admin: true
       responses:
         '200':
           description: Envio aprovado
@@ -553,6 +583,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Envio' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
         '409':
           description: '`ENVIO_JA_ANALISADO`'
@@ -568,6 +599,7 @@ paths:
       operationId: fluigRejeitarEnvio
       summary: Rejeita um envio EM_ANALISE com motivo (envia e-mail de aviso à empresa)
       security: [{ fluigAuth: [] }]
+      x-requer-admin: true
       requestBody:
         required: true
         content:
@@ -581,6 +613,7 @@ paths:
               schema: { $ref: '#/components/schemas/Envio' }
         '400': { $ref: '#/components/responses/Validacao' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
         '409':
           description: '`ENVIO_JA_ANALISADO`'
@@ -809,7 +842,8 @@ components:
       description: |
         JWT HS256 emitido pelo Fluig. `iss`=Auth__Fluig__Issuer (padrão `fluig`),
         `aud`=Auth__Fluig__Audience (padrão `jotanunes-docs-api`), `sub`=login, `name`, `email`,
-        `exp` ≤ 8 h após `iat`. Ver `contracts/fluig-identity.md`.
+        `exp` ≤ 8 h após `iat`; `roles` (opcional, lista de textos) com `admin` = administrador.
+        Ver `contracts/fluig-identity.md`.
     portalAuth:
       type: http
       scheme: bearer
@@ -876,6 +910,16 @@ components:
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problema' }
+    SemPermissao:
+      description: '`SEM_PERMISSAO` — operação só para administradores; o token Fluig não tem `roles` com `admin`'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problema' }
+          example:
+            type: https://jotanunes.com/problemas/sem-permissao
+            title: Só administradores podem fazer isso. Se você precisa, fale com a TI.
+            status: 403
+            code: SEM_PERMISSAO
     NaoEncontrado:
       description: '`NAO_ENCONTRADO` — recurso inexistente ou de outra empresa'
       content:
@@ -910,6 +954,7 @@ components:
         - VALIDACAO
         - NAO_AUTENTICADO
         - TROCA_SENHA_OBRIGATORIA
+        - SEM_PERMISSAO
         - NAO_ENCONTRADO
         - CNPJ_DUPLICADO
         - CNPJ_IMUTAVEL
@@ -936,6 +981,7 @@ components:
         | VALIDACAO | 400 | Confira os dados informados. |
         | NAO_AUTENTICADO | 401 | Sua sessão expirou. Entre de novo. |
         | TROCA_SENHA_OBRIGATORIA | 403 | Crie uma nova senha para continuar. |
+        | SEM_PERMISSAO | 403 | Só administradores podem fazer isso. Se você precisa, fale com a TI. |
         | NAO_ENCONTRADO | 404 | Não encontramos o que você procurou. |
         | CNPJ_DUPLICADO | 409 | Já existe uma empresa com este CNPJ. |
         | CNPJ_IMUTAVEL | 409 | O CNPJ não pode ser alterado depois do convite. |
@@ -1010,11 +1056,16 @@ components:
     # ── Fluig: sessão ──
     UsuarioFluig:
       type: object
-      required: [login, nome, email]
+      required: [login, nome, email, admin]
       properties:
         login: { type: string }
         nome: { type: string }
         email: { type: string }
+        admin:
+          type: boolean
+          description: |
+            true quando o token Fluig traz `roles` com `admin`. O front usa para esconder as ações
+            de administrador; a API confere o papel em toda operação `x-requer-admin`.
     AutorFluig:
       type: object
       required: [login, nome]

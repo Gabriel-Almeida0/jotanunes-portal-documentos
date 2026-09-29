@@ -22,6 +22,7 @@ este documento resolve os detalhes em aberto.
   | `name` | nome do usuário |
   | `email` | e-mail do usuário |
   | `iat`, `exp` | emissão e expiração; `exp - iat` ≤ 8 h; tolerância de relógio 2 min |
+  | `roles` | **opcional** (2026-09-29): lista de textos; contendo `admin` = administrador (R16) |
 
   Entrega ao front: o widget/página do Fluig abre o `fluig-app` (iframe ou nova aba) com o token no
   **fragmento** da URL (`https://.../fluig-app/#fluigToken=<jwt>`). O fragmento não vai para
@@ -35,7 +36,8 @@ este documento resolve os detalhes em aberto.
   [`contracts/fluig-identity.md`](contracts/fluig-identity.md).
 
 - **Porta/adaptador (troca fácil)**:
-  - `Application` só conhece `IUsuarioFluigAtual { Login, Nome, Email }`.
+  - `Application` só conhece `IUsuarioFluigAtual { Login, Nome, Email, EhAdmin }` (`EhAdmin`
+    acrescentado em 2026-09-29, R16).
   - `Api` registra o esquema de autenticação **`Fluig`** (hoje `JwtBearer` HS256) e um adaptador
     `UsuarioFluigAtualDeClaims` que lê as claims.
   - Para trocar (RS256/JWKS do Fluig, OAuth do Fluig, validação da sessão via API REST do Fluig),
@@ -154,6 +156,11 @@ este documento resolve os detalhes em aberto.
   `openapi.yaml#/components/schemas/CodigoErro`), `errors` (mapa campo → mensagens, só em
   `VALIDACAO`) e `traceId`. `title`/`detail` em português, prontos para exibir. Recurso de outra
   empresa → `404 NAO_ENCONTRADO` (nunca 403, para não revelar existência).
+- **Exceção por perfil (2026-09-29)**: na área Jotanunes, operação de administrador chamada por
+  usuário comum → `403 SEM_PERMISSAO` (title "Só administradores podem fazer isso. Se você precisa,
+  fale com a TI."). Não conflita com a regra acima: o 404 protege dados de **outra empresa** no
+  portal; o 403 diz a um colaborador da Jotanunes que a **operação** é restrita, sem revelar nada
+  sobre o recurso (é decidido antes de procurá-lo).
 
 ## R8. Persistência
 
@@ -211,7 +218,11 @@ este documento resolve os detalhes em aberto.
 
 - **Decision**: porta `IRegistroAuditoria`; tabela `auditoria` gravada na mesma transação do caso de
   uso. Ações: `LOGIN_SUCESSO`, `LOGIN_FALHA`, `LOGIN_BLOQUEADO`, `SENHA_TROCADA`, `CONVITE_ENVIADO`,
-  `DOCUMENTO_ENVIADO`, `ARQUIVO_BAIXADO`, `ENVIO_APROVADO`, `ENVIO_REJEITADO`. Logs estruturados
+  `DOCUMENTO_ENVIADO`, `ARQUIVO_BAIXADO`, `ENVIO_APROVADO`, `ENVIO_REJEITADO` e, desde 2026-09-29,
+  `PERMISSAO_NEGADA` (R16). Coluna nova `ator_admin` (bool null): o adaptador `RegistroAuditoriaEf`
+  preenche a partir de `IUsuarioFluigAtual.EhAdmin` quando `ator_tipo = FLUIG` — a porta
+  `IRegistroAuditoria` não muda de assinatura, então nenhum caso de uso existente precisa mudar.
+  Logs estruturados
   (`ILogger`, console JSON fora de Development via `Logging:Console:FormatterName=json` em
   `appsettings.json`, com scopes e timestamp UTC; `simple` em `appsettings.Development.json`) sem senhas, tokens, corpo de e-mail em produção ou conteúdo de
   arquivos. Não há tela de auditoria na v1 (consulta direta no banco).
@@ -235,3 +246,84 @@ este documento resolve os detalhes em aberto.
   `{ itens, total, pagina, tamanhoPagina }`. Tipos de documento e listas de detalhe não paginam.
 - JSON camelCase, enums como string em MAIÚSCULAS, datas ISO 8601 UTC.
 - Portas locais: API `http://localhost:5080`, `fluig-app` `5173`, `portal` `5174`, Postgres `5432`.
+
+## R15. Catálogo padrão de tipos de documento (2026-09-29)
+
+- **Decision**: **semeador idempotente na inicialização**, não migration de dados.
+  - Caso de uso `SemearCatalogoTiposPadrao` em `Application/TiposDocumento/` com a lista
+    `CatalogoTiposPadrao` (nomes e instruções de `data-model.md` §4.1). Regra: se
+    `ITipoDocumentoRepositorio.ExisteAlgumAsync()` (qualquer linha, ativa ou inativa) → não faz nada;
+    senão cria os 10 tipos via `TipoDocumento.Criar(...)` (mesmas validações do domínio) com autor
+    `sistema` e salva numa única transação.
+  - Chamado em `Program.cs` **depois** das migrations (quando `Database:MigrateOnStartup=true`) ou
+    sozinho (quando as migrations são aplicadas por script em produção), controlado por
+    `Catalogo:SemearTiposPadrao` (padrão `true`).
+  - Concorrência (várias instâncias subindo juntas): a transação pega
+    `pg_advisory_xact_lock(<constante>)` antes de checar e inserir; como reforço, violação do índice
+    único `lower(nome)` é capturada, registrada em log `Information` e ignorada (a API sobe).
+  - Testes: `ApiFactory` desliga o semeador por padrão (`Catalogo:SemearTiposPadrao=false`) para
+    que os testes existentes, que contam tipos criados por eles, não mudem; os testes do catálogo
+    ligam explicitamente.
+- **Rationale**:
+  - A regra é **condicional ao estado dos dados** ("só se o catálogo estiver vazio"), não à versão do
+    esquema. Uma migration roda uma vez por banco, mesmo que o banco já tenha dados — teria de
+    embutir `INSERT … WHERE NOT EXISTS` em SQL cru, duplicando no SQL as validações e textos que já
+    vivem no domínio.
+  - Texto e regras no código C# (`CatalogoTiposPadrao` + `TipoDocumento.Criar`) são testáveis por
+    unidade e revisáveis como qualquer código; não ficam congelados num arquivo de migration.
+  - Migrations continuam só de esquema (constituição: "migrations versionadas"), e aplicar scripts
+    idempotentes em produção (`dotnet ef migrations script --idempotent`) não muda.
+  - Se a migration semeasse, **todo** banco de teste do Testcontainers nasceria com 10 tipos e
+    quebraria dezenas de testes existentes que contam tipos (ex.: `documentos.total`).
+- **Alternatives considered**: (a) migration de dados com `INSERT … WHERE NOT EXISTS` — rodaria só
+  uma vez e acoplaria dados ao histórico de esquema, com os efeitos nos testes descritos acima;
+  (b) `HasData` do EF Core — gera `INSERT` incondicional com IDs fixos e reverte/atualiza os dados em
+  migrations futuras quando o texto muda, contrariando "o admin ajusta depois"; (c) botão "criar
+  catálogo padrão" na tela — exige ação manual, contra a decisão do usuário.
+- **Custo**: um `SELECT EXISTS` em `tipos_documento` a cada inicialização.
+
+## R16. Autorização por papel na área Jotanunes (2026-09-29)
+
+- **Decision**:
+  - **Claim**: `roles` (lista de textos) no token Fluig; `admin` = administrador. Nome da claim
+    segue o costume de JWT de acesso (RFC 9068 §2.2.3.1 usa `roles`; o Entra ID também), e lista
+    permite papéis futuros sem mudar o formato. Aceita também o texto único `"admin"` (serialização
+    comum de lista com 1 item). Qualquer outro caso = comum, **sem** recusar o token (menor
+    privilégio; a pessoa continua consultando). Regras completas em `contracts/fluig-identity.md`.
+  - **Adaptador**: `UsuarioFluigAtualDeClaims.EhAdmin` lê `roles` (com `MapInboundClaims=false`,
+    listas JSON viram várias claims `roles`). Constante `PapeisFluig.Admin = "admin"` na `Api`.
+  - **Política**: `Politicas.FluigAdmin` = esquema `Fluig` + usuário autenticado + requisito
+    `PapelAdminRequirement` (handler confere `roles` = `admin`). Falha de autenticação continua 401;
+    falha do requisito vira `403 SEM_PERMISSAO` no `ResultadoAutorizacaoHandler` já existente (o
+    mesmo que produz `TROCA_SENHA_OBRIGATORIA`), que também grava `PERMISSAO_NEGADA` na auditoria
+    com o `operationId` do endpoint (metadado `WithName`).
+  - **Aplicação nas rotas**: o grupo `/api/fluig` continua com `RequireAuthorization("Fluig")`; as
+    10 operações marcadas `x-requer-admin: true` no contrato recebem
+    `.RequireAuthorization(Politicas.FluigAdmin)` (políticas se somam). Como a autorização roda antes
+    do endpoint, o 403 sai antes de ler o corpo ou consultar o banco — sem efeito de negócio (só a linha `PERMISSAO_NEGADA` na auditoria).
+  - **Onde fica a regra**: na `Api` (constituição I: "Api faz autenticação/autorização"). Os casos
+    de uso não repetem a checagem; o teste de rotas (abaixo) é a rede de segurança contra rota nova
+    sem política.
+  - **Testes** (`Api.Tests/Autorizacao/PerfilAdminTests.cs`): enumera via `EndpointDataSource`
+    **toda** rota `/api/fluig/*` com método ≠ GET; lista explícita de exceções permitidas ao comum
+    (`POST /api/fluig/empresas/{empresaId}/convites`); qualquer outra rota de escrita → com token
+    comum 403 `SEM_PERMISSAO` e banco inalterado; com token admin → sucesso (2xx) com dados válidos.
+    Rota de escrita nova sem política faz o teste falhar. O teste de contrato confere que as rotas
+    com `FluigAdmin` são exatamente as `x-requer-admin: true` do `openapi.yaml`.
+  - **Front (`fluig-app`)**: lê `admin` de `GET /api/fluig/me`; **esconde** (não desabilita) as ações
+    de administrador e mostra um aviso único por tela; formulários viram exibição em modo leitura;
+    `SEM_PERMISSAO` vira mensagem na tela.
+- **Rationale (esconder × desabilitar)**: botão desabilitado não diz por quê, some da ordem de
+  tabulação e é anunciado de forma inconsistente por leitores de tela; cinza de desabilitado ainda
+  briga com os tokens de contraste do `docs/design.md`. Esconder e explicar **uma vez** por tela em
+  texto ("Só administradores podem cadastrar, alterar ou analisar. Se você precisa, fale com a TI.")
+  é mais claro, mantém tabelas densas limpas e segue o tom de voz (explicar o próximo passo).
+- **Papel no meio da sessão**: vale o token atual até expirar (máx. 8 h); reabrir pelo Fluig emite
+  token novo. A API não consulta o Fluig por requisição (mesma razão da R1: não acoplar à
+  disponibilidade do Fluig).
+- **Alternatives considered**: (a) claim booleana `admin: true` — mais simples, mas fecha a porta
+  para outros papéis e não segue convenção; (b) tabela de administradores no banco com tela própria
+  — duplicaria no sistema o que o Fluig já governa e exigiria gestão de usuários (o usuário decidiu
+  que o papel vem do Fluig); (c) checar no caso de uso (`Application`) — espalha a regra; a política
+  na borda com teste que percorre todas as rotas cobre o mesmo risco com menos código.
+

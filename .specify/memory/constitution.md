@@ -1,8 +1,21 @@
 <!--
 Sync Impact Report
-- Versão: (template sem versão) → 1.0.0 → 1.0.1 (PATCH, 2026-09-28: exceção explícita no princípio
-  III para o adaptador de e-mail de desenvolvimento que registra o e-mail no log — decisão do usuário
-  que conflitava com a regra de logs; apontada pelo /speckit-analyze)
+- Versão: 1.0.1 → 1.1.0 (MINOR, 2026-09-29: perfis na área Jotanunes. Princípio III ganha regra
+  nova: operações restritas a administrador são autorizadas NO SERVIDOR a partir do papel vindo do
+  Fluig, com 403 sem efeito de negócio e com a tentativa auditada; esconder na interface não basta. Princípio IV
+  exige teste que percorra todas as rotas de escrita com os dois perfis. "Fluxo de Desenvolvimento"
+  define como marcar decisões validadas pelo usuário. Motivo: decisão do dono do produto que
+  substitui a suposição "todos os usuários Fluig têm as mesmas permissões".)
+  - Princípios modificados: III (expandido), IV (expandido); nenhum removido/redefinido
+  - Seções modificadas: Fluxo de Desenvolvimento e Portões de Qualidade
+  - Templates revisados: plan-template.md (✅ Constitution Check genérico), spec-template.md (✅),
+    tasks-template.md (✅) — sem alteração necessária
+  - Artefatos da feature 001 atualizados: spec.md, plan.md (Constitution Check re-check),
+    research.md (R16), tasks.md (Phase 10)
+  - TODOs pendentes: nenhum
+- Histórico: (template sem versão) → 1.0.0 → 1.0.1 (PATCH, 2026-09-28: exceção explícita no
+  princípio III para o adaptador de e-mail de desenvolvimento que registra o e-mail no log — decisão
+  do usuário que conflitava com a regra de logs; apontada pelo /speckit-analyze)
 - Princípios definidos (novos): I. Arquitetura Hexagonal no Backend; II. Contrato de API como Fonte
   de Verdade; III. Segurança, Isolamento e LGPD; IV. Testes Obrigatórios; V. Identidade Visual
   Jotanunes sem Frameworks de CSS; VI. Simplicidade e Adaptadores Trocáveis
@@ -61,6 +74,13 @@ Justificativa: três agentes/equipes trabalham em paralelo, cada um restrito à 
   Única exceção: o adaptador de e-mail de desenvolvimento (sem chave do Resend) PODE registrar no log
   o corpo dos e-mails (link de convite e senha temporária), e DEVE estar habilitado somente no
   ambiente `Development`; fora dele a aplicação não inicia sem chave do Resend.
+- Perfis na área Jotanunes (v1.1.0): o papel do usuário (administrador ou comum) DEVE vir somente
+  da identidade Fluig assinada — nunca de parâmetro, header livre ou dado guardado pelo cliente — e
+  a ausência do papel DEVE significar o perfil de menor privilégio. Toda operação restrita a
+  administrador DEVE ser autorizada no servidor (política da `Api`) e marcada no contrato; usuário
+  sem o papel DEVE receber 403 com `code` estável antes de qualquer validação, leitura de recurso ou
+  efeito de negócio, e a tentativa DEVE ser auditada (o único registro permitido nesse caso). Esconder a ação na interface é complemento de
+  usabilidade, NUNCA o controle.
 
 Justificativa: os documentos contêm dados pessoais de trabalhadores (LGPD).
 
@@ -69,6 +89,9 @@ Justificativa: os documentos contêm dados pessoais de trabalhadores (LGPD).
 - Backend: xUnit. Regras de domínio DEVEM ter testes unitários; cada endpoint DEVE ter teste de
   integração; isolamento entre empresas e separação dos esquemas de autenticação DEVEM ter testes de
   autorização explícitos (casos negativos).
+- Perfis (v1.1.0): DEVE existir teste que enumere TODAS as rotas de escrita da área Jotanunes
+  registradas na API e confira, para cada uma, o resultado com o perfil comum (403 ou permitido por
+  lista explícita) e com o administrador; rota nova sem classificação DEVE fazer o teste falhar.
 - Frontends: Vitest + Testing Library para componentes e fluxos principais.
 - Uma tarefa só está concluída com testes passando localmente.
 
@@ -109,7 +132,8 @@ Justificativa: regras de autorização quebradas são silenciosas; só testes ne
 - Portões antes de concluir uma user story: build sem erros, testes da área passando, contrato
   respeitado (respostas conferidas com `openapi.yaml`), checagem de contraste/tokens nas telas.
 - Decisões assumidas sem validação do cliente DEVEM ficar registradas na spec como
-  "Decisão assumida (a validar com Gustavo/Jotanunes)".
+  "Decisão assumida (a validar com Gustavo/Jotanunes)". Quando o usuário/cliente valida, a spec
+  DEVE marcar "VALIDADA" com a data e a sessão de clarificação, sem apagar o registro anterior.
 
 ## Governance
 
@@ -121,4 +145,4 @@ Justificativa: regras de autorização quebradas são silenciosas; só testes ne
   seção nova; PATCH para redação.
 - Revisões de código DEVEM verificar os princípios III (segurança) e V (sem framework de CSS).
 
-**Version**: 1.0.1 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-09-28
+**Version**: 1.1.0 | **Ratified**: 2026-09-28 | **Last Amended**: 2026-09-29

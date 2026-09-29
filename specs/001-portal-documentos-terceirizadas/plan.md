@@ -17,6 +17,15 @@ ativos), arquivos PDF/JPEG/PNG até 10 MB ficam atrás da porta `IArmazenamentoA
 em dev) e e-mails saem pelo Resend (ou só no log sem chave). O contrato
 [`contracts/openapi.yaml`](contracts/openapi.yaml) é a fonte de verdade para as três áreas.
 
+**Atualização 2026-09-29 (Phase 10)**: (1) **perfis** na área Jotanunes — o token Fluig ganha a
+claim opcional `roles`; com `admin` o usuário é administrador, sem ela é comum. As 10 operações de
+escrita de cadastros e de análise exigem a política `FluigAdmin` (403 `SEM_PERMISSAO` para comum);
+consultas, downloads e convites continuam para todos. `GET /api/fluig/me` devolve `admin` e o
+`fluig-app` esconde as ações de administrador. Auditoria ganha `ator_admin` e a ação
+`PERMISSAO_NEGADA`. (2) **catálogo padrão** — semeador idempotente na inicialização cria 10 tipos de
+documento quando o catálogo está vazio. Contrato 1.1.0; constituição 1.1.0. Decisões em
+[research.md](research.md) R15 e R16.
+
 ## Technical Context
 
 **Language/Version**: C# 12 / .NET 8 (backend); TypeScript 5 + React 18 (frontends); Node 22 (tooling)
@@ -45,7 +54,7 @@ variáveis de ambiente; contraste WCAG AA; telas a partir de 360 px; `fluig-app`
 em `.jn-app`
 
 **Scale/Scope**: ~50 obras, ~500 empresas, ~30 tipos de documento, ~20 mil envios/ano; ~10 telas no
-`fluig-app`, ~5 no `portal`, 34 operações na API
+`fluig-app`, ~5 no `portal`, 34 operações na API (10 delas só para administrador, desde 1.1.0)
 
 ## Constitution Check
 
@@ -55,13 +64,19 @@ em `.jn-app`
 |---|---|---|
 | I. Hexagonal | 4 projetos (`Domain`, `Application`, `Infrastructure`, `Api`); portas em `Application` para repositórios, e-mail, arquivos, hash, identidade, auditoria, relógio (`TimeProvider`) | ✅ |
 | II. Contrato como fonte de verdade | `contracts/openapi.yaml` completo (34 operações, erros com `code`, segurança por rota); fronts geram tipos e mocks dele; teste de contrato no backend | ✅ |
-| III. Segurança/LGPD | esquemas `Fluig` e `Portal` separados + testes cruzados; filtro por `empresaId` do token; BCrypt 12; token de convite só como hash; download só por endpoint; auditoria; segredos em env; e-mail no log só em Development (exceção explícita da constituição v1.0.1) | ✅ |
-| IV. Testes | xUnit unitário/integração/autorização/contrato; Vitest + Testing Library nos fronts | ✅ |
+| III. Segurança/LGPD | esquemas `Fluig` e `Portal` separados + testes cruzados; filtro por `empresaId` do token; BCrypt 12; token de convite só como hash; download só por endpoint; auditoria; segredos em env; e-mail no log só em Development (exceção explícita da constituição v1.0.1); **(v1.1.0)** operações de administrador com política `FluigAdmin` no servidor, papel vindo só do token Fluig, 403 `SEM_PERMISSAO` sem efeito de negócio (só a tentativa `PERMISSAO_NEGADA` é auditada) | ✅ |
+| IV. Testes | xUnit unitário/integração/autorização/contrato; Vitest + Testing Library nos fronts; **(v1.1.0)** teste que percorre todas as rotas de escrita `/api/fluig/*` com token comum (403) e admin (sucesso) | ✅ |
 | V. Visual sem framework CSS | CSS puro com tokens `--jn-*` de `docs/design.md`; `.jn-app` no `fluig-app`; ícones SVG inline | ✅ |
 | VI. Simplicidade | monolito modular; adaptadores de dev sem credenciais (e-mail no log, disco local, token de dev); `docker compose up` só com Postgres | ✅ |
 
 **Re-check pós-design (Fase 1)**: ✅ sem violações. `data-model.md` não introduz tabelas além das
 necessárias; contrato cobre todas as FRs; nenhuma dependência nova fora das listadas.
+
+**Re-check 2026-09-29 (perfis + catálogo padrão, constituição 1.1.0)**: ✅ sem violações. Nenhuma
+tabela nova (só a coluna `auditoria.ator_admin`); nenhuma dependência nova; o papel continua atrás da
+porta `IUsuarioFluigAtual` (I); contrato atualizado antes da implementação, com `x-requer-admin` e
+`SEM_PERMISSAO` (II); autorização no servidor com testes negativos por rota (III, IV); o aviso de
+perfil no `fluig-app` usa só CSS próprio e texto (V); semeador sem infraestrutura nova (VI).
 
 ## Project Structure
 
@@ -105,10 +120,11 @@ backend/                         # [BACKEND]
 │   │   └── Envios/              # EnvioDocumento, StatusEnvio, SituacaoDocumento, FormatoArquivo
 │   ├── Jotanunes.Docs.Application/
 │   │   ├── Portas/              # IRepositórios, IEnviadorEmail, IArmazenamentoArquivos,
-│   │   │                        # IHasherSenha, IGeradorSegredos, IUsuarioFluigAtual,
+│   │   │                        # IHasherSenha, IGeradorSegredos, IUsuarioFluigAtual (+EhAdmin),
 │   │   │                        # IEmpresaPortalAtual, IEmissorTokenPortal, IRegistroAuditoria,
 │   │   │                        # IContextoRequisicao, IUnidadeTrabalho
 │   │   ├── Obras/ Empresas/ Convites/ TiposDocumento/ Envios/ Portal/ Painel/  # casos de uso + DTOs
+│   │   │                        # TiposDocumento/CatalogoTiposPadrao.cs + SemearCatalogoTiposPadrao (R15)
 │   │   ├── Emails/              # ModelosEmail (convite, rejeição)
 │   │   └── Erros/               # ErroAplicacao com CodigoErro
 │   ├── Jotanunes.Docs.Infrastructure/
@@ -119,7 +135,8 @@ backend/                         # [BACKEND]
 │   │   └── Auditoria/
 │   └── Jotanunes.Docs.Api/
 │       ├── Program.cs           # composição, CORS, rate limit, ProblemDetails
-│       ├── Autenticacao/        # esquemas Fluig e Portal, políticas, adaptadores de claims
+│       ├── Autenticacao/        # esquemas Fluig e Portal, políticas (Fluig, FluigAdmin, Portal,
+│       │                        # PortalCompleto), PapelAdminRequirement, adaptadores de claims
 │       ├── Endpoints/Fluig/     # grupos /api/fluig/*
 │       ├── Endpoints/Portal/    # grupos /api/portal/*
 │       └── appsettings*.json    # sem segredos
@@ -133,7 +150,8 @@ fluig-app/                       # [FLUIG] React + Vite + TS, HashRouter, estilo
 └── src/
     ├── main.tsx  App.tsx
     ├── api/                     # schema.d.ts (gerado), client.ts, hooks por recurso
-    ├── auth/                    # leitura do token (fragmento/sessionStorage/dev), guarda
+    ├── auth/                    # leitura do token (fragmento/sessionStorage/dev), guarda,
+    │                            # useEhAdmin + SomenteAdmin/AvisoSomenteAdmin (perfil, R16)
     ├── mocks/                   # handlers MSW conforme contrato + browser.ts/server.ts
     ├── styles/                  # tokens.css, base.css
     ├── components/              # Botao, Campo, Tabela, Selo, TituloPagina, Modal, Paginacao, icons/
@@ -178,12 +196,24 @@ partir de `docs/design.md` §10, para que nenhuma área precise editar arquivos 
 
 | Grupo | Esquema | Política | Observação |
 |---|---|---|---|
-| `/api/fluig/*` | `Fluig` (JwtBearer HS256, segredo Fluig) | `Fluig` | identidade → `IUsuarioFluigAtual` |
+| `/api/fluig/*` (consultas, downloads, convites) | `Fluig` (JwtBearer HS256, segredo Fluig) | `Fluig` | identidade → `IUsuarioFluigAtual` (`EhAdmin` da claim `roles`) |
+| `/api/fluig/*` com `x-requer-admin: true` (10 operações) | `Fluig` | `Fluig` + `FluigAdmin` | requisito `PapelAdminRequirement`; falha → 403 `SEM_PERMISSAO` + auditoria `PERMISSAO_NEGADA` |
 | `/api/portal/auth/login`, `/api/portal/convites/validar` | — | anônimo + rate limit | |
 | `/api/portal/me`, `/api/portal/auth/trocar-senha` | `Portal` | `Portal` | aceita `troca_senha=true` |
 | demais `/api/portal/*` | `Portal` | `PortalCompleto` | exige `troca_senha=false` |
 
 `OnTokenValidated` do esquema `Portal` confere `ver` e `ativa` no banco (revogação imediata).
+
+O `ResultadoAutorizacaoHandler` passa a olhar o requisito que falhou: `PapelAdminRequirement` →
+`SEM_PERMISSAO`; `TrocaSenhaConcluidaRequirement` → `TROCA_SENHA_OBRIGATORIA` (hoje todo 403 vira
+`TROCA_SENHA_OBRIGATORIA`). O papel **não** é revogado no meio do token (vale até expirar, R16).
+
+### Catálogo padrão (R15)
+
+`Program.cs`, depois das migrations: se `Catalogo:SemearTiposPadrao` (padrão `true`), executa
+`SemearCatalogoTiposPadrao` num escopo de DI — sob `pg_advisory_xact_lock`, cria os 10 tipos de
+`data-model.md` §4.1 **só se** `tipos_documento` estiver vazia. `ApiFactory` dos testes desliga por
+padrão.
 
 ### Frontends
 
@@ -197,6 +227,11 @@ partir de `docs/design.md` §10, para que nenhuma área precise editar arquivos 
 - `portal`: cabeçalho `#F2F2F2` com logo, razão social e "Sair"; painel de login com
   `radius-signature`; cards grandes por documento; upload por botão (input file) com validação de
   formato/tamanho no cliente antes de enviar (a validação do servidor continua valendo).
+- **Perfil no `fluig-app` (2026-09-29)**: `AuthFluigProvider` guarda `admin` de `/api/fluig/me`;
+  `useEhAdmin()` e `<SomenteAdmin>` escondem botões e formulários de administrador; `<AvisoSomenteAdmin>`
+  mostra uma vez por tela "Só administradores podem cadastrar, alterar ou analisar. Se você precisa,
+  fale com a TI."; formulários de obra/empresa viram exibição em modo leitura; o cliente trata 403
+  `SEM_PERMISSAO` como erro exibível (sem sair do sistema). Menu igual para os dois perfis.
 
 ### Configuração (variáveis de ambiente)
 
@@ -210,6 +245,7 @@ partir de `docs/design.md` §10, para que nenhuma área precise editar arquivos 
 | `Storage__Root` | API | `../../.data/uploads` (relativo à raiz de conteúdo `backend/src/Jotanunes.Docs.Api` → `backend/.data/uploads`) |
 | `Cors__Origins` | API | `http://localhost:5173,http://localhost:5174` |
 | `Database__MigrateOnStartup` | API | `true` |
+| `Catalogo__SemearTiposPadrao` | API | `true` (testes: `false`, exceto os do catálogo) |
 | `FLUIG_JWT_SECRET` | `.env` raiz (script de token) | 32+ bytes aleatórios |
 | `VITE_API_URL` | fronts | `http://localhost:5080` |
 | `VITE_USE_MOCKS` | fronts | `false` (ou `true` sem backend) |
@@ -223,6 +259,9 @@ partir de `docs/design.md` §10, para que nenhuma área precise editar arquivos 
 - **INFRA** (compose, `.env.example`, script de token, README) é pequena e deve ser feita primeiro
   pelo orquestrador; nenhuma área depende dela para testes automatizados.
 - Integração final: roteiro E2E do [quickstart.md](quickstart.md).
+- **Phase 10 (2 agentes)**: agente **BACKEND+INFRA** (`backend/`, `scripts/`) e agente **FLUIG**
+  (`fluig-app/`), em paralelo a partir do contrato 1.1.0 já atualizado; o `portal/` só regenera
+  tipos (sem mudança de comportamento).
 
 ## Complexity Tracking
 

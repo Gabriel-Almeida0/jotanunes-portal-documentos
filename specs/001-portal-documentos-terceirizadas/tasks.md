@@ -18,7 +18,7 @@ backend; Vitest + Testing Library nos fronts. Escreva o teste antes e veja falha
 ## Format: `[ID] [P?] [Story] [ÁREA] Description`
 
 - **[P]**: pode rodar em paralelo (arquivos diferentes, sem dependência de tarefa incompleta)
-- **[Story]**: US1…US5 (só nas fases de user story)
+- **[Story]**: US1…US7 (só nas fases de user story; US6/US7 na Phase 10)
 - **[ÁREA]** (obrigatória em TODA tarefa): `[BACKEND]` só edita `backend/`; `[FLUIG]` só edita
   `fluig-app/`; `[PORTAL]` só edita `portal/`; `[INFRA]` só edita arquivos da raiz
   (`compose.yaml`, `.env.example`, `.gitignore`, `README.md`, `scripts/`, `docs/`).
@@ -414,7 +414,8 @@ Task: "Páginas fluig-app/src/pages/Obras.tsx e ObraDetalhe.tsx"
 - Commits por tarefa ou grupo lógico (feitos pelo orquestrador).
 - Decisões assumidas da spec (Clarifications) podem mudar após validação com o Gustavo; o impacto
   fica concentrado em `EnviarConvite`/`TrocaSenha` (fluxo de senha) e em `ConsultaDocumentosEf`
-  (documentos por empresa).
+  (documentos por empresa). Atualização 2026-09-29: senha provisória e "todos os tipos para todas
+  as empresas" foram **validadas**; "documentos por empresa, não por obra" continua a validar.
 
 ---
 
@@ -429,3 +430,91 @@ atual. Cada tarefa cita o requisito e a evidência; ordem: HIGH → MEDIUM → L
 - [X] T120 [FLUIG] Tornar acessível, no detalhe da empresa, o histórico de envios de tipos de documento desativados: a seção "Documentos" lista só tipos ativos (`fluig-app/src/pages/empresa/SecaoDocumentos.tsx:19` usa `GET /api/fluig/empresas/{id}/documentos`, que no backend filtra `tipos.ListarAsync(true)` em `CasosDeUsoAnalise.cs:109`), então envios de tipo desativado só aparecem pela fila com filtro de status. Acrescentar bloco "Tipos desativados" (tipos de `GET /api/fluig/tipos-documento?ativo=false`) com botão "Histórico" que abre o `ModalHistorico` existente (`GET /api/fluig/empresas/{id}/documentos/{tipoId}/envios` já inclui tipos inativos, contrato linha 375); atualizar handler MSW e cobrir em teste, per US1/AC7, Edge Case "tipo desativado depois de um envio … continua no histórico", FR-046 (partial)
 - [X] T121 [FLUIG] Criar testes Vitest para fluxos principais ainda sem cobertura: `fluig-app/src/pages/EmpresaDetalhe.test.tsx` (editar dados e salvar; campo CNPJ bloqueado quando `cnpjEditavel=false`; `CNPJ_IMUTAVEL` do servidor exibido; desativar/ativar com confirmação muda o selo para "Desativada"), `fluig-app/src/pages/EmpresaDetalhe.documentos.test.tsx` (seção "Documentos" com situação em texto; modal de histórico do mais recente ao mais antigo mostrando analista, data e motivo) e em `fluig-app/src/pages/Empresas.test.tsx` os filtros por obra e por situação de acesso (hoje só a busca é testada), per Constitution IV, FR-012, US4/AC8, SC-005, US5/AC3 (partial)
 - [X] T122 [BACKEND] Configurar logs estruturados em JSON no console fora de Development (`builder.Logging.AddJsonConsole()` ou `Logging:Console:FormatterName=json` em `appsettings.json`), mantendo o formato simples em Development: hoje `backend/src/Jotanunes.Docs.Api/Program.cs` e `appsettings.json` não definem formatador, per plan: research R12 "Logs estruturados (`ILogger`, console JSON em produção)" (missing)
+
+---
+
+## Phase 10: Perfil administrador e catálogo padrão (US6 P1, US7 P2)
+
+**Purpose**: decisões do dono do produto de 2026-09-29 (spec "Session 2026-09-29"): perfis
+administrador/comum vindos do Fluig (US6, FR-080–FR-086, SC-009) e catálogo padrão de 10 tipos de
+documento numa instalação nova (US7, FR-090–FR-093, SC-010). Desenho em research R15/R16, plan
+"Autenticação" e "Catálogo padrão", data-model §4.1, §7 e §9. Contrato **1.1.0** já atualizado
+(`x-requer-admin`, `SemPermissao`, `SEM_PERMISSAO`, `UsuarioFluig.admin`) e `fluig-identity.md`
+(claim `roles`): nenhum agente edita o contrato.
+
+**Agentes**: **BACKEND+INFRA** (`backend/`, `scripts/`, `README.md`) e **FLUIG** (`fluig-app/`) em
+paralelo; nenhuma tarefa de um exige editar arquivos do outro. `[PORTAL]` T144 é independente e
+pequena (orquestrador). `[INFRA]` T145 (E2E) roda por último.
+
+**Independent Test**: quickstart §6 passos 2–3 e 31–38.
+
+### Tests for User Story 6 (BACKEND) ⚠️
+
+- [ ] T123 [US6] [BACKEND] Estender `backend/tests/Jotanunes.Docs.Api.Tests/Infra/Tokens.cs`: `Tokens.Fluig(...)` ganha `object? roles` com padrão `new[] { "admin" }` (os testes de escrita existentes continuam como administrador, sem editar cada um) e aceita valores brutos para a claim (`"admin"` texto, `new[] { "Admin" }`, `true`, `1`, objeto) ou `null` para omitir; criar `Tokens.FluigComum(api, login = "joao.comum", nome = "João Comum")` sem `roles`. Rodar a suíte inteira: nenhum teste existente muda de resultado; per FR-080 (base dos testes de perfil)
+- [ ] T124 [P] [US6] [BACKEND] Testes do perfil pela claim em `backend/tests/Jotanunes.Docs.Api.Tests/Autorizacao/PerfilClaimTests.cs` (regras de `contracts/fluig-identity.md`): `GET /api/fluig/me` → 200 com `admin=true` para `roles` `["admin"]`, `["leitor","admin"]` e `"admin"`; 200 com `admin=false` para `roles` ausente, `[]`, `["Admin"]`, `["leitor"]`, `true`, `1` e objeto — nunca 401 por causa da claim; o corpo tem exatamente `login`, `nome`, `email`, `admin`; per FR-080, FR-086, US6/AC2
+- [ ] T125 [P] [US6] [BACKEND] Teste que percorre as rotas de escrita em `backend/tests/Jotanunes.Docs.Api.Tests/Autorizacao/PerfilAdminTests.cs` (usa `Rota.Registradas` de `Autorizacao/Rotas.cs`): (a) o conjunto de rotas `/api/fluig/*` com método ≠ GET registradas na API DEVE ser igual a `ExigemAdmin` (as 10 operações `x-requer-admin` do contrato: POST/PUT obras, PUT/DELETE vínculo, POST/PUT empresas, POST/PUT tipos-documento, POST aprovar, POST rejeitar) ∪ `PermitidasAoComum` (`POST /api/fluig/empresas/{empresaId}/convites`) — rota nova sem classificação faz o teste falhar; (b) para cada rota de `ExigemAdmin`, com `Tokens.FluigComum`: corpo `{}` e ids aleatórios → 403 `application/problem+json` com `code=SEM_PERMISSAO` e `title` "Só administradores podem fazer isso. Se você precisa, fale com a TI." (prova que vem antes de validação e de 404), e com dados válidos semeados → 403 igual e contagens de `obras`, `empresas`, `obra_empresas`, `tipos_documento`, `envios_documento` por status e e-mails do `EnviadorEmailFake` inalteradas; (c) para cada rota de `ExigemAdmin`, com token admin e dados válidos semeados (`Infra/Semente.cs`) → 2xx do contrato (201/200/204); (d) com token comum: `POST .../convites` → 201 e todas as rotas GET `/api/fluig/*` → nunca 403 (200 com dados semeados, incluindo download de arquivo); (e) sem token continua 401 (não 403) em `ExigemAdmin`; per FR-081, FR-082, FR-083, SC-009, US6/AC3–AC5, Constitution III/IV v1.1.0
+- [ ] T126 [P] [US6] [BACKEND] Testes de auditoria por perfil em `backend/tests/Jotanunes.Docs.Api.Tests/Autorizacao/AuditoriaPerfilTests.cs` (helper `Infra/AuditoriaTeste.cs`): comum chamando `POST /api/fluig/tipos-documento` grava 1 linha `PERMISSAO_NEGADA` com `ator_tipo=FLUIG`, `ator_id=joao.comum`, `ator_admin=false`, `recurso_tipo=OPERACAO`, `recurso_id=fluigCriarTipoDocumento` e sem corpo/token; `CONVITE_ENVIADO` e `ARQUIVO_BAIXADO` pelo comum → `ator_admin=false`; `ENVIO_APROVADO`/`ENVIO_REJEITADO` e `ARQUIVO_BAIXADO` pelo admin → `ator_admin=true`; linhas do portal (`LOGIN_*`, `DOCUMENTO_ENVIADO`) → `ator_admin` nulo; per FR-061, FR-085, US6/AC8
+- [ ] T127 [P] [US6] [BACKEND] Estender `backend/tests/Jotanunes.Docs.Api.Tests/Contrato/ContratoOpenApiTests.cs`: o conjunto de `operationId` com `x-requer-admin: true` no `openapi.yaml` (lido de `Extensions` da operação) DEVE ser igual ao conjunto de endpoints cujo metadado `IAuthorizeData` inclui a política `FluigAdmin` (nome do endpoint via `IEndpointNameMetadata`); `SEM_PERMISSAO` coberto pela checagem já existente de `CodigoErro`; per FR-083, SC-009, Constitution II
+
+### Implementation for User Story 6 (BACKEND)
+
+- [ ] T128 [US6] [BACKEND] Perfil na identidade: `CodigoErro.SEM_PERMISSAO` em `backend/src/Jotanunes.Docs.Application/Erros/` e na tabela de `title`/status 403 usada pelo `Problemas` da `Api`; `bool EhAdmin { get; }` em `IUsuarioFluigAtual` (`backend/src/Jotanunes.Docs.Application/Portas/Servicos.cs`); `PapeisFluig.Admin = "admin"` e `UsuarioFluigAtualDeClaims.EhAdmin` em `backend/src/Jotanunes.Docs.Api/Autenticacao/Autenticacao.cs` seguindo a tabela de `fluig-identity.md` (claims `roles` repetidas ou texto único; comparação exata; tipo inesperado = false); `GET /api/fluig/me` devolve `admin` em `backend/src/Jotanunes.Docs.Api/Endpoints/Fluig/SessaoEndpoints.cs`; atualizar fakes de `IUsuarioFluigAtual` em `backend/tests/Jotanunes.Docs.Application.Tests/` e asserções de corpo do `/me` em `Autorizacao/EsquemasTests.cs` se compararem o objeto inteiro; per FR-080, FR-086
+- [ ] T129 [US6] [BACKEND] Política `Politicas.FluigAdmin` (esquema `Fluig` + autenticado + `PapelAdminRequirement` com handler que usa a mesma regra de `EhAdmin`) em `backend/src/Jotanunes.Docs.Api/Autenticacao/Autenticacao.cs`; `ResultadoAutorizacaoHandler` passa a olhar `result.AuthorizationFailure.FailedRequirements`: `PapelAdminRequirement` → grava `PERMISSAO_NEGADA` (via `IRegistroAuditoria` + `IUnidadeTrabalho` de `context.RequestServices`, `recurso_id` = `IEndpointNameMetadata.EndpointName`) e escreve 403 `SEM_PERMISSAO`; `TrocaSenhaConcluidaRequirement` → `TROCA_SENHA_OBRIGATORIA` como hoje; aplicar `.RequireAuthorization(Politicas.FluigAdmin)` exatamente às 10 operações `x-requer-admin` em `backend/src/Jotanunes.Docs.Api/Endpoints/Fluig/ObrasEndpoints.cs`, `EmpresasEndpoints.cs`, `TiposDocumentoEndpoints.cs` e `AnaliseEndpoints.cs` (convites e GETs ficam só com `Fluig`), per FR-081, FR-083, FR-085
+- [ ] T130 [US6] [BACKEND] Auditoria com perfil: `AcaoAuditoria.PermissaoNegada = "PERMISSAO_NEGADA"` e propriedade `bool? AtorAdmin` em `backend/src/Jotanunes.Docs.Domain/Auditoria/RegistroAuditoria.cs`; mapeamento `ator_admin boolean null` no `DocsDbContext`; migration `PerfilAdminAuditoria` em `backend/src/Jotanunes.Docs.Infrastructure/Persistencia/Migrations/` (coluna nullable, sem backfill); `RegistroAuditoriaEf` preenche `AtorAdmin` com `IUsuarioFluigAtual.EhAdmin` quando `atorTipo = FLUIG` e `null` nos outros casos, sem mudar a assinatura de `IRegistroAuditoria` (data-model §7), per FR-061, FR-085
+
+### Tests for User Story 7 (BACKEND) ⚠️
+
+- [ ] T131 [P] [US7] [BACKEND] Testes unitários em `backend/tests/Jotanunes.Docs.Application.Tests/TiposDocumento/CatalogoTiposPadraoTests.cs`: `CatalogoTiposPadrao` tem exatamente os 10 nomes e instruções de `data-model.md` §4.1, na ordem, nomes únicos sem diferenciar maiúsculas e todos aceitos por `TipoDocumento.Criar` (3–120; instruções não vazias ≤ 1000); `SemearCatalogoTiposPadrao` com repositório fake vazio cria 10 tipos ativos com autor `sistema`; com 1 tipo inativo existente não cria nada; chamado 2 vezes seguidas cria só na primeira; per FR-090, FR-091, FR-093
+- [ ] T132 [P] [US7] [BACKEND] Testes de integração em `backend/tests/Jotanunes.Docs.Api.Tests/TiposDocumento/CatalogoPadraoTests.cs` com `Catalogo:SemearTiposPadrao=true` e banco limpo do Testcontainers: após subir, `GET /api/fluig/tipos-documento` devolve os 10 tipos ativos com instruções e `criado_por_login = 'sistema'` no banco; subir um segundo host sobre o mesmo banco → continua 10; 5 execuções simultâneas do semeador (`Task.WhenAll`) sobre banco vazio → exatamente 10 e nenhuma exceção; banco com 1 tipo inativo inserido antes de subir → continua 1; tipo padrão editado e desativado pelo admin e novo host → edição e desativação mantidas; empresa ativa criada antes → `documentos.total = 10`, `pendentes = 10`; `Catalogo:SemearTiposPadrao=false` → 0 tipos; per FR-090, FR-091, FR-092, FR-015, SC-010, US7/AC1–AC5
+
+### Implementation for User Story 7 (BACKEND)
+
+- [ ] T133 [US7] [BACKEND] Catálogo e semeador em `backend/src/Jotanunes.Docs.Application/TiposDocumento/CatalogoTiposPadrao.cs` (lista imutável com os textos de `data-model.md` §4.1) e `backend/src/Jotanunes.Docs.Application/TiposDocumento/SemearCatalogoTiposPadrao.cs` (research R15: bloqueio exclusivo → `ExisteAlgumAsync` → cria os 10 com `TipoDocumento.Criar(..., autor: "sistema")` → um único `SalvarAsync`; `ErroAplicacao(NOME_DUPLICADO)` na corrida vira log `Information` e retorno normal); `Task<bool> ExisteAlgumAsync(ct)` em `ITipoDocumentoRepositorio` (`Portas/Persistencia.cs`) + implementação em `backend/src/Jotanunes.Docs.Infrastructure/Persistencia/Repositorios/`; porta `IBloqueioExclusivo.AdquirirAsync(long chave, ct)` implementada em `backend/src/Jotanunes.Docs.Infrastructure/Persistencia/BloqueioExclusivoPostgres.cs` com `pg_advisory_xact_lock` dentro da transação da unidade de trabalho; per FR-090, FR-091, FR-093
+- [ ] T134 [US7] [BACKEND] Ligar na inicialização em `backend/src/Jotanunes.Docs.Api/Program.cs`: depois do bloco de migrations (e também quando `Database:MigrateOnStartup=false`), se `Catalogo:SemearTiposPadrao` (padrão `true` em `appsettings.json`), executar `SemearCatalogoTiposPadrao` num escopo de DI; `ApiFactory` em `backend/tests/Jotanunes.Docs.Api.Tests/Infra/ApiFactory.cs` define `Catalogo:SemearTiposPadrao=false` por padrão com opção de ligar; documentar a variável `Catalogo__SemearTiposPadrao` em `backend/README.md`; per FR-090, FR-091
+
+### INFRA (agente BACKEND+INFRA)
+
+- [ ] T135 [P] [US6] [INFRA] `scripts/gerar-token-fluig-dev.mjs`: aceitar a opção `--admin` em qualquer posição (removida da lista de argumentos posicionais `[login] [nome] [email]`); com `--admin` o payload ganha `"roles": ["admin"]`, sem ela a claim é omitida (usuário comum); opção desconhecida começando com `--` → mensagem de uso e saída 1; atualizar o comentário de uso no topo; conferir decodificando o payload (`node -e` com `Buffer.from(parte, 'base64url')`) que os dois casos batem com `contracts/fluig-identity.md`; acrescentar em `README.md` (raiz) uma linha sobre os perfis e os dois comandos de token do quickstart §3; per FR-080, quickstart §3
+
+### Implementation for User Story 6 (FLUIG)
+
+- [ ] T136 [US6] [FLUIG] Regenerar `fluig-app/src/api/schema.d.ts` (`npm run gen:api`) a partir do contrato 1.1.0; acrescentar `SEM_PERMISSAO` em `MENSAGENS_ERRO` ("Só administradores podem fazer isso. Se você precisa, fale com a TI.") e `STATUS_ERRO` (403) de `fluig-app/src/api/mensagens.ts`; em `fluig-app/src/api/client.ts` garantir que 403 vira `ErroApi` exibível sem disparar `jn:nao-autenticado`; conferir que `UsuarioFluig` em `fluig-app/src/api/tipos.ts` já traz `admin`; `npm run build` e `npm test` verdes; per FR-083, FR-084, FR-086
+- [ ] T137 [US6] [FLUIG] Mocks por perfil: em `fluig-app/src/mocks/dados.ts` o perfil do mock (`admin` por padrão; `VITE_MOCK_PERFIL=comum` no dev) com funções `definirPerfilMock('admin' | 'comum')` para testes (reset para `admin` no `resetHandlers` de `fluig-app/src/test/setup.ts`); `fluig-app/src/mocks/handlers/sessao.ts` devolve `admin`; helper `exigirAdmin()` em `fluig-app/src/mocks/util.ts` que responde 403 `SEM_PERMISSAO` (problem+json do contrato) quando o perfil é comum, aplicado às 10 operações `x-requer-admin` em `handlers/obras.ts`, `handlers/empresas.ts`, `handlers/tiposDocumento.ts` e `handlers/analise.ts` (convites continuam liberados); documentar `VITE_MOCK_PERFIL` em `fluig-app/.env.example`; per FR-083 (mocks conformes ao contrato), Constitution II
+- [ ] T138 [US6] [FLUIG] Perfil na interface: `useEhAdmin()` em `fluig-app/src/auth/contexto.ts` (lê `admin` do usuário do `AuthFluigProvider`); componentes `fluig-app/src/components/SomenteAdmin.tsx` (renderiza os filhos só para administrador; nada para comum) e `fluig-app/src/components/AvisoSomenteAdmin.tsx` (+ `AvisoSomenteAdmin.css`, classes `jn-`, texto "Só administradores podem cadastrar, alterar ou analisar. Se você precisa, fale com a TI.", ícone SVG de informação + texto, contraste AA, `role="note"`; não renderiza para administrador); decisão de UX: **esconder** ações e explicar uma vez por tela (research R16), nunca botão desabilitado; testes em `fluig-app/src/components/SomenteAdmin.test.tsx`; per FR-084
+- [ ] T139 [US6] [FLUIG] Aplicar o perfil nas telas de cadastro: `fluig-app/src/pages/TiposDocumento.tsx` (esconder "Novo tipo", editar e ativar/desativar; aviso no topo), `fluig-app/src/pages/Obras.tsx` (esconder "Nova obra"; aviso), `fluig-app/src/pages/ObraDetalhe.tsx` (dados em modo leitura em vez de `FormularioObra`; esconder ativar/desativar, vincular e desvincular; aviso), `fluig-app/src/pages/Empresas.tsx` (esconder "Nova empresa"; aviso) e `fluig-app/src/pages/EmpresaDetalhe.tsx` (dados em modo leitura em vez de `FormularioEmpresa`; esconder ativar/desativar; **manter** "Enviar/Reenviar convite" em `fluig-app/src/pages/empresa/SecaoAcessoPortal.tsx` e documentos/histórico para os dois perfis; aviso); em todas, `ErroApi` com `code=SEM_PERMISSAO` mostra o `title` no `Alerta` da tela, fecha o modal e mantém os dados (sem ir para "Abra este sistema pelo Fluig."), per FR-081, FR-082, FR-084, US6/AC2, AC4–AC6
+- [ ] T140 [US6] [FLUIG] Aplicar o perfil na análise: `fluig-app/src/pages/EnvioAnalise.tsx` (esconder "Aprovar"/"Rejeitar" e o modal de motivo para comum; manter dados e "Abrir arquivo"; aviso; `SEM_PERMISSAO` exibido como em T139) e `fluig-app/src/pages/FilaAnalise.tsx` (link da linha "Analisar →" para administrador e "Ver →" para comum; mesma rota), per FR-042, FR-081, FR-082, FR-084
+- [ ] T141 [P] [US6] [FLUIG] Testes do perfil comum em `fluig-app/src/pages/Perfil.comum.test.tsx` (com `definirPerfilMock('comum')`): em `Painel`, `Obras`, `ObraDetalhe`, `Empresas`, `EmpresaDetalhe`, `TiposDocumento`, `FilaAnalise` e `EnvioAnalise` os dados do mock aparecem, nenhum botão/controle de administrador existe (consultas por nome: "Novo tipo", "Nova obra", "Nova empresa", "Editar", "Salvar", "Ativar", "Desativar", "Vincular empresa", "Desvincular", "Aprovar", "Rejeitar") e o aviso aparece uma vez; em `EmpresaDetalhe` "Enviar convite" funciona e muda o selo para "Convidada"; em `EnvioAnalise` "Abrir arquivo" chama o download; na fila o link é "Ver →"; com perfil admin (padrão) o aviso não aparece e os botões existem; per FR-082, FR-084, US6/AC2, AC4, AC5
+- [ ] T142 [P] [US6] [FLUIG] Testes de 403 em `fluig-app/src/pages/Perfil.semPermissao.test.tsx`: com UI de administrador mas servidor respondendo 403 `SEM_PERMISSAO` (via `server.use`) ao criar tipo, salvar obra, vincular empresa e aprovar envio → a mensagem "Só administradores podem fazer isso. Se você precisa, fale com a TI." aparece, os dados da tela continuam, o modal fecha e a tela "Abra este sistema pelo Fluig." **não** aparece; per FR-084, US6/AC6
+- [ ] T143 [US6] [FLUIG] Atualizar `fluig-app/README.md`: perfis (administrador × comum, claim `roles`), `VITE_MOCK_PERFIL`, e os tokens de dev `--admin`/comum do quickstart §3; per FR-080
+
+### PORTAL
+
+- [ ] T144 [P] [PORTAL] Regenerar `portal/src/api/schema.d.ts` (`npm run gen:api`) a partir do contrato 1.1.0 e acrescentar `SEM_PERMISSAO` em `MENSAGENS` de `portal/src/api/mensagens.ts` (exigido por `Record<CodigoErro, string>`; o portal nunca recebe esse código); sem mudança de comportamento; `npm run build` e `npm test` verdes; per Constitution II (tipos gerados do contrato 1.1.0)
+
+### INFRA (final)
+
+- [ ] T145 [INFRA] Executar o roteiro E2E de `specs/001-portal-documentos-terceirizadas/quickstart.md` §6 com banco vazio e as áreas integradas (`VITE_USE_MOCKS=false`), com foco nos passos 2–3, 5, 13 e 31–38 (tokens admin e comum; catálogo padrão; reinícios), e registrar divergências para a área responsável; per SC-009, SC-010, US6, US7
+
+### Phase 10 — Dependencies & Execution Order
+
+- **Contrato**: pronto (1.1.0). BACKEND e FLUIG começam juntos.
+- **BACKEND**: T123 → (T124, T125, T126, T127 em paralelo, devem falhar) → T128 → T129 → T130;
+  US7: (T131, T132) → T133 → T134. US6 e US7 podem se intercalar; T130 e T133 geram coisas
+  diferentes (migration só em T130; T133 não cria migration).
+- **INFRA**: T135 independente (qualquer momento); T145 depois de BACKEND e FLUIG.
+- **FLUIG**: T136 → T137 → T138 → (T139, T140) → (T141, T142) → T143. Não depende do backend (MSW).
+- **PORTAL**: T144 independente.
+- **Entre áreas**: só o contrato (leitura). O script de token (T135) não é usado por nenhum teste
+  automatizado.
+
+### Phase 10 — Parallel Example
+
+```bash
+# Agente BACKEND+INFRA
+Task: "PerfilClaimTests.cs"   Task: "PerfilAdminTests.cs"   Task: "AuditoriaPerfilTests.cs"
+Task: "CatalogoTiposPadraoTests.cs"   Task: "CatalogoPadraoTests.cs"   Task: "gerar-token-fluig-dev.mjs --admin"
+
+# Agente FLUIG (ao mesmo tempo, com MSW)
+Task: "schema + mensagens + client (T136)" → "mocks por perfil (T137)" → "SomenteAdmin/AvisoSomenteAdmin (T138)"
+```
+

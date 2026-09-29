@@ -4,7 +4,8 @@
 
 **Created**: 2026-09-28
 
-**Status**: Draft
+**Status**: Draft (implementado até T122; atualização de 2026-09-29: perfis de acesso e catálogo
+padrão de tipos de documento — US6, US7, FR-080–FR-093)
 
 **Input**: User description: "A Jotanunes (construtora) precisa acionar as empresas terceirizadas contratadas para que enviem documentos, e analisar esses documentos. Dois sistemas: (1) lado Jotanunes, aberto de dentro do Fluig, sem login próprio, para cadastrar obras, empresas (com e-mail de contato), vincular empresas às obras, cadastrar tipos de documento (os mesmos para todas as empresas), disparar e-mail de convite com link para o portal e analisar os documentos (aprovar/rejeitar com motivo); (2) portal da empresa terceirizada, com login por CNPJ + senha, onde a empresa vê os documentos exigidos, anexa arquivos, acompanha o status e reenvia os rejeitados." (fonte: `docs/transcricao.txt`)
 
@@ -22,7 +23,8 @@ organiza esse ciclo em duas partes:
 
 | Ator | Quem é | Como acessa |
 |---|---|---|
-| **Analista Jotanunes** | Colaborador da Jotanunes com acesso ao sistema no Fluig | Pelo Fluig, que já identifica o usuário e controla quem pode abrir o sistema |
+| **Analista Jotanunes** (usuário comum) | Colaborador da Jotanunes com acesso ao sistema no Fluig | Pelo Fluig, que já identifica o usuário e controla quem pode abrir o sistema. Consulta tudo e envia/reenvia convites |
+| **Administrador Jotanunes** | Analista que, além disso, está no grupo de administradores do Fluig | Pelo Fluig; o papel chega no token de identidade. Além do que o usuário comum faz, cadastra/edita/ativa/desativa obras, vínculos, empresas e tipos de documento e analisa (aprova/rejeita) os documentos |
 | **Empresa terceirizada** | Empresa contratada para uma ou mais obras (um acesso por CNPJ) | Portal próprio, com CNPJ + senha |
 
 ### Glossário
@@ -37,6 +39,13 @@ organiza esse ciclo em duas partes:
 - **Situação do documento**: estado de um tipo de documento para uma empresa: *Pendente de envio*,
   *Em análise*, *Aprovado* ou *Rejeitado*.
 - **Convite**: e-mail enviado à empresa com o link do portal e as instruções de primeiro acesso.
+- **Perfil**: papel do usuário Jotanunes na área Jotanunes: *administrador* ou *comum*. Vem do Fluig
+  (claim `roles` do token de identidade, ver `contracts/fluig-identity.md`); sem o papel, o usuário
+  é comum.
+- **Ação de administrador**: cadastrar, editar, ativar ou desativar obras (incluindo vincular e
+  desvincular empresas), empresas e tipos de documento, e aprovar ou rejeitar envios.
+- **Catálogo padrão**: os 10 tipos de documento que o sistema cria sozinho numa instalação nova
+  (catálogo vazio). Lista em `data-model.md` §4.1.
 
 ## Clarifications
 
@@ -47,8 +56,8 @@ organiza esse ciclo em duas partes:
 
 - Q: Quem define a senha da empresa no portal? → A: A Jotanunes (o sistema) gera uma senha
   temporária aleatória enviada no convite; a empresa é obrigada a trocá-la no primeiro acesso.
-  **Decisão assumida (a validar com Gustavo/Jotanunes)** — é o fluxo descrito no áudio; a decisão
-  final ficou com o Gustavo.
+  ~~Decisão assumida (a validar com Gustavo/Jotanunes)~~ → **VALIDADA pelo usuário (dono do
+  produto) em 2026-09-29** — ver Session 2026-09-29.
 - Q: Os documentos são exigidos por empresa ou por empresa + obra? → A: Por empresa. Um envio
   aprovado vale para todas as obras em que a empresa atua; o vínculo com a obra serve para a
   Jotanunes organizar e filtrar. **Decisão assumida (a validar com Gustavo/Jotanunes)** — o áudio
@@ -56,14 +65,43 @@ organiza esse ciclo em duas partes:
   como cartão CNPJ e certidões são da empresa, e pedir de novo por obra geraria retrabalho.
 - Q: Quais tipos de documento são exigidos de cada empresa? → A: Todos os tipos de documento ativos
   do catálogo são exigidos de todas as empresas ativas; não há seleção por empresa na v1.
-  **Decisão assumida (a validar com Gustavo/Jotanunes)** — resposta do áudio: "os mesmos tipos".
+  ~~Decisão assumida (a validar com Gustavo/Jotanunes)~~ → **VALIDADA pelo usuário (dono do
+  produto) em 2026-09-29** — resposta do áudio: "os mesmos tipos".
 - Q: Quais formatos e qual tamanho de arquivo são aceitos? → A: PDF, JPEG e PNG, até 10 MB, um
   arquivo por envio. **Decisão assumida (a validar com Gustavo/Jotanunes)** — PDF cobre a maioria
   dos documentos; imagens cobrem fotos de documentos tirados no celular.
 - Q: A senha temporária pode ir no mesmo e-mail do link do convite? → A: Sim, no mesmo e-mail (há um
   único contato por empresa), mitigado por expiração em 7 dias, uso único e troca obrigatória no
-  primeiro acesso; a senha temporária nunca é exibida na área Jotanunes. **Decisão assumida (a
-  validar com Gustavo/Jotanunes)**.
+  primeiro acesso; a senha temporária nunca é exibida na área Jotanunes. **VALIDADA pelo usuário
+  (dono do produto) em 2026-09-29** quanto à senha ir no mesmo e-mail do link; o prazo de 7 dias
+  continua em "Outras decisões assumidas".
+
+### Session 2026-09-29
+
+> Respostas dadas pelo usuário (dono do produto). São fonte de verdade e não devem ser reabertas.
+
+- Q: A senha provisória do convite está confirmada? → A: Sim. No convite, o sistema gera uma senha
+  temporária, enviada no mesmo e-mail do link; a troca é obrigatória no primeiro acesso.
+  **VALIDADA** (fecha a 1ª e a 5ª perguntas da sessão anterior).
+- Q: Os documentos são exigidos de todas as empresas ou há seleção por empresa? → A: De todas as
+  empresas, sem seleção por empresa. **VALIDADA** (fecha a 3ª pergunta da sessão anterior).
+- Q: Todos os usuários que o Fluig deixa entrar têm as mesmas permissões? → A: Não. Há um perfil
+  **administrador**, e quem é administrador vem do **Fluig** (papel no token de identidade; sem o
+  papel = usuário comum). Só o administrador cadastra/edita/ativa/desativa tipos de documento, obras
+  (incluindo vincular/desvincular empresas, por ser edição da obra) e empresas, e analisa
+  (aprova/rejeita) documentos. O usuário comum consulta tudo (painel, listas, detalhes, histórico,
+  abrir/baixar arquivos) e pode enviar/reenviar convites. **VALIDADA** — substitui a suposição
+  antiga "todos têm as mesmas permissões".
+- Q: O que acontece se o papel de administrador for retirado (ou dado) no meio da sessão? → A: Vale
+  o papel do token atual até ele expirar (máx. 8 h); para valer na hora, a pessoa reabre o sistema
+  pelo Fluig. **Decisão técnica derivada** (a API não consulta o Fluig a cada requisição).
+- Q: A instalação nova já vem com tipos de documento? → A: Sim. Com o catálogo **vazio**, o sistema
+  cria sozinho 10 tipos padrão (Cartão CNPJ, Contrato Social e última alteração, CND Federal, CND
+  Estadual, CND Municipal, CRF do FGTS, CNDT, PGR, PCMSO, ART/RRT), com instruções curtas em
+  português. Se já existir qualquer tipo (ativo ou inativo), não cria nada. O administrador ajusta
+  depois pela tela. **VALIDADA**.
+- A pergunta "documentos por empresa, não por obra" continua **Decisão assumida (a validar com
+  Gustavo/Jotanunes)**: o usuário ainda não respondeu.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -76,9 +114,13 @@ social, CNPJ e e-mail de contato) e indica quais empresas atuam em cada obra.
 **Why this priority**: sem esse cadastro não existe a quem pedir documentos nem o que pedir. É a
 base de todas as outras histórias.
 
-**Independent Test**: abrindo o sistema com uma identidade Fluig válida, é possível cadastrar 2
-tipos de documento, 1 obra, 2 empresas, vincular as duas à obra e ver a lista "Empresas da obra"
-com as duas.
+**Perfil (desde 2026-09-29)**: os cadastros desta história (criar, editar, ativar/desativar,
+vincular/desvincular) são ações de **administrador** (US6). "A analista" nos cenários abaixo, quando
+cadastra ou altera algo, é uma administradora; consultar vale para os dois perfis.
+
+**Independent Test**: abrindo o sistema com uma identidade Fluig válida **de administrador**, é
+possível cadastrar 2 tipos de documento, 1 obra, 2 empresas, vincular as duas à obra e ver a lista
+"Empresas da obra" com as duas.
 
 **Acceptance Scenarios**:
 
@@ -182,7 +224,10 @@ informando o motivo. A empresa vê o resultado, lê o motivo da rejeição e env
 **Why this priority**: fecha o ciclo e entrega a análise pedida pelo cliente; depende de haver
 envios (histórias 1–3).
 
-**Independent Test**: com um envio "Em análise", a analista rejeita com motivo; a empresa vê
+**Perfil (desde 2026-09-29)**: aprovar e rejeitar são ações de **administrador** (US6); a fila,
+o detalhe, o arquivo e o histórico ficam visíveis também para o usuário comum.
+
+**Independent Test**: com um envio "Em análise", a analista (administradora) rejeita com motivo; a empresa vê
 "Rejeitado" + motivo, reenvia; a analista aprova; o histórico mostra os dois envios com quem
 analisou, quando e o motivo.
 
@@ -231,6 +276,83 @@ em cada obra, as empresas vinculadas com o progresso de documentos (ex.: "4 de 6
 3. **Given** a lista de empresas, **When** a analista filtra por obra, situação de acesso ou busca
    por nome/CNPJ, **Then** a lista mostra apenas as empresas correspondentes.
 
+---
+
+### User Story 6 - Perfis: administrador e usuário comum (Priority: P1)
+
+A Jotanunes quer que só algumas pessoas mudem cadastros e decidam a análise. A TI coloca essas
+pessoas no grupo de administradores do Fluig; o Fluig informa o papel no token de identidade. O
+administrador faz tudo; o usuário comum acompanha tudo e convida empresas, mas não cadastra, não
+altera e não aprova/rejeita.
+
+**Why this priority**: é controle de acesso (segurança) sobre funções que já existem; sem ele,
+qualquer pessoa com acesso ao sistema altera o catálogo e decide análises.
+
+**Independent Test**: com um token Fluig de usuário comum, abrir todas as telas e ver os dados, sem
+nenhum botão de cadastrar, editar, ativar/desativar, vincular/desvincular, aprovar ou rejeitar;
+chamar cada uma dessas operações direto na API e receber 403 `SEM_PERMISSAO`; enviar um convite com
+sucesso. Com um token de administrador, fazer as mesmas operações com sucesso.
+
+**Acceptance Scenarios**:
+
+1. **Given** um token Fluig com o papel de administrador, **When** o usuário abre o sistema,
+   **Then** vê todas as telas com as ações de cadastro, edição, ativação/desativação, vínculo e
+   análise.
+2. **Given** um token Fluig sem o papel de administrador (claim ausente, vazia ou sem `admin`),
+   **When** o usuário abre o sistema, **Then** vê painel, listas, detalhes, históricos e arquivos,
+   e **não** vê os botões de ação de administrador; onde eles ficariam aparece o aviso "Só
+   administradores podem cadastrar, alterar ou analisar. Se você precisa, fale com a TI.".
+3. **Given** um usuário comum, **When** ele chama direto na API qualquer operação de administrador
+   (criar/editar obra, vincular/desvincular empresa, criar/editar empresa, criar/editar tipo,
+   aprovar/rejeitar envio), **Then** recebe 403 com o código `SEM_PERMISSAO` e a mensagem "Só
+   administradores podem fazer isso. Se você precisa, fale com a TI.", e nenhum dado de negócio
+   muda (nenhum cadastro, vínculo, e-mail ou decisão); só a tentativa fica na auditoria (FR-085).
+4. **Given** um usuário comum, **When** ele envia ou reenvia o convite de uma empresa, **Then** o
+   convite é enviado normalmente (US2).
+5. **Given** um usuário comum, **When** ele abre o detalhe de uma obra, empresa ou envio (inclusive
+   por endereço digitado), **Then** vê os dados em modo leitura, sem formulário editável, e consegue
+   abrir/baixar arquivos.
+6. **Given** uma tela aberta com ações de administrador (ex.: estado antigo da tela), **When** a API
+   responde 403 `SEM_PERMISSAO`, **Then** a tela mostra a mensagem do erro, não sai do sistema e não
+   perde os dados exibidos.
+7. **Given** uma administradora cujo papel foi retirado no Fluig durante a sessão, **When** ela
+   continua usando o token atual, **Then** ele segue valendo como administrador até expirar (máx. 8
+   h); ao reabrir o sistema pelo Fluig, passa a ser usuária comum.
+8. **Given** uma ação de convite, download ou decisão, **When** ela é registrada na auditoria,
+   **Then** o registro indica se o usuário Fluig era administrador; tentativas negadas por falta de
+   permissão também são registradas.
+
+---
+
+### User Story 7 - Catálogo padrão de tipos de documento (Priority: P2)
+
+Numa instalação nova, a Jotanunes não precisa digitar os documentos mais comuns: o sistema já sobe
+com 10 tipos padrão, com instruções curtas para a empresa. O administrador ajusta nome, instruções
+e ativação pela tela depois.
+
+**Why this priority**: acelera a implantação e padroniza o que se pede, mas o processo funciona
+cadastrando os tipos à mão (US1).
+
+**Independent Test**: com um banco limpo (sem tipos), subir a API e ver, na tela de tipos de
+documento, os 10 tipos padrão ativos com instruções; reiniciar a API e continuar com exatamente 10.
+Com um banco que já tem 1 tipo (ativo ou inativo), subir a API e continuar com 1.
+
+**Acceptance Scenarios**:
+
+1. **Given** um banco novo, sem nenhum tipo de documento, **When** a API sobe, **Then** existem 10
+   tipos ativos: Cartão CNPJ; Contrato Social e última alteração; CND Federal (Receita Federal/PGFN);
+   CND Estadual; CND Municipal; CRF do FGTS; CNDT (Certidão Negativa de Débitos Trabalhistas); PGR
+   (Programa de Gerenciamento de Riscos); PCMSO (Programa de Controle Médico de Saúde Ocupacional);
+   ART/RRT — cada um com instruções curtas em português (texto em `data-model.md` §4.1).
+2. **Given** o catálogo padrão já criado, **When** a API reinicia (uma ou várias instâncias ao mesmo
+   tempo), **Then** nenhum tipo é duplicado.
+3. **Given** um banco com qualquer tipo cadastrado (ativo ou inativo, criado à mão ou pelo padrão),
+   **When** a API sobe, **Then** nada é criado.
+4. **Given** o catálogo padrão criado, **When** o administrador edita, desativa ou cria tipos,
+   **Then** as mudanças valem como em qualquer tipo (US1) e não são desfeitas em reinícios.
+5. **Given** empresas ativas numa instalação nova, **When** o catálogo padrão é criado, **Then** os
+   10 tipos aparecem como "Pendente de envio" para elas (FR-015).
+
 ### Edge Cases
 
 - CNPJ digitado com ou sem máscara é tratado como o mesmo CNPJ; CNPJ com dígitos verificadores
@@ -253,6 +375,18 @@ em cada obra, as empresas vinculadas com o progresso de documentos (ex.: "4 de 6
 - Credencial do portal usada na área Jotanunes (ou identidade Fluig usada no portal): recusada.
 - Duas abas da empresa enviando para o mesmo documento ao mesmo tempo: só o primeiro envio é
   aceito; o segundo recebe a mensagem de que o documento já está em análise.
+- Token Fluig sem a claim `roles`, com `roles` vazia, com valor em maiúsculas (`"Admin"`) ou de tipo
+  inesperado (booleano, número): o usuário é **comum**; o token continua válido (não é 401).
+- Papel de administrador retirado ou dado no meio da sessão: vale o token atual até expirar (máx.
+  8 h); reabrir o sistema pelo Fluig aplica o novo papel.
+- Usuário comum chamando operação de administrador com dados inválidos ou recurso inexistente:
+  recebe 403 `SEM_PERMISSAO` (a permissão é verificada antes da validação e da busca do recurso).
+- Usuário comum abrindo por endereço uma tela de edição: vê a tela em modo leitura.
+- Sem nenhum administrador configurado no Fluig: o sistema funciona só para consulta e convites
+  até a TI configurar o grupo (ver `contracts/fluig-identity.md`).
+- Catálogo padrão com várias instâncias da API subindo juntas: no máximo uma cria os tipos; as
+  outras não duplicam nem falham ao subir.
+- Catálogo padrão num banco com tipos só inativos: não cria nada (o catálogo não está vazio).
 
 ## Requirements *(mandatory)*
 
@@ -261,8 +395,8 @@ em cada obra, as empresas vinculadas com o progresso de documentos (ex.: "4 de 6
 **Acesso e identidade**
 
 - **FR-001**: A área Jotanunes DEVE ser acessível somente com uma identidade de usuário emitida pelo
-  Fluig (login, nome e e-mail), sem tela de login própria; o controle de quem pode abrir o sistema é
-  do Fluig.
+  Fluig (login, nome, e-mail e, opcionalmente, o papel de administrador), sem tela de login própria;
+  o controle de quem pode abrir o sistema e de quem é administrador é do Fluig (FR-080).
 - **FR-002**: O sistema DEVE recusar pedidos da área Jotanunes com identidade ausente, expirada,
   adulterada ou emitida para o portal.
 - **FR-003**: O portal DEVE autenticar a empresa por CNPJ + senha e recusar credenciais da área
@@ -282,17 +416,18 @@ em cada obra, as empresas vinculadas com o progresso de documentos (ex.: "4 de 6
 
 **Cadastros (área Jotanunes)**
 
-- **FR-010**: A analista DEVE poder cadastrar, editar, listar e ativar/desativar obras (nome,
-  código interno opcional, cidade, UF).
-- **FR-011**: A analista DEVE poder cadastrar, editar, listar e ativar/desativar empresas (razão
-  social, nome fantasia opcional, CNPJ, e-mail de contato, nome do contato e telefone opcionais).
+- **FR-010**: O administrador DEVE poder cadastrar, editar e ativar/desativar obras (nome,
+  código interno opcional, cidade, UF); qualquer usuário Jotanunes DEVE poder listá-las e vê-las.
+- **FR-011**: O administrador DEVE poder cadastrar, editar e ativar/desativar empresas (razão
+  social, nome fantasia opcional, CNPJ, e-mail de contato, nome do contato e telefone opcionais);
+  qualquer usuário Jotanunes DEVE poder listá-las e vê-las.
 - **FR-012**: O CNPJ DEVE ser único, validado pelos dígitos verificadores (aceitando o formato
   numérico e o alfanumérico da Receita Federal, vigente desde julho de 2026) e armazenado sem máscara;
   o CNPJ não pode ser alterado depois do primeiro convite.
-- **FR-013**: A analista DEVE poder vincular e desvincular empresas de obras; uma empresa pode estar
-  em várias obras e uma obra pode ter várias empresas.
-- **FR-014**: A analista DEVE poder cadastrar, editar, listar e ativar/desativar tipos de documento
-  (nome único, instruções para a empresa).
+- **FR-013**: O administrador DEVE poder vincular e desvincular empresas de obras (é edição da
+  obra); uma empresa pode estar em várias obras e uma obra pode ter várias empresas.
+- **FR-014**: O administrador DEVE poder cadastrar, editar e ativar/desativar tipos de documento
+  (nome único, instruções para a empresa); qualquer usuário Jotanunes DEVE poder listá-los.
 - **FR-015**: Os documentos DEVEM ser exigidos **por empresa**: todos os tipos de documento ativos
   são exigidos de todas as empresas ativas, e um envio vale para todas as obras da empresa. Criar um
   tipo novo o torna "Pendente de envio" para todas as empresas ativas.
@@ -332,8 +467,8 @@ em cada obra, as empresas vinculadas com o progresso de documentos (ex.: "4 de 6
 - **FR-040**: A analista DEVE ter uma fila de envios "Em análise", do mais antigo para o mais novo,
   com filtros por obra, empresa e tipo de documento.
 - **FR-041**: A analista DEVE poder abrir/baixar o arquivo de qualquer envio.
-- **FR-042**: A analista DEVE poder aprovar ou rejeitar um envio "Em análise"; rejeitar exige motivo
-  de 5 a 500 caracteres.
+- **FR-042**: O administrador DEVE poder aprovar ou rejeitar um envio "Em análise"; rejeitar exige
+  motivo de 5 a 500 caracteres. Usuário comum vê a fila e os envios, mas não decide (FR-081).
 - **FR-043**: Cada decisão DEVE registrar o usuário Fluig (login e nome), a data/hora e o motivo
   (quando rejeição); decisões são definitivas e não podem ser editadas.
 - **FR-044**: Um envio já analisado NÃO DEVE poder ser analisado de novo; a segunda decisão
@@ -355,9 +490,50 @@ em cada obra, as empresas vinculadas com o progresso de documentos (ex.: "4 de 6
 - **FR-060**: Os arquivos enviados DEVEM ser acessíveis somente por usuários autenticados e
   autorizados; não pode existir endereço público ou permanente para um arquivo.
 - **FR-061**: O sistema DEVE registrar em trilha de auditoria: login da empresa (sucesso/falha),
-  troca de senha, envio de convite, envio de documento, download de arquivo e decisão de análise,
-  com quem, quando e qual recurso — sem gravar senhas, tokens ou conteúdo de arquivos.
+  troca de senha, envio de convite, envio de documento, download de arquivo, decisão de análise e
+  tentativa negada por falta de permissão (FR-085), com quem, quando, qual recurso e, para usuário
+  Fluig, se era administrador — sem gravar senhas, tokens ou conteúdo de arquivos.
 - **FR-062**: As mensagens de erro de login NÃO DEVEM revelar se o CNPJ existe.
+
+**Perfis e permissões (área Jotanunes)**
+
+- **FR-080**: O sistema DEVE reconhecer dois perfis na área Jotanunes: **administrador**, quando o
+  token Fluig traz a claim `roles` contendo `admin` (regras em `contracts/fluig-identity.md`), e
+  **comum** em qualquer outro caso (claim ausente, vazia, sem `admin` ou de tipo inesperado), sem
+  recusar o token por causa da claim.
+- **FR-081**: Somente o administrador DEVE poder: cadastrar/editar/ativar/desativar tipos de
+  documento; cadastrar/editar/ativar/desativar obras, incluindo vincular e desvincular empresas;
+  cadastrar/editar/ativar/desativar empresas; aprovar e rejeitar envios.
+- **FR-082**: Os dois perfis DEVEM poder consultar tudo na área Jotanunes (painel, listas, detalhes,
+  situação e histórico de documentos, histórico de convites, abrir/baixar arquivos) e enviar/reenviar
+  convites.
+- **FR-083**: A API DEVE recusar operação de administrador feita por usuário comum com 403 e o
+  código `SEM_PERMISSAO` (formato `problem+json` do contrato), antes de validar dados ou procurar o
+  recurso, sem nenhum efeito de negócio (cadastro, vínculo, e-mail, decisão) — o único registro
+  gravado é a tentativa na auditoria (FR-085). A verificação é do servidor; esconder na
+  interface não basta.
+- **FR-084**: A área Jotanunes DEVE esconder as ações de administrador do usuário comum (não apenas
+  desabilitar), mostrando em cada tela afetada um aviso único em texto explicando que só
+  administradores cadastram, alteram ou analisam; formulários de edição viram exibição em modo
+  leitura. Se a API responder `SEM_PERMISSAO`, a tela DEVE mostrar a mensagem do erro sem perder os
+  dados nem sair do sistema.
+- **FR-085**: A auditoria DEVE indicar, em cada registro feito por usuário Fluig, se ele era
+  administrador, e DEVE registrar a tentativa negada (`PERMISSAO_NEGADA`) com usuário, operação e
+  data/hora.
+- **FR-086**: O perfil DEVE ser lido do token da requisição atual e valer enquanto o token for
+  válido (máx. 8 h, FR-008); a API DEVE informar o perfil ao front (`GET /api/fluig/me` → `admin`).
+
+**Catálogo padrão de tipos de documento**
+
+- **FR-090**: Quando o catálogo de tipos de documento estiver **vazio** (nenhum tipo, ativo ou
+  inativo), o sistema DEVE criar automaticamente, ao iniciar, os 10 tipos padrão listados em
+  `data-model.md` §4.1, ativos e com instruções curtas em português no tom de `docs/design.md` §9.
+- **FR-091**: Se existir qualquer tipo cadastrado, o sistema NÃO DEVE criar, alterar nem reativar
+  nenhum tipo ao iniciar; várias inicializações (inclusive simultâneas) NÃO DEVEM duplicar tipos.
+- **FR-092**: Os tipos padrão DEVEM ser tipos comuns do catálogo: o administrador os edita,
+  desativa e complementa pela tela (FR-014), e as mudanças não são desfeitas por reinícios.
+- **FR-093**: A criação do catálogo padrão DEVE ficar registrada como feita pelo sistema (autor
+  `sistema`), sem depender de usuário Fluig.
 
 **Interface**
 
@@ -377,7 +553,8 @@ em cada obra, as empresas vinculadas com o progresso de documentos (ex.: "4 de 6
   ativa/inativa, dados de acesso (senha protegida, se precisa trocar a senha, tentativas falhas,
   bloqueio, último acesso).
 - **Vínculo obra–empresa**: obra, empresa, quem vinculou e quando. Único por par.
-- **Tipo de documento**: nome (único), instruções, ativo/inativo. Catálogo único da Jotanunes.
+- **Tipo de documento**: nome (único), instruções, ativo/inativo. Catálogo único da Jotanunes;
+  numa instalação nova começa com o catálogo padrão (10 tipos).
 - **Convite**: empresa, e-mail de destino, quem enviou, quando, expiração, quando foi usado ou
   substituído.
 - **Envio de documento**: empresa, tipo de documento, arquivo (nome original, formato, tamanho),
@@ -385,7 +562,10 @@ em cada obra, as empresas vinculadas com o progresso de documentos (ex.: "4 de 6
   decisão.
 - **Situação do documento** (derivada): para cada empresa × tipo ativo, a situação do envio mais
   recente, ou "Pendente de envio" se não houver envio.
-- **Registro de auditoria**: ação, ator (usuário Fluig ou empresa), recurso, data/hora, IP.
+- **Registro de auditoria**: ação, ator (usuário Fluig ou empresa), se o usuário Fluig era
+  administrador, recurso, data/hora, IP.
+- **Perfil do usuário Fluig** (não persistido): administrador ou comum, lido do token a cada
+  requisição; não há tabela de usuários nem de papéis no sistema.
 
 ## Success Criteria *(mandatory)*
 
@@ -405,12 +585,21 @@ em cada obra, as empresas vinculadas com o progresso de documentos (ex.: "4 de 6
   empresas, 50 obras, 30 tipos de documento e 20.000 envios.
 - **SC-007**: Todas as combinações de texto/fundo das telas atingem contraste WCAG AA.
 - **SC-008**: Nenhum arquivo enviado pode ser obtido sem autenticação (verificado por teste).
+- **SC-009**: 100% das operações de administrador respondem 403 `SEM_PERMISSAO` para usuário comum
+  e têm sucesso para administrador, verificado por teste automático que percorre todas as rotas de
+  escrita da área Jotanunes (uma rota de escrita nova sem classificação faz o teste falhar).
+- **SC-010**: Numa instalação nova, a tela de tipos de documento mostra os 10 tipos padrão sem
+  nenhum cadastro manual; após 3 reinícios seguidos, continuam exatamente 10.
 
 ## Assumptions
 
 - A Jotanunes consegue configurar no Fluig a abertura do sistema entregando a identidade do usuário
-  logado de forma assinada; quem pode abrir o sistema é definido por perfis no próprio Fluig. Todos
-  os usuários que o Fluig deixa entrar têm as mesmas permissões (não há papéis diferentes na v1).
+  logado de forma assinada; quem pode abrir o sistema é definido por grupos/perfis no próprio Fluig.
+  ~~Todos os usuários que o Fluig deixa entrar têm as mesmas permissões~~ (substituída em
+  2026-09-29): há dois perfis, administrador e comum; a TI inclui o papel `admin` no token a partir
+  de um grupo do Fluig (`contracts/fluig-identity.md`).
+- Não há tela no sistema para gerenciar administradores: quem é administrador é decidido só no
+  Fluig.
 - Um acesso ao portal por empresa (CNPJ); não há vários usuários por empresa na v1.
 - Não há recuperação de senha self-service na v1: a empresa pede à Jotanunes, que reenvia o convite.
 - Validade/vencimento de documentos (ex.: certidões que vencem) está fora do escopo da v1.
@@ -433,6 +622,7 @@ opção mais razoável e também precisam de validação:
 - A empresa só pode enviar arquivo para documento "Pendente de envio" ou "Rejeitado"; não pode
   substituir arquivo "Em análise" nem "Aprovado". A Jotanunes não reabre documento aprovado na v1.
 - A empresa recebe e-mail apenas na rejeição (não na aprovação), para reduzir ruído.
-- Todos os usuários que o Fluig deixa abrir o sistema têm as mesmas permissões (sem papéis na v1).
+- ~~Todos os usuários que o Fluig deixa abrir o sistema têm as mesmas permissões (sem papéis na
+  v1).~~ Substituída pela decisão validada de 2026-09-29 (perfis administrador e comum, US6).
 - Nada é excluído definitivamente pela interface (desativação), exceto vínculos obra–empresa.
 - O CNPJ fica bloqueado para edição depois do primeiro convite.
