@@ -36,7 +36,8 @@ from PIL import Image
 AQUI = os.path.dirname(os.path.abspath(__file__))
 MODELO_PADRAO = os.path.expanduser("~/Downloads/1. ENTREGA_PARCIAL_RIV_LEVELUP_2026.1 (1).docx")
 SAIDA = os.path.join(AQUI, "ENTREGA_PARCIAL_RIV_LEVELUP_2026.1_Squad81.docx")
-CONTEUDO = [os.path.join(AQUI, "conteudo", n) for n in ("secao-1-2.md", "secao-3-4.md", "secao-5.md")]
+CONTEUDO = [os.path.join(AQUI, "conteudo", n) for n in ("secao-1-2.md", "secao-3-4.md")]
+# Itens OPCIONAIS do modelo (1.3 e seção 5) ficam sem preenchimento, por decisão da squad.
 
 EMPRESA = "JOTANUNES CONSTRUTORA"
 SQUAD = "81"
@@ -57,7 +58,6 @@ TAM_LEGENDA = 8.5
 ANCORAS = {
     "1.1": "Personas.",
     "1.2": "Identificar cenários de falha, casos críticos de erro.",
-    "1.3": "Pelo menos uma entrevista com humanos.",
     "2.1": "Descrição dos padrões de uso de ferramentas de IA no projeto.",
     "2.2": "Definição clara dos critérios de aceitação",
     "3.1": "Identificar no modelo de dados quais entidades",
@@ -66,8 +66,6 @@ ANCORAS = {
     "3.4": "Limites de requisição, Latência, indisponibilidade, etc.",
     "4.1": "Detalhamento de stack",
     "4.2": "Como tratar problemas com latência, erros, timeout e indisponibilidade.",
-    "5.1": "Problemas encontrados;",
-    "5.2": "Como trabalharam, qual o impacto",
 }
 # Âncora -> início do título do subitem (de onde vem o recuo do bloco)
 TITULOS = {
@@ -692,7 +690,7 @@ def main():
 
     doc.save(SAIDA)
     shutil.rmtree(tmp, ignore_errors=True)
-    print(f"Âncoras inseridas ({len(inseridas)}/13): {', '.join(inseridas)}")
+    print(f"Âncoras inseridas ({len(inseridas)}/{len(ANCORAS)}): {', '.join(inseridas)}")
     print(f"Figuras: {m.figura}")
     print(f"Gerado: {SAIDA}")
 
