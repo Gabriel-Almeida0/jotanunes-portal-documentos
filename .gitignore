@@ -21,3 +21,8 @@ backend/.data/
 vps.env
 # Segredos de produção (VPS)
 producao.env
+
+# Gravações de clientes (não versionar)
+*.opus
+*.m4a
+*.mp3
