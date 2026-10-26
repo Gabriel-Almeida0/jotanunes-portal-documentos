@@ -11,6 +11,13 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="6.9.0" />
+  </ItemGroup>
+
+  <!-- Contrato (fonte de verdade) servido pelo Swagger UI em /swagger, só em Development. -->
+  <ItemGroup>
+    <Content Include="..\..\..\specs\001-portal-documentos-terceirizadas\contracts\openapi.yaml"
+             Link="Contrato\openapi.yaml" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
 </Project>
