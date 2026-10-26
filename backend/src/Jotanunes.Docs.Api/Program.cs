@@ -86,6 +86,23 @@ app.UseStatusCodePages(async ctx =>
         await Problemas.EscreverAsync(http, Problemas.CodigoPorStatus(http.Response.StatusCode), http.Response.StatusCode);
     }
 });
+// Swagger UI (só em Development) mostrando o contrato openapi.yaml. Fica fora do roteamento de propósito:
+// não vira endpoint, então os testes que comparam as rotas da API com o contrato não mudam.
+if (app.Environment.IsDevelopment())
+{
+    var contrato = Path.Combine(AppContext.BaseDirectory, "Contrato", "openapi.yaml");
+    app.Map("/swagger/openapi.yaml", ramo => ramo.Run(async ctx =>
+    {
+        ctx.Response.ContentType = "application/yaml; charset=utf-8";
+        await ctx.Response.SendFileAsync(contrato);
+    }));
+    app.UseSwaggerUI(o =>
+    {
+        o.SwaggerEndpoint("/swagger/openapi.yaml", "Portal de Documentos — API");
+        o.DocumentTitle = "Jotanunes Docs — API";
+    });
+}
+
 app.UseRouting();
 app.UseCors();
 app.UseRateLimiter();
