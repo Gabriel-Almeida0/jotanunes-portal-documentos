@@ -8,6 +8,7 @@ const CND_ANTIGA = {
   id: '44444444-4444-4444-8444-0000000000aa',
   empresaId: IDS.empresaAlfa,
   tipoDocumentoId: IDS.tipoCndFederal,
+  obraId: null,
   nomeArquivo: 'cnd-federal-antiga.pdf',
   formato: 'application/pdf' as const,
   tamanhoBytes: 120_000,
@@ -16,12 +17,15 @@ const CND_ANTIGA = {
   analisadoEm: '2026-08-02T14:30:00Z',
   analisadoPor: { login: 'maria.silva', nome: 'Maria Silva' },
   motivoRejeicao: 'Certidão vencida.',
+  periodoInicio: null,
+  periodoFim: null,
+  enviadoComAtraso: false,
 };
 
 async function abrirAlfa() {
   const r = renderizarRota(`/empresas/${IDS.empresaAlfa}`);
   await screen.findByRole('heading', { level: 1, name: 'Alfa Engenharia Ltda' });
-  const tabela = await screen.findByRole('table', { name: 'Documentos da empresa' });
+  const tabela = await screen.findByRole('table', { name: 'Documentos gerais da empresa' });
   return { ...r, tabela };
 }
 
@@ -43,7 +47,7 @@ describe('Detalhe da empresa — documentos', () => {
 
   it('empresa sem envios vê "Pendente de envio" e o histórico desabilitado', async () => {
     renderizarRota(`/empresas/${IDS.empresaGama}`);
-    const tabela = await screen.findByRole('table', { name: 'Documentos da empresa' });
+    const tabela = await screen.findByRole('table', { name: 'Documentos gerais da empresa' });
     const pcmso = linha(tabela, 'PCMSO');
     expect(within(pcmso).getByText('Pendente de envio')).toBeInTheDocument();
     expect(within(pcmso).getByText('Nenhum envio')).toBeInTheDocument();
@@ -105,5 +109,50 @@ describe('Detalhe da empresa — documentos', () => {
     // A tabela passa a incluir o tipo reativado; o bloco some.
     expect(await screen.findByText('Alvará de funcionamento (antigo)')).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Tipos desativados' })).not.toBeInTheDocument();
+  });
+
+  it('separa os documentos gerais e um bloco por obra com vínculo ativo', async () => {
+    const { tabela } = await abrirAlfa();
+    expect(screen.getByRole('heading', { level: 2, name: 'Documentos gerais' })).toBeInTheDocument();
+    // Tipo por obra nunca aparece nos gerais.
+    expect(within(tabela).queryByText('ART da obra')).not.toBeInTheDocument();
+
+    const vista = await screen.findByRole('table', { name: 'Documentos da obra Residencial Vista do Rio' });
+    expect(within(linha(vista, 'ART da obra')).getByText('Aprovado')).toBeInTheDocument();
+    expect(within(linha(vista, 'Ordem de serviço')).getByText('Pendente de envio')).toBeInTheDocument();
+
+    const flor = await screen.findByRole('table', { name: 'Documentos da obra Condomínio Flor de Sal' });
+    // Mesmo tipo, outra obra, outra situação.
+    expect(within(linha(flor, 'ART da obra')).getByText('Em análise')).toBeInTheDocument();
+    const bloco = screen.getByRole('region', { name: 'Condomínio Flor de Sal' });
+    expect(within(bloco).getByText('Documentos desta obra: 0 de 1 aprovados')).toBeInTheDocument();
+  });
+
+  it('histórico de um documento da obra mostra só os envios daquela obra', async () => {
+    const { usuario } = await abrirAlfa();
+    const vista = await screen.findByRole('table', { name: 'Documentos da obra Residencial Vista do Rio' });
+    await usuario.click(within(linha(vista, 'ART da obra')).getByRole('button', { name: 'Histórico de ART da obra' }));
+    const dialogo = screen.getByRole('dialog', { name: 'Histórico: ART da obra' });
+    expect(dialogo).toHaveTextContent('Obra: Residencial Vista do Rio');
+    const envios = await within(dialogo).findAllByRole('listitem');
+    expect(envios).toHaveLength(1);
+    expect(envios[0]).toHaveTextContent('art-vista-do-rio.pdf');
+  });
+
+  it('obras com vínculo encerrado ficam recolhidas, só com histórico', async () => {
+    const { usuario } = renderizarRota(`/empresas/${IDS.empresaGama}`);
+    await screen.findByRole('heading', { level: 1, name: 'Gama Instalações Elétricas Ltda' });
+    expect(await screen.findByText('Esta empresa não está em nenhuma obra no momento.', { exact: false })).toBeInTheDocument();
+    const resumo = screen.getByText('Obras encerradas (1)');
+    expect(screen.queryByRole('table', { name: 'Documentos da obra Residencial Vista do Rio' })).not.toBeInTheDocument();
+    await usuario.click(resumo);
+    const tabela = await screen.findByRole('table', { name: 'Documentos da obra Residencial Vista do Rio' });
+    expect(within(linha(tabela, 'ART da obra')).getByText('Aprovado')).toBeInTheDocument();
+    expect(screen.getByText(/Vínculo encerrado: só histórico/)).toBeInTheDocument();
+  });
+
+  it('?obra= de um vínculo encerrado já abre a seção recolhida', async () => {
+    renderizarRota(`/empresas/${IDS.empresaGama}?obra=${IDS.obraVistaDoRio}`);
+    expect(await screen.findByRole('table', { name: 'Documentos da obra Residencial Vista do Rio' })).toBeInTheDocument();
   });
 });

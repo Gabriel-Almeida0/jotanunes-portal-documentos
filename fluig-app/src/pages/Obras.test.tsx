@@ -1,4 +1,5 @@
 import { screen, waitFor, within } from '@testing-library/react';
+import { IDS, db } from '../mocks/dados';
 import { renderizarRota } from '../test/renderizar';
 
 describe('Obras', () => {
@@ -6,8 +7,37 @@ describe('Obras', () => {
     renderizarRota('/obras');
     const tabela = await screen.findByRole('table', { name: 'Obras' });
     const linha = within(tabela).getByText('Residencial Vista do Rio').closest('tr')!;
-    expect(within(linha).getByText('3')).toBeInTheDocument();
+    expect(within(linha).getAllByRole('cell')[2]).toHaveTextContent('3'); // empresas com vínculo ativo
     expect(within(tabela).queryByText('Parque das Palmeiras')).not.toBeInTheDocument();
+  });
+
+  it('mostra a quantidade de documentos exigidos de cada obra', async () => {
+    renderizarRota('/obras');
+    const tabela = await screen.findByRole('table', { name: 'Obras' });
+    expect(within(tabela).getByRole('columnheader', { name: 'Docs exigidos' })).toBeInTheDocument();
+    const flor = within(tabela).getByText('Condomínio Flor de Sal').closest('tr')!;
+    const celulas = within(flor).getAllByRole('cell');
+    expect(celulas[2]).toHaveTextContent('2'); // empresas com vínculo ativo
+    expect(celulas[3]).toHaveTextContent('1'); // ART da obra
+  });
+
+  it('filtra as obras com pendência', async () => {
+    const { usuario, local } = renderizarRota('/obras');
+    await screen.findByRole('table', { name: 'Obras' });
+    await usuario.click(screen.getByRole('checkbox', { name: 'Com pendência' }));
+    await usuario.click(screen.getByRole('button', { name: 'Pesquisar' }));
+    await waitFor(() => expect(local()).toBe('/obras?comPendencia=true'));
+    const tabela = await screen.findByRole('table', { name: 'Obras' });
+    expect(within(tabela).getByText('Residencial Vista do Rio')).toBeInTheDocument();
+  });
+
+  it('obra sem pendência da obra não entra no filtro', async () => {
+    // Remove as marcações da Flor de Sal: ela deixa de ter documento da obra pendente.
+    db.obraTipos.splice(0, db.obraTipos.length, ...db.obraTipos.filter((m) => m.obraId !== IDS.obraFlorDeSal));
+    renderizarRota('/obras?comPendencia=true');
+    const tabela = await screen.findByRole('table', { name: 'Obras' });
+    expect(within(tabela).getByText('Residencial Vista do Rio')).toBeInTheDocument();
+    expect(within(tabela).queryByText('Condomínio Flor de Sal')).not.toBeInTheDocument();
   });
 
   it('filtra por busca pelo padrão de filtros', async () => {

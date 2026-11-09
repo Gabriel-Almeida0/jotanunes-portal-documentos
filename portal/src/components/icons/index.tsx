@@ -64,6 +64,15 @@ export const IconeAlerta = (p: Props) => (
   </Icone>
 );
 
+/** Triângulo de aviso: usado no selo "Atrasado". */
+export const IconeAtraso = (p: Props) => (
+  <Icone {...p}>
+    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </Icone>
+);
+
 export const IconeCheck = (p: Props) => (
   <Icone {...p}>
     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
@@ -150,5 +159,12 @@ export const IconeHistorico = (p: Props) => (
     <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
     <polyline points="3 3 3 8 8 8" />
     <polyline points="12 7 12 12 15 15" />
+  </Icone>
+);
+
+export const IconePin = (p: Props) => (
+  <Icone {...p}>
+    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" />
+    <circle cx="12" cy="10" r="3" />
   </Icone>
 );

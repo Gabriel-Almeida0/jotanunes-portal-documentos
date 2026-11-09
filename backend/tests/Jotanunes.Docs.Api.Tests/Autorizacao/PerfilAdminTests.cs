@@ -26,11 +26,11 @@ public class PerfilAdminTests(ApiFactory api) : TesteApi(api)
 
     /// <summary>Dados válidos semeados para as requisições de sucesso.</summary>
     private sealed record Cenario(Obra Obra, Empresa Empresa, Empresa EmpresaVinculada, TipoDocumento Tipo, TipoDocumento Tipo2,
-        EnvioDocumento EnvioAprovar, EnvioDocumento EnvioRejeitar, UsuarioInterno Usuario);
+        EnvioDocumento EnvioAprovar, EnvioDocumento EnvioRejeitar, UsuarioInterno Usuario, TipoDocumento TipoObra, TipoDocumento TipoObraMarcado);
 
     private sealed record Operacao(HttpStatusCode Sucesso, Func<Cenario, (string Url, object? Corpo)> Valida);
 
-    /// <summary>As 15 operações <c>x-requer-admin: true</c> do contrato, com a requisição válida e o status de sucesso.</summary>
+    /// <summary>As 17 operações <c>x-requer-admin: true</c> do contrato, com a requisição válida e o status de sucesso.</summary>
     private static readonly Dictionary<Rota, Operacao> ExigemAdmin = new()
     {
         [new("GET", "/api/fluig/usuarios")] = new(HttpStatusCode.OK, _ => ("/api/fluig/usuarios", null)),
@@ -49,14 +49,18 @@ public class PerfilAdminTests(ApiFactory api) : TesteApi(api)
             c => ($"/api/fluig/obras/{c.Obra.Id}/empresas/{c.Empresa.Id}", null)),
         [new("DELETE", "/api/fluig/obras/{obraId}/empresas/{empresaId}")] = new(HttpStatusCode.NoContent,
             c => ($"/api/fluig/obras/{c.Obra.Id}/empresas/{c.EmpresaVinculada.Id}", null)),
+        [new("PUT", "/api/fluig/obras/{obraId}/tipos-documento/{tipoDocumentoId}")] = new(HttpStatusCode.NoContent,
+            c => ($"/api/fluig/obras/{c.Obra.Id}/tipos-documento/{c.TipoObra.Id}", null)),
+        [new("DELETE", "/api/fluig/obras/{obraId}/tipos-documento/{tipoDocumentoId}")] = new(HttpStatusCode.NoContent,
+            c => ($"/api/fluig/obras/{c.Obra.Id}/tipos-documento/{c.TipoObraMarcado.Id}", null)),
         [new("POST", "/api/fluig/empresas")] = new(HttpStatusCode.Created,
             _ => ("/api/fluig/empresas", new { razaoSocial = "Empresa criada no teste de perfil", cnpj = CnpjTeste.Gerar(), emailContato = "perfil@empresa.test" })),
         [new("PUT", "/api/fluig/empresas/{empresaId}")] = new(HttpStatusCode.OK,
             c => ($"/api/fluig/empresas/{c.Empresa.Id}", new { razaoSocial = c.Empresa.RazaoSocial + " editada", cnpj = c.Empresa.Cnpj, emailContato = c.Empresa.EmailContato, ativa = false })),
         [new("POST", "/api/fluig/tipos-documento")] = new(HttpStatusCode.Created,
-            _ => ("/api/fluig/tipos-documento", new { nome = "Tipo criado no teste de perfil", instrucoes = "Envie o documento." })),
+            _ => ("/api/fluig/tipos-documento", new { nome = "Tipo criado no teste de perfil", instrucoes = "Envie o documento.", abrangencia = "GERAL" })),
         [new("PUT", "/api/fluig/tipos-documento/{tipoDocumentoId}")] = new(HttpStatusCode.OK,
-            c => ($"/api/fluig/tipos-documento/{c.Tipo.Id}", new { nome = c.Tipo.Nome + " editado", instrucoes = "Novas instruções", ativo = false })),
+            c => ($"/api/fluig/tipos-documento/{c.Tipo.Id}", new { nome = c.Tipo.Nome + " editado", instrucoes = "Novas instruções", abrangencia = "GERAL", ativo = false })),
         [new("POST", "/api/fluig/envios/{envioId}/aprovar")] = new(HttpStatusCode.OK,
             c => ($"/api/fluig/envios/{c.EnvioAprovar.Id}/aprovar", null)),
         [new("POST", "/api/fluig/envios/{envioId}/rejeitar")] = new(HttpStatusCode.OK,
@@ -108,7 +112,10 @@ public class PerfilAdminTests(ApiFactory api) : TesteApi(api)
         var aprovar = await Semente.EnvioAsync(empresa, tipo);
         var rejeitar = await Semente.EnvioAsync(empresa, tipo2);
         var usuario = await Semente.UsuarioInternoAsync("alvo.perfil", "Alvo Perfil");
-        return new Cenario(obra, empresa, vinculada, tipo, tipo2, aprovar, rejeitar, usuario);
+        var tipoObra = await Semente.TipoPorObraAsync();
+        var tipoObraMarcado = await Semente.TipoPorObraAsync();
+        await Semente.MarcarAsync(obra, tipoObraMarcado);
+        return new Cenario(obra, empresa, vinculada, tipo, tipo2, aprovar, rejeitar, usuario, tipoObra, tipoObraMarcado);
     }
 
     private static HttpRequestMessage Requisicao(Rota rota, string url, object? corpo)
@@ -124,6 +131,7 @@ public class PerfilAdminTests(ApiFactory api) : TesteApi(api)
             SELECT 'obras ' || row_to_json(t)::text AS x FROM obras t
             UNION ALL SELECT 'empresas ' || row_to_json(t)::text FROM empresas t
             UNION ALL SELECT 'obra_empresas ' || row_to_json(t)::text FROM obra_empresas t
+            UNION ALL SELECT 'obra_tipos_documento ' || row_to_json(t)::text FROM obra_tipos_documento t
             UNION ALL SELECT 'tipos_documento ' || row_to_json(t)::text FROM tipos_documento t
             UNION ALL SELECT 'envios_documento ' || row_to_json(t)::text FROM envios_documento t
             UNION ALL SELECT 'convites ' || row_to_json(t)::text FROM convites t
@@ -162,7 +170,7 @@ public class PerfilAdminTests(ApiFactory api) : TesteApi(api)
 
         Assert.Empty(escrita.Except(classificadas));
         Assert.Empty(classificadas.Except(fluig));
-        Assert.Equal(15, ExigemAdmin.Count);
+        Assert.Equal(17, ExigemAdmin.Count);
     }
 
     [Fact]
@@ -244,7 +252,8 @@ public class PerfilAdminTests(ApiFactory api) : TesteApi(api)
         var valores = new Dictionary<string, Guid>
         {
             ["obraId"] = c.Obra.Id,
-            ["empresaId"] = c.Empresa.Id,
+            // Empresa vinculada à obra: as rotas /obras/{obraId}/empresas/{empresaId}/… exigem o vínculo (002).
+            ["empresaId"] = c.EmpresaVinculada.Id,
             ["tipoDocumentoId"] = c.Tipo.Id,
             ["envioId"] = c.EnvioAprovar.Id,
         };
@@ -253,10 +262,27 @@ public class PerfilAdminTests(ApiFactory api) : TesteApi(api)
             .ToList();
         Assert.True(leituras.Count >= 14, $"esperava as rotas GET do contrato, achou {leituras.Count}");
 
+        // 003: as rotas …/periodos só atendem tipos periódicos.
+        var mensal = Periodicidade.Meses(1, 15);
+        var geralPeriodico = await Semente.TipoPeriodicoAsync("Guia do FGTS", mensal);
+        var obraPeriodico = await Semente.TipoPeriodicoAsync("Relatório mensal da obra", mensal, abrangencia: Abrangencia.POR_OBRA);
+        await Semente.MarcarAsync(c.Obra, obraPeriodico);
+
         var falhas = new List<string>();
         foreach (var rota in leituras)
         {
-            var url = Regex.Replace(rota.Padrao, @"\{(\w+)\}", m => valores[m.Groups[1].Value].ToString());
+            // Documento da obra: tipo POR_OBRA marcado (o tipo GERAL dá 404 nessas rotas).
+            var daObra = rota.Padrao.StartsWith("/api/fluig/obras/{obraId}/empresas/", StringComparison.Ordinal);
+            var periodos = rota.Padrao.EndsWith("/periodos", StringComparison.Ordinal);
+            var url = Regex.Replace(rota.Padrao, @"\{(\w+)\}", m => m.Groups[1].Value != "tipoDocumentoId"
+                ? valores[m.Groups[1].Value].ToString()
+                : (daObra, periodos) switch
+                {
+                    (true, true) => obraPeriodico.Id.ToString(),
+                    (true, false) => c.TipoObraMarcado.Id.ToString(),
+                    (false, true) => geralPeriodico.Id.ToString(),
+                    _ => c.Tipo.Id.ToString(),
+                });
             var r = await cliente.GetAsync(url);
             if (r.StatusCode != HttpStatusCode.OK) falhas.Add($"{rota} → {(int)r.StatusCode}");
         }

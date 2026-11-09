@@ -1,5 +1,5 @@
 /**
- * Mocks por perfil (T137): `/me` informa `admin` e as 10 operações `x-requer-admin` do contrato
+ * Mocks por perfil (T137): `/me` informa `admin` e as 12 operações `x-requer-admin` de cadastro e análise do contrato
  * respondem 403 `SEM_PERMISSAO` quando o perfil do mock é comum. Convites e consultas continuam
  * liberados.
  */
@@ -22,7 +22,7 @@ function envioEmAnalise(): string {
   return envio.id;
 }
 
-/** As 10 operações com `x-requer-admin: true` no contrato 1.1.0. */
+/** As 12 operações `x-requer-admin: true` de obras, empresas, tipos e análise (contrato 1.3.0; as de usuários têm teste próprio). */
 function operacoesDeAdmin(): Array<[string, string, unknown]> {
   return [
     ['POST', '/obras', { nome: 'Obra Nova', cidade: 'Aracaju', uf: 'SE' }],
@@ -35,6 +35,9 @@ function operacoesDeAdmin(): Array<[string, string, unknown]> {
     ['PUT', `/tipos-documento/${IDS.tipoAso}`, { nome: 'ASO', ativo: false }],
     ['POST', `/envios/${envioEmAnalise()}/aprovar`, undefined],
     ['POST', `/envios/${envioEmAnalise()}/rejeitar`, { motivo: 'Documento ilegível.' }],
+    // 002: tipos exigidos da obra.
+    ['PUT', `/obras/${IDS.obraFlorDeSal}/tipos-documento/${IDS.tipoOrdemServico}`, undefined],
+    ['DELETE', `/obras/${IDS.obraVistaDoRio}/tipos-documento/${IDS.tipoArt}`, undefined],
   ];
 }
 
@@ -53,7 +56,7 @@ describe('mocks por perfil', () => {
     expect(me.origem).toBe('FLUIG');
   });
 
-  it('com perfil comum as 10 operações de administrador respondem 403 SEM_PERMISSAO sem mudar nada', async () => {
+  it('com perfil comum as 12 operações de administrador respondem 403 SEM_PERMISSAO sem mudar nada', async () => {
     definirPerfilMock('comum');
     const antes = JSON.stringify(db);
     for (const [metodo, caminho, corpo] of operacoesDeAdmin()) {

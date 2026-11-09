@@ -112,6 +112,17 @@
   white-space: nowrap;
 }
 
+/* Botão com cara de link de ação (ex.: "Ver períodos" no meio de um texto). */
+.jn-app button.jn-link-acao {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .jn-app .jn-texto-secundario {
   color: var(--jn-gray-500);
 }

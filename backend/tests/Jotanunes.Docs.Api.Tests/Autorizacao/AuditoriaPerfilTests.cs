@@ -13,7 +13,7 @@ public class AuditoriaPerfilTests(ApiFactory api) : TesteApi(api)
     {
         var token = Tokens.FluigComum(Api);
         var r = await Api.Cliente(token: token).PostAsJsonAsync("/api/fluig/tipos-documento",
-            new { nome = "Tipo secreto do comum", instrucoes = "Instrução secreta do comum" });
+            new { nome = "Tipo secreto do comum", instrucoes = "Instrução secreta do comum", abrangencia = "GERAL" });
         Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode);
 
         var linha = Assert.Single(await Api.NoBancoAsync(db => db.Auditoria.AsNoTracking().ToListAsync()));

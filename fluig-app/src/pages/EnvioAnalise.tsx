@@ -10,14 +10,16 @@ import { AvisoSomenteAdmin } from '../components/AvisoSomenteAdmin';
 import { Botao } from '../components/Botao';
 import { CampoArea } from '../components/Campo';
 import { Carregando, EstadoErro } from '../components/Estados';
+import { HistoricoEnvios } from '../components/HistoricoEnvios';
 import { IconeAbrir, IconeCheck, IconeDocumento, IconeDownload, IconeFechar } from '../components/icons';
 import { Modal, ModalConfirmacao } from '../components/Modal';
-import { SeloSituacao } from '../components/Selo';
+import { SeloComAtraso, SeloSituacao } from '../components/Selo';
 import { TituloPagina } from '../components/TituloPagina';
 import type { Aviso } from '../hooks/useAviso';
 import { formatarCnpj } from '../utils/cnpj';
 import { formatarDataHora, tempoDecorrido } from '../utils/datas';
 import { formatarTamanho } from '../utils/formatos';
+import { formatarDiaIso, prazoDoPeriodo } from '../utils/periodicidade';
 import './EnvioAnalise.css';
 
 const FORMATOS: Record<FormatoArquivo, string> = {
@@ -79,7 +81,12 @@ export function EnvioAnalise() {
     }
   }
 
-  const descricao = `${envio.tipoDocumento.nome} de ${envio.empresa.razaoSocial}`;
+  const periodo = envio.periodo ?? null;
+  /** O contrato não traz o prazo no envio: fim do período + prazo atual do tipo (003). */
+  const prazo = periodo ? prazoDoPeriodo(periodo, envio.tipoDocumento.periodicidade) : null;
+  const descricao = `${envio.tipoDocumento.nome}${periodo ? ` (${periodo.rotulo})` : ''} de ${
+    envio.empresa.razaoSocial
+  }${envio.obra ? ` na obra ${envio.obra.nome}` : ''}`;
 
   async function abrir() {
     setErroArquivo(null);
@@ -111,8 +118,22 @@ export function EnvioAnalise() {
     <>
       <TituloPagina titulo={envio.tipoDocumento.nome} voltar={{ para: '/analise', rotulo: 'Fila de análise' }}>
         <SeloSituacao situacao={envio.status} />
+        {envio.enviadoComAtraso ? <SeloComAtraso /> : null}
+        {periodo ? (
+          <span className="jn-meta jn-envio__periodo">
+            Período: <strong>{periodo.rotulo}</strong>
+            {prazo ? ` · prazo ${formatarDiaIso(prazo)}` : ''}
+          </span>
+        ) : null}
         <span className="jn-meta">
           <Link to={`/empresas/${envio.empresa.id}`}>{envio.empresa.razaoSocial}</Link>
+        </span>
+        <span className="jn-meta jn-envio__contexto">
+          {envio.obra ? (
+            <Link to={`/obras/${envio.obra.id}`}>Obra: {envio.obra.nome}</Link>
+          ) : (
+            'Geral da empresa'
+          )}
         </span>
         <span className="jn-meta">
           Enviado em {formatarDataHora(envio.enviadoEm)} ({tempoDecorrido(envio.enviadoEm)})
@@ -224,10 +245,41 @@ export function EnvioAnalise() {
               </dd>
               <dt>CNPJ</dt>
               <dd className="jn-mono">{formatarCnpj(envio.empresa.cnpj)}</dd>
+              <dt>Obra</dt>
+              <dd>
+                {envio.obra ? (
+                  <>
+                    {envio.obra.nome}{' '}
+                    <span className="jn-texto-secundario">
+                      ({envio.obra.cidade}/{envio.obra.uf})
+                    </span>
+                  </>
+                ) : (
+                  'Geral da empresa (vale em todas as obras)'
+                )}
+              </dd>
+              {periodo ? (
+                <>
+                  <dt>Período</dt>
+                  <dd>
+                    {periodo.rotulo}{' '}
+                    <span className="jn-texto-secundario">
+                      ({formatarDiaIso(periodo.inicio)} a {formatarDiaIso(periodo.fim)})
+                    </span>
+                  </dd>
+                  <dt>Prazo do período</dt>
+                  <dd>
+                    {formatarDiaIso(prazo)}
+                    {envio.enviadoComAtraso ? ' — enviado depois do prazo' : ' — enviado no prazo'}
+                  </dd>
+                </>
+              ) : null}
             </dl>
           </section>
         </div>
       </div>
+
+      <HistoricoDocumento envio={envio} />
 
       <ModalConfirmacao
         aberto={podeDecidir && aprovando}
@@ -264,6 +316,53 @@ export function EnvioAnalise() {
         />
       ) : null}
     </>
+  );
+}
+
+/**
+ * Histórico só deste documento, no contexto certo: geral da empresa ou da obra do envio (US3). Para
+ * documento periódico, só os envios do período deste envio (003).
+ */
+function HistoricoDocumento({ envio }: { envio: EnvioFila }) {
+  const obraId = envio.obra?.id ?? null;
+  const periodo = envio.periodo ?? null;
+  const periodoInicio = periodo?.inicio;
+  const consulta = useConsulta(
+    (sinal) =>
+      obraId
+        ? api.listarHistoricoEnviosEmpresaObra(obraId, envio.empresa.id, envio.tipoDocumento.id, sinal, periodoInicio)
+        : api.listarHistoricoEnvios(envio.empresa.id, envio.tipoDocumento.id, sinal, periodoInicio),
+    [obraId, envio.empresa.id, envio.tipoDocumento.id, envio.status, periodoInicio],
+  );
+
+  return (
+    <section className="jn-secao jn-envio__historico" aria-labelledby="jn-envio-historico">
+      <div className="jn-secao__cabecalho">
+        <div>
+          <h2 className="jn-secao__titulo" id="jn-envio-historico">
+            {periodo ? `Histórico do período ${periodo.rotulo}` : 'Histórico deste documento'}
+          </h2>
+          <p className="jn-secao__descricao">
+            {periodo
+              ? `Envios de ${envio.empresa.razaoSocial} para ${envio.tipoDocumento.nome}${envio.obra ? ` na obra ${envio.obra.nome}` : ''} neste período, do mais recente para o mais antigo.`
+              : envio.obra
+              ? `Envios de ${envio.empresa.razaoSocial} para ${envio.tipoDocumento.nome} na obra ${envio.obra.nome}, do mais recente para o mais antigo.`
+              : `Envios de ${envio.empresa.razaoSocial} para ${envio.tipoDocumento.nome} (geral da empresa), do mais recente para o mais antigo.`}
+          </p>
+        </div>
+      </div>
+      {consulta.carregando && !consulta.dados ? (
+        <Carregando texto="Carregando histórico…" />
+      ) : consulta.erro ? (
+        <EstadoErro erro={consulta.erro} onTentarDeNovo={consulta.recarregar} />
+      ) : (
+        <HistoricoEnvios
+          envios={consulta.dados ?? []}
+          rotulo={periodo ? `Histórico do período ${periodo.rotulo}` : 'Histórico deste documento'}
+          envioAtualId={envio.id}
+        />
+      )}
+    </section>
   );
 }
 

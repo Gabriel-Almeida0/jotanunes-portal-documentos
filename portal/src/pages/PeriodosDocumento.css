@@ -1,0 +1,93 @@
+.jn-periodos__instrucoes {
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-600);
+}
+
+.jn-periodos__lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.jn-periodos__anteriores {
+  border-top: 1px solid var(--jn-gray-100);
+  padding-top: var(--jn-space-4);
+}
+
+.jn-periodos__anteriores > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font: 600 16px/1.4 var(--jn-font);
+  color: var(--jn-red-700);
+}
+
+.jn-periodos__anteriores > summary:focus-visible {
+  outline: none;
+  box-shadow: var(--jn-focus-ring);
+  border-radius: var(--jn-radius-control);
+}
+
+.jn-periodos__anteriores[open] > summary {
+  margin-bottom: var(--jn-space-3);
+}
+
+.jn-periodo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--jn-space-3);
+  min-width: 0;
+  padding: var(--jn-space-4) var(--jn-space-5);
+  border: var(--jn-border-card);
+  border-radius: var(--jn-radius-card);
+  background: var(--jn-white);
+}
+
+.jn-periodo--rejeitado,
+.jn-periodo--atrasado {
+  border-color: var(--jn-danger-fg);
+  box-shadow: inset 4px 0 0 var(--jn-danger-fg);
+}
+
+.jn-periodo__cabeca {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--jn-space-2) var(--jn-space-3);
+}
+
+.jn-periodo__rotulo {
+  font: var(--jn-text-h3);
+  color: var(--jn-gray-900);
+}
+
+.jn-periodo__prazo {
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-600);
+}
+
+.jn-periodo__prazo--vencido {
+  color: var(--jn-danger-fg);
+  font-weight: 500;
+}
+
+.jn-periodo__envio {
+  display: flex;
+  gap: var(--jn-space-3);
+}
+
+.jn-periodo .jn-doc__motivo,
+.jn-periodo .jn-envio {
+  align-self: stretch;
+}
+
+@media (max-width: 420px) {
+  .jn-periodo {
+    padding: var(--jn-space-4);
+  }
+}

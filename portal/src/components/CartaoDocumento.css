@@ -127,3 +127,38 @@
     padding: var(--jn-space-4);
   }
 }
+
+/* Documento periódico (feature 003) */
+.jn-doc__periodicidade {
+  font: var(--jn-text-sm);
+  font-weight: 500;
+  color: var(--jn-gray-600);
+}
+
+.jn-doc__periodos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-1);
+  padding-top: var(--jn-space-4);
+  border-top: 1px solid var(--jn-gray-100);
+}
+
+.jn-doc__resumo {
+  font: 600 15px/1.4 var(--jn-font);
+  color: var(--jn-gray-900);
+}
+
+.jn-doc__proximo {
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-600);
+}
+
+.jn-doc__proximo--atrasado {
+  color: var(--jn-danger-fg);
+  font-weight: 500;
+}
+
+.jn-doc__ver-periodos {
+  align-self: flex-start;
+  text-decoration: none;
+}

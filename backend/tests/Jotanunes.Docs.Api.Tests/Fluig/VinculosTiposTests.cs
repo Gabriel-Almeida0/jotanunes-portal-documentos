@@ -3,7 +3,7 @@ namespace Jotanunes.Docs.Api.Tests.Fluig;
 public class VinculosTiposTests(ApiFactory api) : TesteApi(api)
 {
     [Fact]
-    public async Task Vincular_e_idempotente_e_desvincular()
+    public async Task Vincular_e_idempotente()
     {
         var c = Fluig();
         var obra = await Semente.ObraAsync();
@@ -23,13 +23,10 @@ public class VinculosTiposTests(ApiFactory api) : TesteApi(api)
         Assert.Equal(alfa.Cnpj, primeira.Str("cnpj"));
         Assert.Equal("NAO_CONVIDADA", primeira.Str("situacaoAcesso"));
         Assert.True(primeira.TryGetProperty("vinculadoEm", out _));
-        Assert.Equal(0, primeira.GetProperty("documentos").GetProperty("total").GetInt32());
-
-        Assert.Equal(HttpStatusCode.NoContent, (await c.DeleteAsync($"/api/fluig/obras/{obra.Id}/empresas/{alfa.Id}")).StatusCode);
-        var r404 = await c.DeleteAsync($"/api/fluig/obras/{obra.Id}/empresas/{alfa.Id}");
-        Assert.Equal(HttpStatusCode.NotFound, r404.StatusCode);
-        Assert.Equal("NAO_ENCONTRADO", await r404.CodigoAsync());
-        Assert.Single((await (await c.GetAsync($"/api/fluig/obras/{obra.Id}")).LerAsync()).GetProperty("empresas").EnumerateArray());
+        Assert.Equal(0, primeira.GetProperty("documentosObra").GetProperty("total").GetInt32());
+        Assert.Equal(0, primeira.GetProperty("documentosGerais").GetProperty("total").GetInt32());
+        Assert.Equal(0, primeira.GetProperty("quantidadeEnviosNaObra").GetInt32());
+        // Encerrar/reabrir (antigo "desvincular apaga"): ver VinculoEncerradoTests.
     }
 
     [Fact]
@@ -53,7 +50,7 @@ public class VinculosTiposTests(ApiFactory api) : TesteApi(api)
     }
 
     [Fact]
-    public async Task Contagem_de_documentos_no_detalhe_da_obra()
+    public async Task Contagem_de_documentos_gerais_no_detalhe_da_obra()
     {
         var obra = await Semente.ObraAsync();
         var empresa = await Semente.EmpresaAsync();
@@ -67,7 +64,7 @@ public class VinculosTiposTests(ApiFactory api) : TesteApi(api)
         await Semente.EnvioAsync(empresa, t2, Domain.Envios.StatusEnvio.EM_ANALISE);
         await Semente.EnvioAsync(empresa, t3, Domain.Envios.StatusEnvio.REJEITADO);
 
-        var docs = (await (await Fluig().GetAsync($"/api/fluig/obras/{obra.Id}")).LerAsync()).GetProperty("empresas")[0].GetProperty("documentos");
+        var docs = (await (await Fluig().GetAsync($"/api/fluig/obras/{obra.Id}")).LerAsync()).GetProperty("empresas")[0].GetProperty("documentosGerais");
         Assert.Equal(4, docs.GetProperty("total").GetInt32());
         Assert.Equal(1, docs.GetProperty("aprovados").GetInt32());
         Assert.Equal(1, docs.GetProperty("emAnalise").GetInt32());
@@ -79,7 +76,7 @@ public class VinculosTiposTests(ApiFactory api) : TesteApi(api)
     public async Task Tipos_criar_obter_atualizar_e_listar()
     {
         var c = Fluig();
-        var r = await c.PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "Cartão CNPJ", instrucoes = "Emitido há menos de 30 dias" });
+        var r = await c.PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "Cartão CNPJ", instrucoes = "Emitido há menos de 30 dias", abrangencia = "GERAL" });
         Assert.Equal(HttpStatusCode.Created, r.StatusCode);
         var t = await r.LerAsync();
         Assert.Equal($"/api/fluig/tipos-documento/{t.Id()}", r.Headers.Location!.OriginalString);
@@ -91,15 +88,15 @@ public class VinculosTiposTests(ApiFactory api) : TesteApi(api)
         Assert.Equal("Emitido há menos de 30 dias", (await obtido.LerAsync()).Str("instrucoes"));
         Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync($"/api/fluig/tipos-documento/{Guid.NewGuid()}")).StatusCode);
 
-        var put = await c.PutAsJsonAsync($"/api/fluig/tipos-documento/{t.Id()}", new { nome = "Cartão CNPJ atualizado", instrucoes = (string?)null, ativo = false });
+        var put = await c.PutAsJsonAsync($"/api/fluig/tipos-documento/{t.Id()}", new { nome = "Cartão CNPJ atualizado", instrucoes = (string?)null, abrangencia = "GERAL", ativo = false });
         Assert.Equal(HttpStatusCode.OK, put.StatusCode);
         var atualizado = await put.LerAsync();
         Assert.Equal("Cartão CNPJ atualizado", atualizado.Str("nome"));
         Assert.Equal(JsonValueKind.Null, atualizado.GetProperty("instrucoes").ValueKind);
         Assert.False(atualizado.GetProperty("ativo").GetBoolean());
 
-        await c.PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "PCMSO" });
-        await c.PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "CND Federal" });
+        await c.PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "PCMSO", abrangencia = "GERAL" });
+        await c.PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "CND Federal", abrangencia = "GERAL" });
         var todos = (await (await c.GetAsync("/api/fluig/tipos-documento")).LerAsync()).EnumerateArray().Select(x => x.Str("nome")).ToList();
         Assert.Equal(new[] { "Cartão CNPJ atualizado", "CND Federal", "PCMSO" }, todos);
         Assert.Equal(2, (await (await c.GetAsync("/api/fluig/tipos-documento?ativo=true")).LerAsync()).GetArrayLength());
@@ -110,14 +107,14 @@ public class VinculosTiposTests(ApiFactory api) : TesteApi(api)
     public async Task Tipo_nome_duplicado_sem_diferenciar_maiusculas()
     {
         var c = Fluig();
-        await c.PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "PCMSO" });
-        var r = await c.PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "pcmso" });
+        await c.PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "PCMSO", abrangencia = "GERAL" });
+        var r = await c.PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "pcmso", abrangencia = "GERAL" });
         Assert.Equal(HttpStatusCode.Conflict, r.StatusCode);
         Assert.Equal("NOME_DUPLICADO", await r.CodigoAsync());
         Assert.Equal("Já existe um tipo de documento com este nome.", (await r.LerAsync()).Str("title"));
 
-        var outro = await (await c.PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "NR-35" })).LerAsync();
-        var put = await c.PutAsJsonAsync($"/api/fluig/tipos-documento/{outro.Id()}", new { nome = "Pcmso", ativo = true });
+        var outro = await (await c.PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "NR-35", abrangencia = "GERAL" })).LerAsync();
+        var put = await c.PutAsJsonAsync($"/api/fluig/tipos-documento/{outro.Id()}", new { nome = "Pcmso", abrangencia = "GERAL", ativo = true });
         Assert.Equal(HttpStatusCode.Conflict, put.StatusCode);
         Assert.Equal("NOME_DUPLICADO", await put.CodigoAsync());
     }
@@ -125,7 +122,7 @@ public class VinculosTiposTests(ApiFactory api) : TesteApi(api)
     [Fact]
     public async Task Tipo_invalido_devolve_validacao()
     {
-        var r = await Fluig().PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "ab" });
+        var r = await Fluig().PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "ab", abrangencia = "GERAL" });
         Assert.Equal(HttpStatusCode.BadRequest, r.StatusCode);
         Assert.True((await r.LerAsync()).GetProperty("errors").TryGetProperty("nome", out _));
     }
@@ -136,18 +133,18 @@ public class VinculosTiposTests(ApiFactory api) : TesteApi(api)
         var c = Fluig();
         var e1 = await Semente.EmpresaAsync();
         var e2 = await Semente.EmpresaAsync();
-        var t = await (await c.PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "Cartão CNPJ" })).LerAsync();
+        var t = await (await c.PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "Cartão CNPJ", abrangencia = "GERAL" })).LerAsync();
 
         async Task<JsonElement> Docs(Guid id) => (await (await c.GetAsync($"/api/fluig/empresas/{id}")).LerAsync()).GetProperty("documentos");
         Assert.Equal(1, (await Docs(e1.Id)).GetProperty("pendentes").GetInt32());
 
         // criar tipo novo aumenta pendentes de todas as empresas ativas (FR-015)
-        await c.PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "NR-35" });
+        await c.PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "NR-35", abrangencia = "GERAL" });
         Assert.Equal(2, (await Docs(e1.Id)).GetProperty("pendentes").GetInt32());
         Assert.Equal(2, (await Docs(e2.Id)).GetProperty("total").GetInt32());
 
         // desativar reduz o total
-        await c.PutAsJsonAsync($"/api/fluig/tipos-documento/{t.Id()}", new { nome = "Cartão CNPJ", ativo = false });
+        await c.PutAsJsonAsync($"/api/fluig/tipos-documento/{t.Id()}", new { nome = "Cartão CNPJ", abrangencia = "GERAL", ativo = false });
         var d = await Docs(e1.Id);
         Assert.Equal(1, d.GetProperty("total").GetInt32());
         Assert.Equal(1, d.GetProperty("pendentes").GetInt32());

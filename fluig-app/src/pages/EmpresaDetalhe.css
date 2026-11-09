@@ -66,48 +66,6 @@
   color: var(--jn-danger-fg);
 }
 
-.jn-app .jn-historico {
-  display: flex;
-  flex-direction: column;
-  gap: var(--jn-space-3);
-}
-
-.jn-app .jn-historico__item {
-  display: flex;
-  flex-direction: column;
-  gap: var(--jn-space-2);
-  padding: var(--jn-space-4);
-  border: 1px solid var(--jn-divider);
-  border-left: 3px solid var(--jn-gray-400);
-  border-radius: var(--jn-radius-control);
-}
-
-.jn-app .jn-historico__topo {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--jn-space-2);
-}
-
-.jn-app .jn-historico__arquivo {
-  font-weight: 600;
-  color: var(--jn-gray-900);
-}
-
-.jn-app .jn-historico__analise {
-  font: var(--jn-text-sm);
-}
-
-.jn-app .jn-historico__motivo {
-  font: var(--jn-text-sm);
-  font-weight: 500;
-  padding: var(--jn-space-2) var(--jn-space-3);
-  background: var(--jn-danger-bg);
-  color: var(--jn-danger-fg);
-  border-radius: var(--jn-radius-control);
-}
-
 .jn-app .jn-documentos__desativados {
   margin-top: var(--jn-space-6);
   padding-top: var(--jn-space-4);
@@ -131,4 +89,29 @@
   min-width: 0;
   font-weight: 500;
   color: var(--jn-gray-900);
+}
+
+/* Bloco de uma obra nos documentos da empresa (002). */
+.jn-app .jn-bloco-obra__cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--jn-space-3) var(--jn-space-5);
+  margin-bottom: var(--jn-space-4);
+}
+
+.jn-app .jn-bloco-obra__titulo {
+  font: var(--jn-text-h3);
+  color: var(--jn-gray-900);
+  margin: 0 0 var(--jn-space-1);
+}
+
+.jn-app .jn-bloco-obra--destacada {
+  border-color: var(--jn-red-600);
+  box-shadow: inset 3px 0 0 var(--jn-red-600);
+}
+
+.jn-app .jn-obras-encerradas {
+  margin-top: var(--jn-space-5);
 }

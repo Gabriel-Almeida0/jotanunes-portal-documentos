@@ -7,6 +7,8 @@ import type {
   EmpresaPortal,
   EnvioPortal,
   LoginInput,
+  ObraPortal,
+  PeriodoPortal,
   Problema,
   SessaoPortal,
   TrocaSenhaInput,
@@ -141,10 +143,18 @@ async function requisitarJson<T>(caminho: string, opcoes?: OpcoesRequisicao): Pr
   return (await resposta.json()) as T;
 }
 
-/** Envia um arquivo (multipart, campo `arquivo`) para a URL indicada. */
-export async function enviarArquivo<T>(caminho: string, arquivo: File): Promise<T> {
+/**
+ * Envia um arquivo (multipart, campo `arquivo`) para a URL indicada. `periodoInicio` vai junto
+ * quando o documento é periódico (contrato 1.4.0).
+ */
+export async function enviarArquivo<T>(
+  caminho: string,
+  arquivo: File,
+  periodoInicio?: string | null,
+): Promise<T> {
   const dados = new FormData();
   dados.append('arquivo', arquivo, arquivo.name);
+  if (periodoInicio) dados.append('periodoInicio', periodoInicio);
   return requisitarJson<T>(caminho, { metodo: 'POST', corpo: dados, contexto: 'envio' });
 }
 
@@ -181,6 +191,10 @@ export async function baixarArquivo(caminho: string, nomeSugerido: string): Prom
 
 const segmento = (valor: string) => encodeURIComponent(valor);
 
+/** `?periodoInicio=AAAA-MM-DD` (histórico de um período) ou vazio. */
+const buscaPeriodo = (periodoInicio?: string | null) =>
+  periodoInicio ? `?periodoInicio=${encodeURIComponent(periodoInicio)}` : '';
+
 /** Operações do portal (contrato `openapi.yaml`, tags "Portal - *"). */
 export const api = {
   /** O token do convite é segredo: vai no corpo, nunca na URL (caminho/query acabam em logs). */
@@ -205,13 +219,49 @@ export const api = {
 
   listarDocumentos: () => requisitarJson<DocumentoSituacaoPortal[]>('/api/portal/documentos'),
 
-  listarHistorico: (tipoDocumentoId: string) =>
-    requisitarJson<EnvioPortal[]>(`/api/portal/documentos/${segmento(tipoDocumentoId)}/envios`),
+  listarHistorico: (tipoDocumentoId: string, periodoInicio?: string | null) =>
+    requisitarJson<EnvioPortal[]>(
+      `/api/portal/documentos/${segmento(tipoDocumentoId)}/envios${buscaPeriodo(periodoInicio)}`,
+    ),
 
-  enviarDocumento: (tipoDocumentoId: string, arquivo: File) =>
+  enviarDocumento: (tipoDocumentoId: string, arquivo: File, periodoInicio?: string | null) =>
     enviarArquivo<EnvioPortal>(
       `/api/portal/documentos/${segmento(tipoDocumentoId)}/envios`,
       arquivo,
+      periodoInicio,
+    ),
+
+  /** Períodos do documento geral periódico (mais recente primeiro). */
+  listarPeriodos: (tipoDocumentoId: string) =>
+    requisitarJson<PeriodoPortal[]>(`/api/portal/documentos/${segmento(tipoDocumentoId)}/periodos`),
+
+  /** Obras ativas com vínculo ativo (com pendência primeiro, depois nome). */
+  listarObras: () => requisitarJson<ObraPortal[]>('/api/portal/obras'),
+
+  listarDocumentosObra: (obraId: string) =>
+    requisitarJson<DocumentoSituacaoPortal[]>(`/api/portal/obras/${segmento(obraId)}/documentos`),
+
+  listarHistoricoObra: (obraId: string, tipoDocumentoId: string, periodoInicio?: string | null) =>
+    requisitarJson<EnvioPortal[]>(
+      `/api/portal/obras/${segmento(obraId)}/documentos/${segmento(tipoDocumentoId)}/envios${buscaPeriodo(periodoInicio)}`,
+    ),
+
+  enviarDocumentoObra: (
+    obraId: string,
+    tipoDocumentoId: string,
+    arquivo: File,
+    periodoInicio?: string | null,
+  ) =>
+    enviarArquivo<EnvioPortal>(
+      `/api/portal/obras/${segmento(obraId)}/documentos/${segmento(tipoDocumentoId)}/envios`,
+      arquivo,
+      periodoInicio,
+    ),
+
+  /** Períodos do documento periódico da obra (mais recente primeiro). */
+  listarPeriodosObra: (obraId: string, tipoDocumentoId: string) =>
+    requisitarJson<PeriodoPortal[]>(
+      `/api/portal/obras/${segmento(obraId)}/documentos/${segmento(tipoDocumentoId)}/periodos`,
     ),
 
   baixarArquivoEnvio: (envio: Pick<EnvioPortal, 'id' | 'nomeArquivo'>) =>

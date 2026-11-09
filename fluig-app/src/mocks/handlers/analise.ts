@@ -8,9 +8,11 @@ import {
   paraDocumentoSituacao,
   paraEnvio,
   paraEnvioFila,
-  tiposAtivos,
+  paraPeriodo,
+  periodosDe,
+  tiposGeraisAtivos,
 } from '../dados';
-import { API, exigirAdmin, exigirFluig, latencia, paginar, problema, validacao } from '../util';
+import { API, booleano, exigirAdmin, exigirFluig, latencia, paginar, problema, validacao } from '../util';
 import { pdfExemplo, pngExemplo } from './arquivoExemplo';
 
 const STATUS: StatusEnvio[] = ['EM_ANALISE', 'APROVADO', 'REJEITADO'];
@@ -24,13 +26,22 @@ export const handlersAnalise = [
     const status = (url.searchParams.get('status') ?? 'EM_ANALISE') as StatusEnvio;
     if (!STATUS.includes(status)) return validacao({ status: ['Situação inválida.'] });
     const obraId = url.searchParams.get('obraId');
+    const somenteGerais = booleano(url.searchParams.get('somenteGerais')) === true;
+    if (obraId && somenteGerais) {
+      return validacao({ somenteGerais: ['Escolha uma obra ou "Somente gerais", não os dois.'] });
+    }
     const empresaId = url.searchParams.get('empresaId');
     const tipoId = url.searchParams.get('tipoDocumentoId');
+    const comAtraso = booleano(url.searchParams.get('comAtraso')) === true;
     const lista = db.envios
       .filter((e) => e.status === status)
-      .filter((e) => !obraId || db.vinculos.some((v) => v.obraId === obraId && v.empresaId === e.empresaId))
+      // 002: `obraId` = envios desta obra; `somenteGerais` = envios sem obra.
+      .filter((e) => !obraId || e.obraId === obraId)
+      .filter((e) => !somenteGerais || e.obraId === null)
       .filter((e) => !empresaId || e.empresaId === empresaId)
       .filter((e) => !tipoId || e.tipoDocumentoId === tipoId)
+      // 003: envios feitos depois do prazo do período.
+      .filter((e) => !comAtraso || e.enviadoComAtraso)
       .sort((a, b) =>
         status === 'EM_ANALISE'
           ? a.enviadoEm.localeCompare(b.enviadoEm)
@@ -110,7 +121,8 @@ export const handlersAnalise = [
     if (negado) return negado;
     const empresa = db.empresas.find((e) => e.id === params.empresaId);
     if (!empresa) return problema('NAO_ENCONTRADO');
-    return HttpResponse.json(tiposAtivos().map((t) => paraDocumentoSituacao(empresa.id, t)));
+    // Só documentos gerais (002).
+    return HttpResponse.json(tiposGeraisAtivos().map((t) => paraDocumentoSituacao(empresa.id, t)));
   }),
 
   http.get(`${API}/empresas/:empresaId/documentos/:tipoId/envios`, async ({ request, params }) => {
@@ -119,7 +131,22 @@ export const handlersAnalise = [
     if (negado) return negado;
     const empresa = db.empresas.find((e) => e.id === params.empresaId);
     const tipo = db.tipos.find((t) => t.id === params.tipoId);
-    if (!empresa || !tipo) return problema('NAO_ENCONTRADO');
-    return HttpResponse.json(enviosDe(empresa.id, tipo.id).map(paraEnvio));
+    if (!empresa || !tipo || tipo.abrangencia !== 'GERAL') return problema('NAO_ENCONTRADO');
+    const periodoInicio = new URL(request.url).searchParams.get('periodoInicio');
+    const envios = enviosDe(empresa.id, tipo.id, null).filter((e) => !periodoInicio || e.periodoInicio === periodoInicio);
+    return HttpResponse.json(envios.map(paraEnvio));
+  }),
+
+  // 003: períodos do documento geral periódico (mais recente primeiro).
+  http.get(`${API}/empresas/:empresaId/documentos/:tipoId/periodos`, async ({ request, params }) => {
+    await latencia();
+    const negado = exigirFluig(request);
+    if (negado) return negado;
+    const empresa = db.empresas.find((e) => e.id === params.empresaId);
+    const tipo = db.tipos.find((t) => t.id === params.tipoId);
+    if (!empresa || !tipo || tipo.abrangencia !== 'GERAL' || tipo.periodicidade.unidade === 'UNICA') {
+      return problema('NAO_ENCONTRADO');
+    }
+    return HttpResponse.json(periodosDe(empresa.id, tipo, null).map(paraPeriodo));
   }),
 ];

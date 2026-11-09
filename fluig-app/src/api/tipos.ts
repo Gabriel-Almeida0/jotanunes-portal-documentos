@@ -15,6 +15,7 @@ export type SituacaoConvite = S['SituacaoConvite'];
 export type StatusEnvio = S['StatusEnvio'];
 export type SituacaoDocumento = S['SituacaoDocumento'];
 export type FormatoArquivo = S['FormatoArquivo'];
+export type Abrangencia = S['Abrangencia'];
 
 export type UsuarioFluig = S['UsuarioFluig'];
 export type OrigemSessao = S['OrigemSessao'];
@@ -32,6 +33,9 @@ export type ObraResumo = S['ObraResumo'];
 export type ObraDetalhe = S['ObraDetalhe'];
 export type ObraRef = S['ObraRef'];
 export type PaginaObras = S['PaginaObras'];
+export type TipoExigidoObra = S['TipoExigidoObra'];
+export type VinculoEncerrado = S['VinculoEncerrado'];
+export type ObraNaEmpresa = S['ObraNaEmpresa'];
 
 export type EmpresaInput = S['EmpresaInput'];
 export type EmpresaAtualizacao = S['EmpresaAtualizacao'];
@@ -48,6 +52,12 @@ export type TipoDocumentoInput = S['TipoDocumentoInput'];
 export type TipoDocumentoAtualizacao = S['TipoDocumentoAtualizacao'];
 export type TipoDocumento = S['TipoDocumento'];
 export type TipoDocumentoRef = S['TipoDocumentoRef'];
+export type UnidadePeriodicidade = S['UnidadePeriodicidade'];
+export type Periodicidade = S['Periodicidade'];
+export type PeriodoRef = S['PeriodoRef'];
+export type PeriodoComPrazo = S['PeriodoComPrazo'];
+export type Periodo = S['Periodo'];
+export type ResumoPeriodos = S['ResumoPeriodos'];
 
 export type Envio = S['Envio'];
 export type EnvioFila = S['EnvioFila'];

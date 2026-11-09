@@ -230,6 +230,7 @@ describe('Acesso', () => {
     await entrar(user, EMPRESA_ALFA.cnpj, EMPRESA_ALFA.senha);
     expect(await screen.findByRole('heading', { name: 'Meus documentos' })).toBeInTheDocument();
     expect(rotaAtual()).toBe('/documentos');
+    expect(await screen.findByRole('heading', { name: 'Suas obras' })).toBeInTheDocument();
     expect(banco.empresas[1].tentativasFalhas).toBe(0);
   });
 

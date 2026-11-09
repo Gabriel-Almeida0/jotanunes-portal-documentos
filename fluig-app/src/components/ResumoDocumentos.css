@@ -33,3 +33,9 @@
   font-weight: 400;
   color: var(--jn-gray-500);
 }
+
+.jn-app .jn-resumo-docs__atrasados {
+  font: var(--jn-text-xs);
+  font-weight: 600;
+  color: var(--jn-danger-fg);
+}

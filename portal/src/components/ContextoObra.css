@@ -1,0 +1,29 @@
+.jn-contexto-obra {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--jn-space-2);
+  padding: var(--jn-space-2) var(--jn-space-4);
+  border: 1px solid var(--jn-gray-400);
+  border-radius: var(--jn-radius-control);
+  background: var(--jn-gray-50);
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-800);
+  overflow-wrap: anywhere;
+}
+
+.jn-contexto-obra strong {
+  font-weight: 600;
+  color: var(--jn-gray-900);
+}
+
+.jn-contexto-obra__pin {
+  flex: none;
+  color: var(--jn-red-700);
+}
+
+.jn-contexto-obra__local {
+  color: var(--jn-gray-600);
+}

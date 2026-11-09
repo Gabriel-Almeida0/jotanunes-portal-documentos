@@ -46,6 +46,7 @@ public static class DependencyInjection
         services.AddScoped<ITipoDocumentoRepositorio, TipoDocumentoRepositorio>();
         services.AddScoped<IConviteRepositorio, ConviteRepositorio>();
         services.AddScoped<IEnvioRepositorio, EnvioRepositorio>();
+        services.AddScoped<CalculoPeriodicos>();
         services.AddScoped<IConsultaDocumentos, ConsultaDocumentosEf>();
         services.AddScoped<IRegistroAuditoria, RegistroAuditoriaEf>();
 

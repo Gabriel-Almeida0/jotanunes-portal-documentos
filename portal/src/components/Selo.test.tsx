@@ -15,4 +15,17 @@ describe('Selo', () => {
     // O ícone é decorativo: a informação não depende da cor nem do ícone.
     expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
+
+  it('atrasado sem envio mostra só "Atrasado" (texto e ícone)', () => {
+    const { container } = render(<Selo situacao="PENDENTE_ENVIO" atrasado />);
+    expect(screen.getByText('Atrasado')).toBeInTheDocument();
+    expect(screen.queryByText('Pendente de envio')).not.toBeInTheDocument();
+    expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('rejeitado e atrasado mostra os dois selos', () => {
+    render(<Selo situacao="REJEITADO" atrasado />);
+    expect(screen.getByText('Rejeitado')).toBeInTheDocument();
+    expect(screen.getByText('Atrasado')).toBeInTheDocument();
+  });
 });

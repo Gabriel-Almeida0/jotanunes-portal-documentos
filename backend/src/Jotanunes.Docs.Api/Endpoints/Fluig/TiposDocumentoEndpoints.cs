@@ -8,8 +8,8 @@ public static class TiposDocumentoEndpoints
 {
     public static RouteGroupBuilder MapTiposDocumento(this RouteGroupBuilder g)
     {
-        g.MapGet("/tipos-documento", async (bool? ativo, ListarTipos uc, CancellationToken ct) =>
-            Results.Ok(await uc.ExecutarAsync(ativo, ct))).WithName("fluigListarTiposDocumento");
+        g.MapGet("/tipos-documento", async (bool? ativo, string? abrangencia, bool? periodico, ListarTipos uc, CancellationToken ct) =>
+            Results.Ok(await uc.ExecutarAsync(ativo, abrangencia, periodico, ct))).WithName("fluigListarTiposDocumento");
 
         g.MapPost("/tipos-documento", async (TipoDocumentoInput entrada, CriarTipo uc, CancellationToken ct) =>
         {

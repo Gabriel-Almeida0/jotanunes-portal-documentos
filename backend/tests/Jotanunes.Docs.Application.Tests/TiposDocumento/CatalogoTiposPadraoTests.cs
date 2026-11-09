@@ -64,6 +64,7 @@ public class CatalogoTiposPadraoTests
         Assert.All(f.Repositorio.Salvos, t =>
         {
             Assert.True(t.Ativo);
+            Assert.Equal(Abrangencia.GERAL, t.Abrangencia); // 002: catálogo padrão nasce GERAL
             Assert.Equal("sistema", t.CriadoPorLogin);
             Assert.Equal(Agora, t.CriadoEm);
         });
@@ -142,10 +143,13 @@ public class CatalogoTiposPadraoTests
 
         public void Adicionar(TipoDocumento tipo) => Pendentes.Add(tipo);
 
-        public Task<IReadOnlyList<TipoDocumento>> ListarAsync(bool? ativo, CancellationToken ct = default) =>
-            Task.FromResult<IReadOnlyList<TipoDocumento>>(Salvos.Where(t => ativo is null || t.Ativo == ativo).ToList());
+        public Task<IReadOnlyList<TipoDocumento>> ListarAsync(bool? ativo, Abrangencia? abrangencia = null, bool? periodico = null, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<TipoDocumento>>(Salvos
+                .Where(t => (ativo is null || t.Ativo == ativo) && (abrangencia is null || t.Abrangencia == abrangencia)).ToList());
 
         public Task<bool> ExisteAlgumAsync(CancellationToken ct = default) => Task.FromResult(Salvos.Count > 0);
+
+        public Task<bool> TemEnviosAsync(Guid tipoDocumentoId, CancellationToken ct = default) => Task.FromResult(false);
     }
 
     private sealed class UnidadeTrabalhoFake(RepositorioFake repositorio) : IUnidadeTrabalho

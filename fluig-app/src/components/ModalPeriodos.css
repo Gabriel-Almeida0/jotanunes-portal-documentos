@@ -1,0 +1,61 @@
+.jn-app .jn-periodos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.jn-app .jn-periodos__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-1);
+  padding: var(--jn-space-3) var(--jn-space-4);
+  border: 1px solid var(--jn-divider);
+  border-left: 3px solid var(--jn-gray-400);
+  border-radius: var(--jn-radius-control);
+}
+
+/* A cor reforça, mas o selo "Atrasado" é que informa (status sempre com texto). */
+.jn-app .jn-periodos__item--atrasado {
+  border-left-color: var(--jn-danger-fg);
+}
+
+.jn-app .jn-periodos__topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--jn-space-2);
+}
+
+.jn-app .jn-periodos__rotulo {
+  font: var(--jn-text-h3);
+  color: var(--jn-gray-900);
+}
+
+.jn-app .jn-periodos__envio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-1);
+  font: var(--jn-text-sm);
+}
+
+.jn-app .jn-periodos__envio p {
+  margin: 0;
+}
+
+.jn-app .jn-periodos__arquivo {
+  font-weight: 600;
+  color: var(--jn-gray-900);
+  overflow-wrap: anywhere;
+}
+
+.jn-app .jn-periodos__motivo {
+  color: var(--jn-danger-fg);
+}
+
+.jn-app .jn-periodos__anteriores {
+  margin-top: var(--jn-space-4);
+}

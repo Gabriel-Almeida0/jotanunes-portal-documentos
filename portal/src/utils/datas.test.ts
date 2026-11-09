@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { formatarDataHora, formatarHora, formatarTamanho } from './datas';
+import { formatarData, formatarDataHora, formatarHora, formatarTamanho } from './datas';
 
 describe('datas (America/Sao_Paulo)', () => {
   it('formata data e hora no fuso de Brasília', () => {
     expect(formatarDataHora('2026-09-28T17:32:00Z')).toBe('28/09/2026 às 14:32');
+  });
+
+  it('formata data sem hora do contrato sem mudar de dia', () => {
+    expect(formatarData('2026-11-15')).toBe('15/11/2026');
   });
 
   it('formata só a hora', () => {

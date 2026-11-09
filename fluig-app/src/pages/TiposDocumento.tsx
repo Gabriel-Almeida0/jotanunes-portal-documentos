@@ -1,30 +1,31 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ErroApi, ehSemPermissao, mensagemDeErro } from '../api/client';
+import { ehSemPermissao, mensagemDeErro } from '../api/client';
 import { api } from '../api/fluig';
-import type { TipoDocumento } from '../api/tipos';
+import type { Abrangencia, TipoDocumento } from '../api/tipos';
 import { useConsulta } from '../api/useConsulta';
-import { Alerta } from '../components/Alerta';
 import { AvisoPagina } from '../components/AvisoPagina';
 import { AvisoSomenteAdmin } from '../components/AvisoSomenteAdmin';
 import { Botao } from '../components/Botao';
-import { Campo, CampoArea, CampoSelecao } from '../components/Campo';
+import { CampoSelecao } from '../components/Campo';
 import { Carregando, EstadoErro, EstadoVazio } from '../components/Estados';
 import { Filtros } from '../components/Filtros';
+import { FormularioTipo } from '../components/FormularioTipo';
 import { IconeLapis, IconeMais } from '../components/icons';
-import { Modal, ModalConfirmacao } from '../components/Modal';
-import { SeloAtivo } from '../components/Selo';
+import { ModalConfirmacao } from '../components/Modal';
+import { SeloAbrangencia, SeloAtivo } from '../components/Selo';
 import { SomenteAdmin } from '../components/SomenteAdmin';
 import { Tabela } from '../components/Tabela';
 import { TituloPagina } from '../components/TituloPagina';
 import { useEhAdmin } from '../auth/contexto';
 import { useAviso } from '../hooks/useAviso';
 import { formatarData } from '../utils/datas';
+import { ehPeriodico, periodicidadeDeEntrada, textoPeriodicidade } from '../utils/periodicidade';
 import './TiposDocumento.css';
 
 type FiltroSituacao = 'todos' | 'ativos' | 'inativos';
-
-const LIMITE_INSTRUCOES = 1000;
+type FiltroAbrangencia = 'todas' | Abrangencia;
+type FiltroPeriodicidade = 'todas' | 'unicos' | 'periodicos';
 
 function resumir(texto: string | null | undefined, max = 110): string {
   if (!texto) return '';
@@ -34,24 +35,44 @@ function resumir(texto: string | null | undefined, max = 110): string {
 export function TiposDocumento() {
   const [params, setParams] = useSearchParams();
   const situacao = (params.get('situacao') as FiltroSituacao | null) ?? 'todos';
+  const abrangenciaParam = params.get('abrangencia');
+  const abrangencia: FiltroAbrangencia =
+    abrangenciaParam === 'GERAL' || abrangenciaParam === 'POR_OBRA' ? abrangenciaParam : 'todas';
   const [rascunho, setRascunho] = useState<FiltroSituacao>(situacao);
+  const [rascunhoAbrangencia, setRascunhoAbrangencia] = useState<FiltroAbrangencia>(abrangencia);
+  const periodicidadeParam = params.get('periodicidade');
+  const periodicidade: FiltroPeriodicidade =
+    periodicidadeParam === 'unicos' || periodicidadeParam === 'periodicos' ? periodicidadeParam : 'todas';
+  const [rascunhoPeriodicidade, setRascunhoPeriodicidade] = useState<FiltroPeriodicidade>(periodicidade);
   const [aviso, mostrarAviso] = useAviso();
   const [editando, setEditando] = useState<TipoDocumento | 'novo' | null>(null);
   const [alternando, setAlternando] = useState<TipoDocumento | null>(null);
   const ehAdmin = useEhAdmin();
 
   const ativo = situacao === 'ativos' ? true : situacao === 'inativos' ? false : undefined;
-  const consulta = useConsulta((sinal) => api.listarTipos({ ativo }, sinal), [ativo]);
+  const filtroAbrangencia = abrangencia === 'todas' ? undefined : abrangencia;
+  const periodico = periodicidade === 'periodicos' ? true : periodicidade === 'unicos' ? false : undefined;
+  const consulta = useConsulta(
+    (sinal) => api.listarTipos({ ativo, abrangencia: filtroAbrangencia, periodico }, sinal),
+    [ativo, filtroAbrangencia, periodico],
+  );
+  const filtrado = situacao !== 'todos' || abrangencia !== 'todas' || periodicidade !== 'todas';
 
   function pesquisar() {
     const novo = new URLSearchParams(params);
     if (rascunho === 'todos') novo.delete('situacao');
     else novo.set('situacao', rascunho);
+    if (rascunhoAbrangencia === 'todas') novo.delete('abrangencia');
+    else novo.set('abrangencia', rascunhoAbrangencia);
+    if (rascunhoPeriodicidade === 'todas') novo.delete('periodicidade');
+    else novo.set('periodicidade', rascunhoPeriodicidade);
     setParams(novo);
   }
 
   function limpar() {
     setRascunho('todos');
+    setRascunhoAbrangencia('todas');
+    setRascunhoPeriodicidade('todas');
     setParams(new URLSearchParams());
   }
 
@@ -59,9 +80,11 @@ export function TiposDocumento() {
     setEditando(null);
     mostrarAviso({
       tom: 'sucesso',
-      texto: novo
-        ? 'Tipo de documento cadastrado. Ele já passa a ser exigido de todas as empresas ativas.'
-        : `Alterações em "${tipo.nome}" salvas.`,
+      texto: !novo
+        ? `Alterações em "${tipo.nome}" salvas.`
+        : tipo.abrangencia === 'GERAL'
+          ? 'Tipo de documento cadastrado. Ele já passa a ser exigido de todas as empresas ativas.'
+          : 'Tipo de documento cadastrado. Marque-o nas obras que o exigem, na aba "Documentos exigidos" de cada obra.',
     });
     consulta.recarregar();
   }
@@ -79,7 +102,7 @@ export function TiposDocumento() {
     <>
       <TituloPagina
         titulo="Tipos de documento"
-        descricao="Os documentos que a Jotanunes exige. Todo tipo ativo é pedido de todas as empresas ativas."
+        descricao="Os documentos que a Jotanunes exige. Tipos gerais são pedidos de todas as empresas ativas; tipos por obra, só nas obras que os marcarem."
         acoes={
           <SomenteAdmin>
             <Botao icone={<IconeMais tamanho={18} />} onClick={() => setEditando('novo')}>
@@ -91,7 +114,7 @@ export function TiposDocumento() {
 
       <AvisoSomenteAdmin />
 
-      <Filtros titulo="Encontre o documento" onPesquisar={pesquisar} onLimpar={situacao !== 'todos' ? limpar : undefined}>
+      <Filtros titulo="Encontre o documento" onPesquisar={pesquisar} onLimpar={filtrado ? limpar : undefined}>
         <CampoSelecao
           rotulo="Situação"
           value={rascunho}
@@ -100,6 +123,24 @@ export function TiposDocumento() {
           <option value="todos">Todos</option>
           <option value="ativos">Ativos</option>
           <option value="inativos">Inativos</option>
+        </CampoSelecao>
+        <CampoSelecao
+          rotulo="Abrangência"
+          value={rascunhoAbrangencia}
+          onChange={(e) => setRascunhoAbrangencia(e.target.value as FiltroAbrangencia)}
+        >
+          <option value="todas">Todas</option>
+          <option value="GERAL">Geral da empresa</option>
+          <option value="POR_OBRA">Por obra</option>
+        </CampoSelecao>
+        <CampoSelecao
+          rotulo="Periodicidade"
+          value={rascunhoPeriodicidade}
+          onChange={(e) => setRascunhoPeriodicidade(e.target.value as FiltroPeriodicidade)}
+        >
+          <option value="todas">Todas</option>
+          <option value="unicos">Únicos</option>
+          <option value="periodicos">Periódicos</option>
         </CampoSelecao>
       </Filtros>
 
@@ -110,7 +151,7 @@ export function TiposDocumento() {
       ) : consulta.erro ? (
         <EstadoErro erro={consulta.erro} onTentarDeNovo={consulta.recarregar} />
       ) : tipos.length === 0 ? (
-        situacao === 'todos' ? (
+        !filtrado ? (
           <EstadoVazio
             titulo="Nenhum tipo de documento cadastrado."
             texto={
@@ -134,6 +175,8 @@ export function TiposDocumento() {
           <thead>
             <tr>
               <th scope="col">Documento</th>
+              <th scope="col">Abrangência</th>
+              <th scope="col">Periodicidade</th>
               <th scope="col">Situação</th>
               <th scope="col">Cadastrado em</th>
               {ehAdmin ? (
@@ -149,6 +192,14 @@ export function TiposDocumento() {
                 <td className="jn-tipos__celula-nome">
                   <span className="jn-tabela__principal">{t.nome}</span>
                   <span className="jn-tabela__sub">{resumir(t.instrucoes) || 'Sem instruções para a empresa.'}</span>
+                </td>
+                <td>
+                  <SeloAbrangencia abrangencia={t.abrangencia} />
+                </td>
+                <td>
+                  <span className={ehPeriodico(t.periodicidade) ? undefined : 'jn-texto-secundario'}>
+                    {textoPeriodicidade(t.periodicidade)}
+                  </span>
                 </td>
                 <td>
                   <SeloAtivo ativo={t.ativo} />
@@ -209,98 +260,6 @@ export function TiposDocumento() {
   );
 }
 
-function FormularioTipo({
-  tipo,
-  onFechar,
-  onSalvo,
-  onSemPermissao,
-}: {
-  tipo: TipoDocumento | null;
-  onFechar: () => void;
-  onSalvo: (tipo: TipoDocumento, novo: boolean) => void;
-  onSemPermissao: (mensagem: string) => void;
-}) {
-  const [nome, setNome] = useState(tipo?.nome ?? '');
-  const [instrucoes, setInstrucoes] = useState(tipo?.instrucoes ?? '');
-  const [erros, setErros] = useState<Record<string, string | undefined>>({});
-  const [erroGeral, setErroGeral] = useState<string | null>(null);
-  const [salvando, setSalvando] = useState(false);
-
-  async function salvar(e: FormEvent) {
-    e.preventDefault();
-    const nomeLimpo = nome.trim();
-    const novosErros: Record<string, string> = {};
-    if (nomeLimpo.length < 3 || nomeLimpo.length > 120) novosErros.nome = 'Informe o nome (de 3 a 120 caracteres).';
-    if (instrucoes.length > LIMITE_INSTRUCOES) novosErros.instrucoes = 'As instruções podem ter até 1000 caracteres.';
-    setErros(novosErros);
-    setErroGeral(null);
-    if (Object.keys(novosErros).length) return;
-
-    setSalvando(true);
-    try {
-      const dados = { nome: nomeLimpo, instrucoes: instrucoes.trim() || null };
-      const salvo = tipo ? await api.atualizarTipo(tipo.id, { ...dados, ativo: tipo.ativo }) : await api.criarTipo(dados);
-      onSalvo(salvo, !tipo);
-    } catch (erro) {
-      if (ehSemPermissao(erro)) {
-        onSemPermissao(erro.title);
-      } else if (erro instanceof ErroApi && erro.code === 'NOME_DUPLICADO') {
-        setErros({ nome: erro.title });
-      } else if (erro instanceof ErroApi && erro.code === 'VALIDACAO') {
-        setErros({ nome: erro.erroDoCampo('nome'), instrucoes: erro.erroDoCampo('instrucoes') });
-        setErroGeral(erro.title);
-      } else {
-        setErroGeral(mensagemDeErro(erro));
-      }
-    } finally {
-      setSalvando(false);
-    }
-  }
-
-  return (
-    <Modal
-      aberto
-      titulo={tipo ? 'Editar tipo de documento' : 'Novo tipo de documento'}
-      onFechar={onFechar}
-      bloqueado={salvando}
-      rodape={
-        <>
-          <Botao variante="secundario" onClick={onFechar} disabled={salvando}>
-            Cancelar
-          </Botao>
-          <Botao type="submit" form="jn-form-tipo" carregando={salvando} textoCarregando="Salvando…">
-            Salvar
-          </Botao>
-        </>
-      }
-    >
-      <form id="jn-form-tipo" className="jn-pilha" onSubmit={salvar} noValidate>
-        {erroGeral ? <Alerta tom="erro">{erroGeral}</Alerta> : null}
-        <Campo
-          rotulo="Nome"
-          obrigatorio
-          maxLength={120}
-          value={nome}
-          onChange={(e) => setNome(e.target.value)}
-          erro={erros.nome}
-          placeholder="Ex.: Cartão CNPJ"
-          complemento={`${nome.length}/120`}
-        />
-        <CampoArea
-          rotulo="Instruções para a empresa"
-          value={instrucoes}
-          onChange={(e) => setInstrucoes(e.target.value)}
-          erro={erros.instrucoes}
-          maxLength={LIMITE_INSTRUCOES}
-          ajuda="Aparece para a empresa junto do documento. Diga o que enviar e como."
-          complemento={`${instrucoes.length}/${LIMITE_INSTRUCOES}`}
-          rows={5}
-        />
-      </form>
-    </Modal>
-  );
-}
-
 function ConfirmarAlternancia({
   tipo,
   onFechar,
@@ -323,6 +282,9 @@ function ConfirmarAlternancia({
       const atualizado = await api.atualizarTipo(tipo.id, {
         nome: tipo.nome,
         instrucoes: tipo.instrucoes ?? null,
+        abrangencia: tipo.abrangencia,
+        // Omitida = UNICA (contrato): reenvia a atual para não perder a periodicidade.
+        periodicidade: periodicidadeDeEntrada(tipo.periodicidade),
         ativo: !tipo.ativo,
       });
       onConcluido(atualizado);
@@ -342,8 +304,16 @@ function ConfirmarAlternancia({
       mensagem={
         desativar ? (
           <p>
-            <strong>{tipo?.nome}</strong>. Este tipo deixa de ser exigido das empresas. Os envios já feitos continuam
-            no histórico.
+            <strong>{tipo?.nome}</strong>.{' '}
+            {tipo?.abrangencia === 'POR_OBRA'
+              ? 'Este tipo deixa de ser exigido das empresas em todas as obras que o marcaram (as marcações ficam guardadas).'
+              : 'Este tipo deixa de ser exigido das empresas.'}{' '}
+            Os envios já feitos continuam no histórico.
+          </p>
+        ) : tipo?.abrangencia === 'POR_OBRA' ? (
+          <p>
+            <strong>{tipo?.nome}</strong> volta a ser exigido nas obras que o marcaram e aparece como “Pendente de
+            envio” para as empresas dessas obras que ainda não enviaram.
           </p>
         ) : (
           <p>

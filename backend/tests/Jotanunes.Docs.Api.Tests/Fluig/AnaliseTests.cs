@@ -30,7 +30,8 @@ public class AnaliseTests(ApiFactory api) : TesteApi(api)
         Assert.Equal("EM_ANALISE", item.Str("status"));
 
         async Task<Guid[]> Ids(string q) => (await (await c.GetAsync("/api/fluig/envios?" + q)).LerAsync()).GetProperty("itens").EnumerateArray().Select(i => i.Id()).ToArray();
-        Assert.Equal(new[] { e1.Id, e3.Id }, await Ids($"obraId={obra.Id}"));
+        // 002: obraId = envios DESTA obra (envios_documento.obra_id), não mais "empresas vinculadas"; aqui todos são gerais.
+        Assert.Empty(await Ids($"obraId={obra.Id}"));
         Assert.Equal(new[] { e2.Id }, await Ids($"empresaId={beta.Id}"));
         Assert.Equal(new[] { e3.Id }, await Ids($"tipoDocumentoId={t2.Id}"));
         Assert.Equal(new[] { e2.Id }, await Ids("pagina=2&tamanhoPagina=1"));
@@ -201,7 +202,7 @@ public class AnaliseTests(ApiFactory api) : TesteApi(api)
     {
         var tipo = await Semente.TipoAsync("Tipo que será desativado");
         var envio = await Semente.EnvioAsync(await Semente.EmpresaAsync(), tipo);
-        await Fluig().PutAsJsonAsync($"/api/fluig/tipos-documento/{tipo.Id}", new { nome = tipo.Nome, ativo = false });
+        await Fluig().PutAsJsonAsync($"/api/fluig/tipos-documento/{tipo.Id}", new { nome = tipo.Nome, abrangencia = "GERAL", ativo = false });
         Assert.Equal(HttpStatusCode.OK, (await Fluig().PostAsync($"/api/fluig/envios/{envio.Id}/aprovar", null)).StatusCode);
     }
 
@@ -231,7 +232,7 @@ public class AnaliseTests(ApiFactory api) : TesteApi(api)
         Assert.Equal("Documento ilegível", hist[1].Str("motivoRejeicao"));
         Assert.Equal("analista", hist[1].GetProperty("analisadoPor").Str("login"));
 
-        await c.PutAsJsonAsync($"/api/fluig/tipos-documento/{cartao.Id}", new { nome = cartao.Nome, ativo = false });
+        await c.PutAsJsonAsync($"/api/fluig/tipos-documento/{cartao.Id}", new { nome = cartao.Nome, abrangencia = "GERAL", ativo = false });
         Assert.Equal(2, (await (await c.GetAsync($"/api/fluig/empresas/{empresa.Id}/documentos/{cartao.Id}/envios")).LerAsync()).GetArrayLength());
         Assert.Single((await (await c.GetAsync($"/api/fluig/empresas/{empresa.Id}/documentos")).LerAsync()).EnumerateArray());
 

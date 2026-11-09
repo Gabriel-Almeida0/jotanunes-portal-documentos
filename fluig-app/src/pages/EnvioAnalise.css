@@ -61,3 +61,7 @@
   border-radius: var(--jn-radius-control);
   font: var(--jn-text-sm);
 }
+
+.jn-app .jn-envio__historico {
+  margin-top: var(--jn-space-6);
+}

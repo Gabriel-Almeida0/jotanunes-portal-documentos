@@ -33,6 +33,7 @@ describe('403 SEM_PERMISSAO', () => {
     await usuario.click(screen.getByRole('button', { name: 'Novo tipo de documento' }));
     const dialogo = screen.getByRole('dialog', { name: 'Novo tipo de documento' });
     await usuario.type(within(dialogo).getByLabelText(/Nome/), 'NR-35 — Trabalho em altura');
+    await usuario.click(within(dialogo).getByRole('radio', { name: /Geral da empresa/ }));
     await usuario.click(within(dialogo).getByRole('button', { name: 'Salvar' }));
 
     await mensagemNaTela();
@@ -80,7 +81,7 @@ describe('403 SEM_PERMISSAO', () => {
 
     await mensagemNaTela();
     expect(local()).toBe(`/analise/${IDS.envioAlfaPcmso}`);
-    expect(screen.getByText('PCMSO 2026 - Alfa Engenharia.pdf')).toBeInTheDocument();
+    expect(screen.getAllByText('PCMSO 2026 - Alfa Engenharia.pdf').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Em análise').length).toBeGreaterThan(0);
   });
 });

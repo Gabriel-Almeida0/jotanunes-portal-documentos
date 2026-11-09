@@ -113,7 +113,7 @@ organiza esse ciclo em duas partes:
   depois pela tela. **VALIDADA**.
 - Q: Os documentos são por empresa ou por empresa + obra? → A: Uma obra tem várias empresas e os
   documentos são **por empresa** (um envio vale para todas as obras da empresa). **VALIDADA** (fecha
-  a 2ª pergunta da sessão anterior).
+  a 2ª pergunta da sessão anterior). **Substituída em 2026-10-26 pela feature 002** ([documentos por obra](../002-documentos-por-obra/spec.md)): tipos passam a ter abrangência *Geral da empresa* (esta regra) ou *Por obra* (cada obra escolhe os tipos exigidos).
 
 ### Session 2026-09-29 (tarde) — login próprio da área Jotanunes
 
@@ -545,7 +545,8 @@ recusa sem alterar nada; conferir que a senha não aparece no log da aplicação
 - Tipo de documento criado depois que as empresas já estão ativas: passa a aparecer como
   "Pendente de envio" para todas as empresas ativas.
 - Empresa desvinculada de todas as obras: continua podendo acessar o portal e enviar documentos
-  (o vínculo é informativo para a Jotanunes).
+  (o vínculo é informativo para a Jotanunes). **Desde a 002**: vale para os documentos gerais; os
+  documentos por obra exigem vínculo ativo, e desvincular passa a encerrar o vínculo (histórico preservado).
 - Token de sessão da empresa expirado no meio de um envio: o portal pede novo acesso e informa que o
   arquivo precisa ser enviado de novo.
 - Credencial do portal usada na área Jotanunes (ou identidade Fluig usada no portal): recusada.
@@ -633,7 +634,7 @@ recusa sem alterar nada; conferir que a senha não aparece no log da aplicação
   (nome único, instruções para a empresa); qualquer usuário Jotanunes DEVE poder listá-los.
 - **FR-015**: Os documentos DEVEM ser exigidos **por empresa**: todos os tipos de documento ativos
   são exigidos de todas as empresas ativas, e um envio vale para todas as obras da empresa. Criar um
-  tipo novo o torna "Pendente de envio" para todas as empresas ativas.
+  tipo novo o torna "Pendente de envio" para todas as empresas ativas. **Substituída em 2026-10-26 pela feature 002** ([documentos por obra](../002-documentos-por-obra/spec.md)): tipos passam a ter abrangência *Geral da empresa* (esta regra) ou *Por obra* (cada obra escolhe os tipos exigidos).
 - **FR-016**: Nada é apagado definitivamente pela interface: obras, empresas e tipos de documento são
   desativados; vínculos podem ser removidos.
 

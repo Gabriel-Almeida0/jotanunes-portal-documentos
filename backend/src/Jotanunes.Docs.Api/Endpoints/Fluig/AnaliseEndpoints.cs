@@ -8,9 +8,9 @@ public static class AnaliseEndpoints
 {
     public static RouteGroupBuilder MapAnalise(this RouteGroupBuilder g)
     {
-        g.MapGet("/envios", async (string? status, Guid? obraId, Guid? empresaId, Guid? tipoDocumentoId, int? pagina, int? tamanhoPagina,
-                ListarFilaEnvios uc, CancellationToken ct) =>
-            Results.Ok(await uc.ExecutarAsync(status, obraId, empresaId, tipoDocumentoId, pagina, tamanhoPagina, ct)))
+        g.MapGet("/envios", async (string? status, Guid? obraId, bool? somenteGerais, Guid? empresaId, Guid? tipoDocumentoId, bool? comAtraso,
+                int? pagina, int? tamanhoPagina, ListarFilaEnvios uc, CancellationToken ct) =>
+            Results.Ok(await uc.ExecutarAsync(status, obraId, somenteGerais, empresaId, tipoDocumentoId, pagina, tamanhoPagina, comAtraso, ct)))
             .WithName("fluigListarEnvios");
 
         g.MapGet("/envios/{envioId}", async (Guid envioId, ObterEnvio uc, CancellationToken ct) =>
@@ -29,8 +29,12 @@ public static class AnaliseEndpoints
             Results.Ok(await uc.ExecutarAsync(empresaId, ct))).WithName("fluigListarDocumentosEmpresa");
 
         g.MapGet("/empresas/{empresaId}/documentos/{tipoDocumentoId}/envios",
-            async (Guid empresaId, Guid tipoDocumentoId, ListarHistoricoEnviosEmpresa uc, CancellationToken ct) =>
-                Results.Ok(await uc.ExecutarAsync(empresaId, tipoDocumentoId, ct))).WithName("fluigListarHistoricoEnvios");
+            async (Guid empresaId, Guid tipoDocumentoId, DateOnly? periodoInicio, ListarHistoricoEnviosEmpresa uc, CancellationToken ct) =>
+                Results.Ok(await uc.ExecutarAsync(empresaId, tipoDocumentoId, periodoInicio, ct))).WithName("fluigListarHistoricoEnvios");
+
+        g.MapGet("/empresas/{empresaId}/documentos/{tipoDocumentoId}/periodos",
+            async (Guid empresaId, Guid tipoDocumentoId, ListarPeriodosEmpresa uc, CancellationToken ct) =>
+                Results.Ok(await uc.ExecutarAsync(empresaId, tipoDocumentoId, ct))).WithName("fluigListarPeriodosEmpresa");
         return g;
     }
 }

@@ -9,9 +9,20 @@
   max-width: calc((100% - 2 * var(--jn-space-5)) * 2 / 3 + var(--jn-space-5));
 }
 
+.jn-app .jn-painel__grade--quatro {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* "Precisa de atenção": cinco cartões (003 incluiu "Empresas com período atrasado"). */
+.jn-app .jn-painel__grade--atencao {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
 @media (max-width: 1000px) {
   .jn-app .jn-painel__grade,
-  .jn-app .jn-painel__grade--dupla {
+  .jn-app .jn-painel__grade--dupla,
+  .jn-app .jn-painel__grade--quatro,
+  .jn-app .jn-painel__grade--atencao {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     max-width: none;
   }
@@ -19,7 +30,9 @@
 
 @media (max-width: 600px) {
   .jn-app .jn-painel__grade,
-  .jn-app .jn-painel__grade--dupla {
+  .jn-app .jn-painel__grade--dupla,
+  .jn-app .jn-painel__grade--quatro,
+  .jn-app .jn-painel__grade--atencao {
     grid-template-columns: minmax(0, 1fr);
   }
 }

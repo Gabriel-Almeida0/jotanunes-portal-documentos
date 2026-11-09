@@ -8,9 +8,9 @@ public static class EmpresasEndpoints
 {
     public static RouteGroupBuilder MapEmpresas(this RouteGroupBuilder g)
     {
-        g.MapGet("/empresas", async (string? busca, Guid? obraId, string? situacaoAcesso, bool? comPendencia, int? pagina, int? tamanhoPagina,
-                ListarEmpresas uc, CancellationToken ct) =>
-            Results.Ok(await uc.ExecutarAsync(busca, obraId, situacaoAcesso, comPendencia, pagina, tamanhoPagina, ct)))
+        g.MapGet("/empresas", async (string? busca, Guid? obraId, string? situacaoAcesso, bool? comPendencia, bool? comAtraso, int? pagina,
+                int? tamanhoPagina, ListarEmpresas uc, CancellationToken ct) =>
+            Results.Ok(await uc.ExecutarAsync(busca, obraId, situacaoAcesso, comPendencia, pagina, tamanhoPagina, comAtraso, ct)))
             .WithName("fluigListarEmpresas");
 
         g.MapPost("/empresas", async (EmpresaInput entrada, CriarEmpresa uc, CancellationToken ct) =>

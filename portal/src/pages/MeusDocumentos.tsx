@@ -1,19 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ErroApi } from '../api/client';
 import { MENSAGENS } from '../api/mensagens';
-import type { DocumentoSituacaoPortal, EnvioPortal, SituacaoDocumento } from '../api/tipos';
+import type {
+  DocumentoSituacaoPortal,
+  EnvioPortal,
+  ObraPortal,
+  SituacaoDocumento,
+} from '../api/tipos';
 import { useSessao } from '../auth/contexto';
 import { Alerta } from '../components/Alerta';
 import { Botao } from '../components/Botao';
 import { Carregando } from '../components/Carregando';
 import { CartaoDocumento } from '../components/CartaoDocumento';
+import { CartaoObra } from '../components/CartaoObra';
 import { TituloPagina } from '../components/TituloPagina';
+import { caminhoDocumento } from '../utils/contexto';
 import './MeusDocumentos.css';
 
 type Estado =
   | { tipo: 'carregando' }
   | { tipo: 'erro'; mensagem: string }
-  | { tipo: 'pronto'; documentos: DocumentoSituacaoPortal[] };
+  | { tipo: 'pronto'; documentos: DocumentoSituacaoPortal[]; obras: ObraPortal[] };
 
 /** Rejeitados primeiro (precisam de ação), depois pendentes, em análise e aprovados. */
 const ORDEM: Record<SituacaoDocumento, number> = {
@@ -23,9 +30,19 @@ const ORDEM: Record<SituacaoDocumento, number> = {
   APROVADO: 3,
 };
 
+/** Obras com pendente/rejeitado primeiro, depois por nome (FR-250). */
+function ordenarObras(obras: ObraPortal[]): ObraPortal[] {
+  const pendencia = (o: ObraPortal) =>
+    o.documentos.pendentes + o.documentos.rejeitados + o.documentos.periodosAtrasados > 0 ? 0 : 1;
+  return [...obras].sort(
+    (a, b) => pendencia(a) - pendencia(b) || a.nome.localeCompare(b.nome, 'pt-BR'),
+  );
+}
+
 function ordenar(documentos: DocumentoSituacaoPortal[]): DocumentoSituacaoPortal[] {
   return [...documentos].sort(
     (a, b) =>
+      Number(b.atrasado) - Number(a.atrasado) ||
       ORDEM[a.situacao] - ORDEM[b.situacao] ||
       a.tipoDocumento.nome.localeCompare(b.tipoDocumento.nome, 'pt-BR'),
   );
@@ -53,8 +70,8 @@ export function MeusDocumentos() {
   const carregar = useCallback(async (silencioso = false) => {
     if (!silencioso) setEstado({ tipo: 'carregando' });
     try {
-      const documentos = await api.listarDocumentos();
-      setEstado({ tipo: 'pronto', documentos: ordenar(documentos) });
+      const [documentos, obras] = await Promise.all([api.listarDocumentos(), api.listarObras()]);
+      setEstado({ tipo: 'pronto', documentos: ordenar(documentos), obras: ordenarObras(obras) });
     } catch (erro) {
       if (
         erro instanceof ErroApi &&
@@ -78,7 +95,7 @@ export function MeusDocumentos() {
       atual.tipo !== 'pronto'
         ? atual
         : {
-            tipo: 'pronto',
+            ...atual,
             documentos: atual.documentos.map((d) =>
               d.tipoDocumento.id === documento.tipoDocumento.id
                 ? { ...d, situacao: 'EM_ANALISE', envioAtual: envio, podeEnviar: false }
@@ -129,54 +146,95 @@ export function MeusDocumentos() {
 
       {estado.tipo === 'pronto' && (
         <>
-          {documentos.length > 0 && (
-            <section aria-label="Resumo dos documentos" className="jn-resumo">
-              <ul>
-                {RESUMO.map(({ situacao, singular, plural }) => {
-                  const n = contagem(situacao);
-                  return (
-                    <li
-                      key={situacao}
-                      className={`jn-resumo__item jn-resumo__item--${situacao.toLowerCase()}`}
-                    >
-                      <span className="jn-resumo__numero">{n}</span>
-                      <span className="jn-resumo__rotulo">{n === 1 ? singular : plural}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          )}
-
-          {precisamDeAcao === 0 ? (
-            <div className="jn-vazio" role="status">
-              <p className="jn-vazio__titulo">Nenhum documento pendente. Tudo certo por aqui.</p>
-              {documentos.length > 0 && (
-                <p className="jn-vazio__texto">
-                  Se a Jotanunes pedir um documento novo ou recusar algum arquivo, ele aparece aqui.
+          <section aria-labelledby="titulo-obras" className="jn-secao">
+            <div className="jn-secao__cabeca">
+              <h2 id="titulo-obras" className="jn-secao__titulo">
+                Suas obras
+              </h2>
+              {estado.obras.length > 0 && (
+                <p className="jn-secao__texto">
+                  Cada obra pede os próprios documentos. Abra a obra para enviar.
                 </p>
               )}
             </div>
-          ) : (
-            <p className="jn-pagina__orientacao">
-              {precisamDeAcao === 1 ? 'Falta 1 documento.' : `Faltam ${precisamDeAcao} documentos.`}{' '}
-              Envie cada um em PDF, JPG ou PNG, com até 10 MB.
-            </p>
-          )}
 
-          {documentos.length > 0 && (
-            <ul className="jn-grade" aria-label="Documentos exigidos">
-              {documentos.map((documento) => (
-                <li key={documento.tipoDocumento.id}>
-                  <CartaoDocumento
-                    documento={documento}
-                    aoEnviar={(envio) => aoEnviar(documento, envio)}
-                    aoDesatualizar={() => void carregar(true)}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
+            {estado.obras.length === 0 ? (
+              <p className="jn-secao__vazio">
+                Você ainda não está em nenhuma obra. Quando a Jotanunes vincular sua empresa a uma
+                obra, os documentos dela aparecem aqui.
+              </p>
+            ) : (
+              <ul className="jn-grade" aria-label="Obras">
+                {estado.obras.map((obra) => (
+                  <li key={obra.id}>
+                    <CartaoObra obra={obra} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section aria-labelledby="titulo-gerais" className="jn-secao">
+            <div className="jn-secao__cabeca">
+              <h2 id="titulo-gerais" className="jn-secao__titulo">
+                Documentos gerais da empresa
+              </h2>
+              <p className="jn-secao__texto">Valem para todas as obras.</p>
+            </div>
+
+            {documentos.length > 0 && (
+              <div aria-label="Resumo dos documentos gerais" role="group" className="jn-resumo">
+                <ul>
+                  {RESUMO.map(({ situacao, singular, plural }) => {
+                    const n = contagem(situacao);
+                    return (
+                      <li
+                        key={situacao}
+                        className={`jn-resumo__item jn-resumo__item--${situacao.toLowerCase()}`}
+                      >
+                        <span className="jn-resumo__numero">{n}</span>
+                        <span className="jn-resumo__rotulo">{n === 1 ? singular : plural}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
+            {precisamDeAcao === 0 ? (
+              <div className="jn-vazio" role="status">
+                <p className="jn-vazio__titulo">Nenhum documento pendente. Tudo certo por aqui.</p>
+                {documentos.length > 0 && (
+                  <p className="jn-vazio__texto">
+                    Se a Jotanunes pedir um documento novo ou recusar algum arquivo, ele aparece
+                    aqui.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="jn-pagina__orientacao">
+                {precisamDeAcao === 1
+                  ? 'Falta 1 documento.'
+                  : `Faltam ${precisamDeAcao} documentos.`}{' '}
+                Envie cada um em PDF, JPG ou PNG, com até 10 MB.
+              </p>
+            )}
+
+            {documentos.length > 0 && (
+              <ul className="jn-grade" aria-label="Documentos gerais exigidos">
+                {documentos.map((documento) => (
+                  <li key={documento.tipoDocumento.id}>
+                    <CartaoDocumento
+                      documento={documento}
+                      linkHistorico={caminhoDocumento(null, documento.tipoDocumento.id)}
+                      aoEnviar={(envio) => aoEnviar(documento, envio)}
+                      aoDesatualizar={() => void carregar(true)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </>
       )}
     </div>

@@ -1,41 +1,69 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { api, ErroApi } from '../api/client';
 import { MENSAGENS } from '../api/mensagens';
-import type { DocumentoSituacaoPortal, EnvioPortal } from '../api/tipos';
+import type { DocumentoSituacaoPortal, EnvioPortal, ObraPortal, PeriodoPortal } from '../api/tipos';
 import { Alerta } from '../components/Alerta';
 import { BotaoBaixar } from '../components/BotaoBaixar';
 import { Botao } from '../components/Botao';
 import { Carregando } from '../components/Carregando';
+import { ContextoObra } from '../components/ContextoObra';
 import { EnvioArquivo } from '../components/EnvioArquivo';
 import { IconeSetaEsquerda } from '../components/icons';
 import { Selo } from '../components/Selo';
 import { TituloPagina } from '../components/TituloPagina';
+import {
+  caminhoLista,
+  caminhoPeriodos,
+  listarDocumentos,
+  listarHistorico,
+  listarPeriodos,
+} from '../utils/contexto';
 import { formatarDataHora, formatarTamanho } from '../utils/datas';
+import { ehPeriodico } from '../utils/periodos';
 import './DocumentoHistorico.css';
 
 type Estado =
   | { tipo: 'carregando' }
   | { tipo: 'erro'; mensagem: string; naoEncontrado: boolean }
-  | { tipo: 'pronto'; documento: DocumentoSituacaoPortal | null; envios: EnvioPortal[] };
+  | {
+      tipo: 'pronto';
+      documento: DocumentoSituacaoPortal | null;
+      envios: EnvioPortal[];
+      obra: ObraPortal | null;
+      /** Período filtrado (`?periodo=`), quando o documento é periódico. */
+      periodo: PeriodoPortal | null;
+    };
 
-/** Histórico de envios de um tipo (mais recente primeiro). Nunca mostra quem analisou. */
+/**
+ * Histórico de envios de um documento (mais recente primeiro), no contexto certo: geral
+ * (`/documentos/:tipo`) ou da obra (`/obras/:obraId/documentos/:tipo`). Nunca mostra quem analisou.
+ * Documento periódico: `?periodo=AAAA-MM-DD` mostra só aquele período; o envio fica na página de
+ * períodos.
+ */
 export function DocumentoHistorico() {
-  const { tipoDocumentoId = '' } = useParams();
+  const { tipoDocumentoId = '', obraId: obraIdParam } = useParams();
+  const obraId = obraIdParam ?? null;
+  const [busca] = useSearchParams();
+  const periodoInicio = busca.get('periodo');
   const [estado, setEstado] = useState<Estado>({ tipo: 'carregando' });
   const [mensagem, setMensagem] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     setEstado({ tipo: 'carregando' });
     try {
-      const [documentos, envios] = await Promise.all([
-        api.listarDocumentos(),
-        api.listarHistorico(tipoDocumentoId),
+      const [documentos, envios, obras, periodos] = await Promise.all([
+        listarDocumentos(obraId),
+        listarHistorico(obraId, tipoDocumentoId, periodoInicio),
+        obraId ? api.listarObras() : Promise.resolve([]),
+        periodoInicio ? listarPeriodos(obraId, tipoDocumentoId) : Promise.resolve([]),
       ]);
       setEstado({
         tipo: 'pronto',
         documento: documentos.find((d) => d.tipoDocumento.id === tipoDocumentoId) ?? null,
         envios: [...envios].sort((a, b) => b.enviadoEm.localeCompare(a.enviadoEm)),
+        obra: obras.find((o) => o.id === obraId) ?? null,
+        periodo: periodos.find((p) => p.inicio === periodoInicio) ?? null,
       });
     } catch (erro) {
       if (
@@ -50,24 +78,42 @@ export function DocumentoHistorico() {
         naoEncontrado: erro instanceof ErroApi && erro.code === 'NAO_ENCONTRADO',
       });
     }
-  }, [tipoDocumentoId]);
+  }, [obraId, tipoDocumentoId, periodoInicio]);
 
   useEffect(() => {
     void carregar();
   }, [carregar]);
 
   const nome = estado.tipo === 'pronto' ? estado.documento?.tipoDocumento.nome : undefined;
+  const obra = estado.tipo === 'pronto' ? estado.obra : null;
+  const periodo = estado.tipo === 'pronto' ? estado.periodo : null;
+  const periodico =
+    estado.tipo === 'pronto' && estado.documento ? ehPeriodico(estado.documento) : false;
 
   useEffect(() => {
-    document.title = `${nome ?? 'Histórico de envios'} · Portal de documentos Jotanunes`;
-  }, [nome]);
+    const titulo = [nome ?? 'Histórico de envios', periodo?.rotulo, obra?.nome]
+      .filter(Boolean)
+      .join(' · ');
+    document.title = `${titulo} · Portal de documentos Jotanunes`;
+  }, [nome, periodo?.rotulo, obra?.nome]);
 
   return (
     <div className="jn-container jn-pagina jn-historico-pagina">
-      <Link to="/documentos" className="jn-voltar">
+      <Link
+        to={periodico ? caminhoPeriodos(obraId, tipoDocumentoId) : caminhoLista(obraId)}
+        className="jn-voltar"
+      >
         <IconeSetaEsquerda tamanho={16} />
-        Voltar para meus documentos
+        {periodico
+          ? 'Voltar para os períodos'
+          : obraId
+            ? obra
+              ? `Voltar para a obra ${obra.nome}`
+              : 'Voltar para a obra'
+            : 'Voltar para meus documentos'}
       </Link>
+
+      {obra && <ContextoObra obra={obra} />}
 
       {estado.tipo === 'carregando' && <Carregando texto="Carregando o histórico…" />}
 
@@ -93,25 +139,39 @@ export function DocumentoHistorico() {
             {nome ?? 'Histórico de envios'}
           </TituloPagina>
 
-          {estado.documento && (
+          {periodo && <p className="jn-historico__periodo">Período: {periodo.rotulo}</p>}
+
+          {(periodo ?? estado.documento) && (
             <div className="jn-historico__situacao">
               <span>Situação atual:</span>
-              <Selo situacao={estado.documento.situacao} />
+              {periodo ? (
+                <Selo situacao={periodo.situacao} atrasado={periodo.atrasado} />
+              ) : (
+                estado.documento && (
+                  <Selo situacao={estado.documento.situacao} atrasado={estado.documento.atrasado} />
+                )
+              )}
             </div>
           )}
 
           <div aria-live="polite">{mensagem && <Alerta tipo="sucesso" titulo={mensagem} />}</div>
 
-          {estado.documento?.podeEnviar && (
+          {/* Periódico: o envio é feito por período, na página de períodos. */}
+          {estado.documento?.podeEnviar && !periodico && (
             <EnvioArquivo
               tipoDocumento={estado.documento.tipoDocumento}
+              obraId={obraId}
               rotulo={
                 estado.documento.situacao === 'REJEITADO'
                   ? 'Enviar novo arquivo'
                   : 'Enviar documento'
               }
               aoEnviar={() => {
-                setMensagem('Recebemos o arquivo. Agora é com a Jotanunes.');
+                setMensagem(
+                  obra
+                    ? `Recebemos o arquivo da obra ${obra.nome}. Agora é com a Jotanunes.`
+                    : 'Recebemos o arquivo. Agora é com a Jotanunes.',
+                );
                 void carregar();
               }}
               aoDesatualizar={() => void carregar()}
@@ -137,6 +197,14 @@ export function DocumentoHistorico() {
                       <Selo situacao={envio.status} />
                       {i === 0 && <span className="jn-historico__atual">Envio mais recente</span>}
                     </div>
+                    {envio.periodo && !periodo && (
+                      <span className="jn-historico__periodo-envio">
+                        Período: {envio.periodo.rotulo}
+                      </span>
+                    )}
+                    {envio.enviadoComAtraso && (
+                      <span className="jn-periodo__marca-atraso">Enviado com atraso</span>
+                    )}
                     <BotaoBaixar envio={envio} />
                     <dl className="jn-historico__dados">
                       <div>

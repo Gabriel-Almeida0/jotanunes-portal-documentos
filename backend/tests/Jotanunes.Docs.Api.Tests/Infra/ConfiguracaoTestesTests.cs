@@ -36,7 +36,7 @@ public class ConfiguracaoTestesTests(ApiFactory api) : TesteApi(api)
     [Fact]
     public async Task Dados_gravados_pela_api_aparecem_no_banco_do_container()
     {
-        var r = await Fluig().PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "Tipo prova de banco" });
+        var r = await Fluig().PostAsJsonAsync("/api/fluig/tipos-documento", new { nome = "Tipo prova de banco", abrangencia = "GERAL" });
         Assert.Equal(System.Net.HttpStatusCode.Created, r.StatusCode);
 
         await using var conn = new NpgsqlConnection(Api.ConnectionString);

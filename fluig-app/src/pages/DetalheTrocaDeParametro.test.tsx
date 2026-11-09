@@ -46,12 +46,12 @@ describe('Páginas de detalhe — troca do parâmetro da rota', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('obra: o modal de desvincular fecha ao navegar para outra obra', async () => {
+  it('obra: o modal de encerrar vínculo fecha ao navegar para outra obra', async () => {
     const { usuario, navegar } = renderizarRota(`/obras/${IDS.obraFlorDeSal}`);
     const tabela = await screen.findByRole('table', { name: 'Empresas da obra' });
     const linha = within(tabela).getByText('Delta Pinturas e Acabamentos ME').closest('tr')!;
-    await usuario.click(within(linha).getByRole('button', { name: /Desvincular/ }));
-    expect(screen.getByRole('dialog', { name: 'Desvincular empresa?' })).toBeInTheDocument();
+    await usuario.click(within(linha).getByRole('button', { name: /Encerrar vínculo/ }));
+    expect(screen.getByRole('dialog', { name: 'Encerrar vínculo?' })).toBeInTheDocument();
 
     navegar(`/obras/${IDS.obraVistaDoRio}`);
 

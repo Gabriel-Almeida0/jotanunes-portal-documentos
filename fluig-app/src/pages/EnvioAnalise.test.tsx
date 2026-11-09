@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import { http } from 'msw';
-import { IDS } from '../mocks/dados';
+import { DATA_FIXA_TESTES, IDS, fixarRelogioMock, reiniciarDados } from '../mocks/dados';
 import { server } from '../mocks/server';
 import { renderizarRota } from '../test/renderizar';
 
@@ -16,6 +16,41 @@ describe('Análise de um envio', () => {
     expect(screen.getByText('PCMSO 2026 - Alfa Engenharia.pdf')).toBeInTheDocument();
     expect(screen.getAllByText('Em análise').length).toBeGreaterThan(0);
     expect(screen.getByText('11.222.333/0001-81')).toBeInTheDocument();
+  });
+
+  it('envio geral mostra "Geral da empresa" no topo e o histórico do documento geral', async () => {
+    await abrirEnvio();
+    expect(screen.getByText('Geral da empresa')).toBeInTheDocument();
+    const historico = await screen.findByRole('list', { name: 'Histórico deste documento' });
+    expect(within(historico).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(historico).getByText('PCMSO 2026 - Alfa Engenharia.pdf')).toBeInTheDocument();
+  });
+
+  it('envio por obra mostra a obra no topo e só o histórico daquele documento naquela obra', async () => {
+    renderizarRota(`/analise/${IDS.envioAlfaArtFlorDeSal}`);
+    await screen.findByRole('heading', { level: 1, name: 'ART da obra' });
+    expect(screen.getByRole('link', { name: 'Obra: Condomínio Flor de Sal' })).toHaveAttribute(
+      'href',
+      `/obras/${IDS.obraFlorDeSal}`,
+    );
+    const historico = await screen.findByRole('list', { name: 'Histórico deste documento' });
+    // O ART da mesma empresa na obra Vista do Rio não entra.
+    expect(within(historico).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(historico).getByText('art-flor-de-sal.pdf')).toBeInTheDocument();
+    expect(within(historico).queryByText('art-vista-do-rio.pdf')).not.toBeInTheDocument();
+  });
+
+  it('rejeitar envio por obra cita a obra no aviso', async () => {
+    const { usuario } = renderizarRota(`/analise/${IDS.envioAlfaArtFlorDeSal}`);
+    await screen.findByRole('heading', { level: 1, name: 'ART da obra' });
+    await usuario.click(screen.getByRole('button', { name: 'Rejeitar' }));
+    const dialogo = screen.getByRole('dialog', { name: 'Rejeitar documento' });
+    expect(dialogo).toHaveTextContent('ART da obra de Alfa Engenharia Ltda na obra Condomínio Flor de Sal');
+    await usuario.type(within(dialogo).getByLabelText(/Motivo da rejeição/), 'Falta a assinatura do responsável');
+    await usuario.click(within(dialogo).getByRole('button', { name: 'Rejeitar documento' }));
+    expect(
+      await screen.findByText('ART da obra de Alfa Engenharia Ltda na obra Condomínio Flor de Sal. A empresa foi avisada por e-mail.'),
+    ).toBeInTheDocument();
   });
 
   it('aprovar registra a decisão e mostra "Aprovado" ao voltar para a fila', async () => {
@@ -77,7 +112,9 @@ describe('Análise de um envio', () => {
           tamanhoBytes: 1000,
           enviadoEm: '2026-09-20T12:00:00Z',
           empresa: { id: IDS.empresaAlfa, razaoSocial: 'Alfa Engenharia Ltda', cnpj: '11222333000181' },
-          tipoDocumento: { id: IDS.tipoPcmso, nome: 'PCMSO', instrucoes: null },
+          tipoDocumento: { id: IDS.tipoPcmso, nome: 'PCMSO', instrucoes: null, abrangencia: 'GERAL' },
+          obraId: null,
+          obra: null,
         };
         return Response.json(
           jaAnalisado
@@ -93,5 +130,34 @@ describe('Análise de um envio', () => {
     expect(await screen.findByText('Este envio já foi analisado.')).toBeInTheDocument();
     expect(await screen.findByText('Maria Silva')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Aprovar' })).not.toBeInTheDocument());
+  });
+
+  describe('envio periódico (003)', () => {
+    beforeEach(() => {
+      fixarRelogioMock(DATA_FIXA_TESTES);
+      reiniciarDados();
+    });
+
+    it('mostra o período e o prazo no topo e só o histórico daquele período', async () => {
+      renderizarRota(`/analise/${IDS.envioAlfaFgtsAtrasado}`);
+      await screen.findByRole('heading', { level: 1, name: 'Guia do FGTS' });
+      const periodo = screen.getByText('Agosto/2026', { selector: 'strong' }).parentElement!;
+      expect(periodo).toHaveTextContent('Período: Agosto/2026 · prazo 15/09/2026');
+      expect(screen.getAllByText('Com atraso').length).toBeGreaterThan(0);
+      expect(screen.getByText('15/09/2026 — enviado depois do prazo')).toBeInTheDocument();
+      const historico = await screen.findByRole('list', { name: 'Histórico do período Agosto/2026' });
+      // O envio aprovado de julho é de outro período e não entra.
+      expect(within(historico).getAllByRole('listitem')).toHaveLength(1);
+      expect(within(historico).queryByText(/fgts-2026-07/)).not.toBeInTheDocument();
+    });
+
+    it('a rejeição cita o período', async () => {
+      const { usuario } = renderizarRota(`/analise/${IDS.envioAlfaFgtsAtrasado}`);
+      await screen.findByRole('heading', { level: 1, name: 'Guia do FGTS' });
+      await usuario.click(screen.getByRole('button', { name: 'Rejeitar' }));
+      expect(
+        within(screen.getByRole('dialog', { name: 'Rejeitar documento' })).getByText('Guia do FGTS (Agosto/2026) de Alfa Engenharia Ltda'),
+      ).toBeInTheDocument();
+    });
   });
 });
