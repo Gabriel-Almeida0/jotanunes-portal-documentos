@@ -1,8 +1,9 @@
 import { useId, useRef, useState, type ChangeEvent } from 'react';
-import { api, ErroApi } from '../api/client';
+import { ErroApi } from '../api/client';
 import { MENSAGENS } from '../api/mensagens';
 import type { EnvioPortal } from '../api/tipos';
 import { ACCEPT, validarArquivo } from '../utils/arquivo';
+import { enviarDocumento, type ObraIdOuGeral } from '../utils/contexto';
 import { formatarTamanho } from '../utils/datas';
 import { Alerta } from './Alerta';
 import { Botao } from './Botao';
@@ -11,6 +12,10 @@ import './EnvioArquivo.css';
 
 interface Props {
   tipoDocumento: { id: string; nome: string };
+  /** Obra do documento (`null`/ausente = documento geral da empresa). */
+  obraId?: ObraIdOuGeral;
+  /** Período do envio (documento periódico); vai como `periodoInicio`. */
+  periodo?: { inicio: string; rotulo: string } | null;
   /** "Enviar documento" (pendente) ou "Enviar novo arquivo" (rejeitado). */
   rotulo?: string;
   aoEnviar: (envio: EnvioPortal) => void;
@@ -24,6 +29,8 @@ interface Props {
  */
 export function EnvioArquivo({
   tipoDocumento,
+  obraId = null,
+  periodo = null,
   rotulo = 'Enviar documento',
   aoEnviar,
   aoDesatualizar,
@@ -67,7 +74,7 @@ export function EnvioArquivo({
     setErro(null);
     setEnviando(true);
     try {
-      const envio = await api.enviarDocumento(tipoDocumento.id, arquivo);
+      const envio = await enviarDocumento(obraId, tipoDocumento.id, arquivo, periodo?.inicio);
       setArquivo(null);
       setEnviando(false);
       aoEnviar(envio);
@@ -93,7 +100,7 @@ export function EnvioArquivo({
         className="jn-visually-hidden"
         tabIndex={-1}
         aria-hidden="true"
-        aria-label={`Arquivo para ${tipoDocumento.nome}`}
+        aria-label={`Arquivo para ${tipoDocumento.nome}${periodo ? `, ${periodo.rotulo}` : ''}`}
         onChange={aoEscolher}
       />
 

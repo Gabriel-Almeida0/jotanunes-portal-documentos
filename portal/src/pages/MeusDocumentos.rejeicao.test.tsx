@@ -1,15 +1,19 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { banco } from '../mocks/dados';
 import { arquivoPdf, conectarComo, EMPRESA_ALFA, renderizarPortal, rotaAtual } from '../test/utils';
 
 describe('MeusDocumentos — rejeição e reenvio', () => {
-  it('documento rejeitado aparece primeiro, com o motivo e "Enviar novo arquivo"', async () => {
+  it('documento rejeitado aparece primeiro (depois do atrasado), com o motivo e "Enviar novo arquivo"', async () => {
     await conectarComo(EMPRESA_ALFA.cnpj, EMPRESA_ALFA.senha);
     renderizarPortal('/documentos');
 
-    const cartoes = await screen.findAllByRole('article');
-    expect(within(cartoes[0]).getByRole('heading')).toHaveTextContent('Cartão CNPJ');
-    const rejeitado = within(cartoes[0]);
+    const gerais = await screen.findByRole('list', { name: 'Documentos gerais exigidos' });
+    const cartoes = within(gerais).getAllByRole('article');
+    // O periódico com período atrasado (Guia do FGTS) vem antes de tudo.
+    expect(within(cartoes[0]).getByRole('heading')).toHaveTextContent('Guia do FGTS');
+    expect(within(cartoes[1]).getByRole('heading')).toHaveTextContent('Cartão CNPJ');
+    const rejeitado = within(cartoes[1]);
     expect(rejeitado.getByText('Rejeitado')).toBeInTheDocument();
     expect(rejeitado.getByText('Motivo:').parentElement).toHaveTextContent(
       'Motivo: Documento ilegível, envie de novo.',
@@ -70,5 +74,12 @@ describe('MeusDocumentos — rejeição e reenvio', () => {
     renderizarPortal('/documentos/00000000-0000-4000-8000-00000000ffff');
     expect(await screen.findByText('Não encontramos o que você procurou.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Voltar para meus documentos/ })).toBeInTheDocument();
+  });
+
+  it('tipo por obra não abre pelo histórico geral (só no contexto da obra)', async () => {
+    await conectarComo(EMPRESA_ALFA.cnpj, EMPRESA_ALFA.senha);
+    const art = banco.tipos.find((t) => t.nome === 'ART da obra')!;
+    renderizarPortal(`/documentos/${art.id}`);
+    expect(await screen.findByText('Não encontramos o que você procurou.')).toBeInTheDocument();
   });
 });

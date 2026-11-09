@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { server } from '../mocks/server';
-import { reiniciarDados, reiniciarSessaoMock } from '../mocks/dados';
+import { fixarRelogioMock, reiniciarDados, reiniciarSessaoMock } from '../mocks/dados';
 
 beforeAll(() => {
   server.listen({ onUnhandledRequest: 'error' });
@@ -14,6 +14,8 @@ afterEach(() => {
   server.resetHandlers();
   // Padrão dos testes: administrador entrando pelo Fluig, login próprio ligado.
   reiniciarSessaoMock();
+  // Testes de períodos (003) fixam o relógio do mock; volta ao relógio real.
+  fixarRelogioMock(null);
   reiniciarDados();
   window.sessionStorage.clear();
 });

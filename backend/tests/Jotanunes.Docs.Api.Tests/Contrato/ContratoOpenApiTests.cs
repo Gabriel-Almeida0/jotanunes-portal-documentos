@@ -44,10 +44,12 @@ public class ContratoOpenApiTests(ApiFactory api) : TesteApi(api)
             .ToList();
 
     [Fact]
-    public void Contrato_tem_43_operacoes()
+    public void Contrato_tem_56_operacoes()
     {
         // 34 até o contrato 1.1.0 + 9 do login próprio (1.2.0): configuracao, login, trocar-senha, sair e as 5 de usuários.
-        Assert.Equal(43, RotasContrato().Count);
+        // + 9 dos documentos por obra (1.3.0): 5 na área Jotanunes e 4 no portal.
+        // + 4 dos documentos periódicos (1.4.0): períodos geral/obra na área Jotanunes e no portal.
+        Assert.Equal(56, RotasContrato().Count);
     }
 
     [Fact]
@@ -77,8 +79,8 @@ public class ContratoOpenApiTests(ApiFactory api) : TesteApi(api)
             .Where(o => o.Extensions.TryGetValue("x-requer-admin", out var ext) && ext is OpenApiBoolean { Value: true })
             .Select(o => o.OperationId)
             .ToHashSet();
-        // 10 de escrita (1.1.0) + as 5 rotas /api/fluig/usuarios* (1.2.0), inclusive os 2 GET.
-        Assert.Equal(15, contrato.Count);
+        // 10 de escrita (1.1.0) + as 5 rotas /api/fluig/usuarios* (1.2.0), inclusive os 2 GET + marcar/desmarcar tipo exigido da obra (1.3.0).
+        Assert.Equal(17, contrato.Count);
 
         var api = Api.Services.GetRequiredService<EndpointDataSource>().Endpoints
             .Where(e => e.Metadata.GetOrderedMetadata<IAuthorizeData>().Any(a => a.Policy == Politicas.FluigAdmin))
@@ -102,6 +104,8 @@ public class ContratoOpenApiTests(ApiFactory api) : TesteApi(api)
         Assert.Equal(EnumContrato("Uf"), Enum.GetNames<Uf>());
         Assert.Equal(EnumContrato("SituacaoUsuarioInterno"), Enum.GetNames<Domain.UsuariosInternos.SituacaoUsuarioInterno>());
         Assert.Equal(EnumContrato("OrigemSessao"), Enum.GetNames<OrigemSessao>());
+        Assert.Equal(EnumContrato("Abrangencia"), Enum.GetNames<Domain.TiposDocumento.Abrangencia>());
+        Assert.Equal(EnumContrato("UnidadePeriodicidade"), Enum.GetNames<Domain.TiposDocumento.UnidadePeriodicidade>());
     }
 
     [Fact]
@@ -143,6 +147,10 @@ public class ContratoOpenApiTests(ApiFactory api) : TesteApi(api)
         { typeof(ObraResumoDto), "ObraResumo" },
         { typeof(ObraDetalheDto), "ObraDetalhe" },
         { typeof(ObraRefDto), "ObraRef" },
+        { typeof(VinculoEncerradoDto), "VinculoEncerrado" },
+        { typeof(TipoExigidoObraDto), "TipoExigidoObra" },
+        { typeof(ObraNaEmpresaDto), "ObraNaEmpresa" },
+        { typeof(ObraPortalDto), "ObraPortal" },
         { typeof(EmpresaNaObraDto), "EmpresaNaObra" },
         { typeof(EmpresaResumoDto), "EmpresaResumo" },
         { typeof(EmpresaDto), "Empresa" },
@@ -173,6 +181,13 @@ public class ContratoOpenApiTests(ApiFactory api) : TesteApi(api)
         { typeof(UsuarioInternoAtualizacao), "UsuarioInternoAtualizacao" },
         { typeof(UsuarioInternoDto), "UsuarioInterno" },
         { typeof(PaginaResultado<UsuarioInternoDto>), "PaginaUsuariosInternos" },
+        // 003: documentos periódicos
+        { typeof(PeriodicidadeDto), "Periodicidade" },
+        { typeof(PeriodoRefDto), "PeriodoRef" },
+        { typeof(PeriodoComPrazoDto), "PeriodoComPrazo" },
+        { typeof(ResumoPeriodosDto), "ResumoPeriodos" },
+        { typeof(PeriodoDto), "Periodo" },
+        { typeof(PeriodoPortalDto), "PeriodoPortal" },
     };
 
     [Theory]

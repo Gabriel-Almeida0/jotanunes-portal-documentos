@@ -35,6 +35,9 @@ public sealed class ErroAplicacao : Exception
         TipoErroDominio.SenhaFraca => new(CodigoErro.SENHA_FRACA, erro.Message),
         TipoErroDominio.TransicaoInvalida => new(CodigoErro.ENVIO_JA_ANALISADO),
         TipoErroDominio.CnpjImutavel => new(CodigoErro.CNPJ_IMUTAVEL),
+        TipoErroDominio.AbrangenciaImutavel => new(CodigoErro.ABRANGENCIA_IMUTAVEL),
+        TipoErroDominio.PeriodicidadeImutavel => new(CodigoErro.PERIODICIDADE_IMUTAVEL),
+        TipoErroDominio.PeriodoObrigatorio => new(CodigoErro.PERIODO_OBRIGATORIO),
         _ => new(CodigoErro.ERRO_INTERNO),
     };
 }

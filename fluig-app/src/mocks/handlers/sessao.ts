@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import type { Painel } from '../../api/tipos';
-import { contagemDocumentos, db, situacaoAcesso } from '../dados';
+import { db, obraTemPendencia, situacaoAcesso, temAtraso, temPendencia } from '../dados';
 import { API, exigirFluig, latencia, problema, sessaoDe } from '../util';
 
 export const handlersSessao = [
@@ -18,10 +18,11 @@ export const handlersSessao = [
     const ativas = db.empresas.filter((e) => e.ativa);
     const painel: Painel = {
       enviosEmAnalise: db.envios.filter((e) => e.status === 'EM_ANALISE').length,
-      empresasComPendencia: ativas.filter((e) => {
-        const c = contagemDocumentos(e.id);
-        return c.pendentes + c.rejeitados > 0;
-      }).length,
+      // Gerais ou da obra (vínculo ativo em obra ativa) — data-model §5.
+      empresasComPendencia: ativas.filter(temPendencia).length,
+      obrasComPendencia: db.obras.filter(obraTemPendencia).length,
+      // 003 (FR-322): algum período atrasado, geral ou da obra.
+      empresasComAtraso: ativas.filter(temAtraso).length,
       empresasConvidadasSemAcesso: db.empresas.filter((e) => {
         const s = situacaoAcesso(e);
         return s === 'CONVIDADA' || s === 'CONVITE_EXPIRADO';

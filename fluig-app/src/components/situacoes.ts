@@ -1,4 +1,5 @@
 import type {
+  Abrangencia,
   SituacaoAcesso,
   SituacaoConvite,
   SituacaoDocumento,
@@ -41,3 +42,9 @@ export function textoSituacao(situacao: Situacao): string {
   return SITUACOES[situacao]?.texto ?? situacao;
 }
 
+
+/** Texto da abrangência do tipo de documento (002): sempre escrito, nunca só cor. */
+export const TEXTO_ABRANGENCIA: Record<Abrangencia, string> = {
+  GERAL: 'Geral da empresa',
+  POR_OBRA: 'Por obra',
+};

@@ -10,6 +10,7 @@ import {
   paraEmpresa,
   paraEmpresaResumo,
   situacaoAcesso,
+  temAtraso,
   temPendencia,
   type EmpresaDb,
 } from '../dados';
@@ -73,6 +74,7 @@ export const handlersEmpresas = [
     const obraId = url.searchParams.get('obraId');
     const situacao = url.searchParams.get('situacaoAcesso') as SituacaoAcesso | null;
     const comPendencia = booleano(url.searchParams.get('comPendencia'));
+    const comAtraso = booleano(url.searchParams.get('comAtraso'));
     if (situacao && !SITUACOES.includes(situacao)) {
       return validacao({ situacaoAcesso: ['Situação de acesso inválida.'] });
     }
@@ -83,11 +85,13 @@ export const handlersEmpresas = [
         simplificar(e.nomeFantasia).includes(busca) ||
         (buscaCnpj.length >= 2 && e.cnpj.includes(buscaCnpj)),
       )
-      .filter((e) => !obraId || db.vinculos.some((v) => v.obraId === obraId && v.empresaId === e.id))
+      // Filtro por obra só considera vínculos ativos (002, data-model §3).
+      .filter((e) => !obraId || db.vinculos.some((v) => v.obraId === obraId && v.empresaId === e.id && v.ativo))
       .filter((e) => !situacao || situacaoAcesso(e) === situacao)
       .filter((e) => comPendencia !== true || (e.ativa && temPendencia(e)))
+      .filter((e) => comAtraso !== true || (e.ativa && temAtraso(e)))
       .sort((a, b) => a.razaoSocial.localeCompare(b.razaoSocial, 'pt-BR'))
-      .map(paraEmpresaResumo);
+      .map((e) => paraEmpresaResumo(e, obraId));
     const pagina = paginar(lista, url);
     return pagina instanceof HttpResponse ? pagina : HttpResponse.json(pagina);
   }),

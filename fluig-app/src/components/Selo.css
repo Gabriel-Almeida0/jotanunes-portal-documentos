@@ -44,3 +44,10 @@
   background: var(--jn-neutral-bg);
   border-color: color-mix(in srgb, var(--jn-neutral-fg) 12%, transparent);
 }
+
+/* Mais de um selo juntos (ex.: "Atrasado" + "Rejeitado"). */
+.jn-app .jn-selos {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--jn-space-1);
+}

@@ -47,6 +47,7 @@ public sealed class EnviarConvite(
         convites.Adicionar(convite);
         auditoria.Registrar(AtorAuditoria.Fluig, usuario.Login, AcaoAuditoria.ConviteEnviado, "EMPRESA", empresa.Id.ToString());
 
+        // Só obras com vínculo ativo (vínculo encerrado não aparece no convite; research R5).
         var nomesObras = (await obras.ListarObrasDaEmpresaAsync(empresa.Id, ct)).Select(o => o.Nome).ToList();
         var link = $"{portal.Value.BaseUrl.TrimEnd('/')}/acesso?convite={token}";
         var mensagem = ModelosEmail.Convite(empresa.EmailContato, empresa.RazaoSocial,

@@ -42,6 +42,14 @@ export const MENSAGENS: Record<CodigoErro, string> = {
   EMAIL_ACESSO_FALHOU:
     'Não conseguimos enviar o e-mail com a senha provisória. Tente de novo em alguns minutos.',
   SO_LOGIN_LOCAL: 'Esta opção é só para quem entra com login e senha.',
+  // Só da área Jotanunes (tipos de documento por obra, contrato 1.3.0); o portal nunca recebe.
+  ABRANGENCIA_IMUTAVEL: 'A abrangência não pode ser alterada porque este tipo já tem envios.',
+  TIPO_NAO_E_POR_OBRA: 'Só tipos de documento por obra podem ser exigidos de uma obra.',
+  // Só da área Jotanunes (periodicidade do tipo, contrato 1.4.0); o portal nunca recebe.
+  PERIODICIDADE_IMUTAVEL:
+    'A periodicidade não pode ser alterada porque este tipo já tem envios. O prazo pode mudar.',
+  // Envio de documento periódico sem o período (ou de documento único com período).
+  PERIODO_OBRIGATORIO: 'Escolha o período a que este arquivo se refere.',
 };
 
 export const MENSAGEM_FALHA_REDE =

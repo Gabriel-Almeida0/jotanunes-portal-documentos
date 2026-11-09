@@ -35,3 +35,16 @@
   color: var(--jn-danger-fg);
   background: var(--jn-danger-bg);
 }
+
+/* Período com prazo vencido (feature 003): fundo cheio para se distinguir de "Rejeitado".
+   Branco sobre --jn-danger-fg (#a01b1b) = 7,87:1 (AA/AAA). */
+.jn-selo--atrasado {
+  color: var(--jn-white);
+  background: var(--jn-danger-fg);
+}
+
+.jn-selos {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--jn-space-2);
+}

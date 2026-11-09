@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: API do Portal de Documentação de Terceirizadas Jotanunes
-  version: 1.2.0
+  version: 1.4.0
   license:
     name: Proprietário — Jotanunes Construtora
   description: |
@@ -46,6 +46,24 @@ info:
     - O perfil vem só do token atual: vale até o token expirar (máx. 8 h) — no login próprio, mudar o
       papel revoga o token. `GET /api/fluig/me` devolve `admin`, `origem` e `trocaSenhaObrigatoria`
       para o front esconder as ações e decidir as telas.
+
+    ## Documentos por obra (desde 1.3.0, feature 002)
+    - Todo tipo de documento tem `abrangencia`: `GERAL` (da empresa, vale em todas as obras) ou
+      `POR_OBRA` (exigido só nas obras que o marcam; cada obra recebe o seu envio).
+    - As rotas de documentos já existentes (`/empresas/{e}/documentos*`, `/portal/documentos*`)
+      tratam só os documentos gerais; os da obra ficam em `/obras/{o}/...` (área Jotanunes e portal).
+    - Desvincular empresa da obra encerra o vínculo (histórico preservado); vincular de novo reabre.
+    - Detalhes: `specs/002-documentos-por-obra/contracts/mudancas-api.md`.
+
+    ## Documentos periódicos (desde 1.4.0, feature 003)
+    - Todo tipo de documento tem `periodicidade`: `UNICA` (um envio vale para sempre, como antes) ou
+      periódica (`MESES` ou `DIAS`, com `intervalo` e `prazoDias` depois do fim de cada período).
+    - Tipo periódico exige um envio por período; os períodos são calculados pela API (não são
+      cadastrados) e listados em `.../documentos/{tipoDocumentoId}/periodos` (área Jotanunes e portal).
+    - O envio de documento periódico informa `periodoInicio`; a situação do documento resume os
+      períodos (atrasado primeiro) e `periodos` traz as contagens.
+    - Mudar unidade/intervalo de tipo com envios → 409 `PERIODICIDADE_IMUTAVEL`.
+    - Detalhes: `specs/003-documentos-periodicos/contracts/mudancas-api.md`.
 
     ## Convenções
     - JSON em camelCase; enums em MAIÚSCULAS; datas ISO 8601 em UTC.
@@ -242,6 +260,10 @@ paths:
           in: query
           description: Filtra por ativa/inativa. Omitido = todas.
           schema: { type: boolean }
+        - name: comPendencia
+          in: query
+          description: true = somente obras ativas com alguma empresa (vínculo ativo) com documento da obra pendente de envio ou rejeitado.
+          schema: { type: boolean }
         - { $ref: '#/components/parameters/Pagina' }
         - { $ref: '#/components/parameters/TamanhoPagina' }
       responses:
@@ -332,24 +354,149 @@ paths:
     put:
       tags: [Fluig - Obras]
       operationId: fluigVincularEmpresaObra
-      summary: Vincula a empresa à obra (idempotente)
+      summary: Vincula ou reabre o vínculo (idempotente)
       security: [{ fluigAuth: [] }]
       x-requer-admin: true
       responses:
-        '204': { description: Vínculo existe (criado agora ou antes) }
+        '204': { description: 'Vínculo ativo (criado agora, reaberto ou já existente)' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
         '403': { $ref: '#/components/responses/SemPermissao' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
     delete:
       tags: [Fluig - Obras]
       operationId: fluigDesvincularEmpresaObra
-      summary: Remove o vínculo da empresa com a obra
+      summary: Encerra o vínculo (histórico preservado)
       security: [{ fluigAuth: [] }]
       x-requer-admin: true
       responses:
-        '204': { description: Vínculo removido }
+        '204': { description: Vínculo encerrado (agora ou antes) }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
         '403': { $ref: '#/components/responses/SemPermissao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /api/fluig/obras/{obraId}/tipos-documento:
+    parameters:
+      - { $ref: '#/components/parameters/ObraId' }
+    get:
+      tags: [Fluig - Obras]
+      operationId: fluigListarTiposExigidosObra
+      summary: Tipos POR_OBRA e se cada um é exigido nesta obra (ordenados por nome)
+      description: Todos os tipos `POR_OBRA` ativos e, dos inativos, só os marcados na obra.
+      security: [{ fluigAuth: [] }]
+      responses:
+        '200':
+          description: Tipos da obra
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TipoExigidoObra' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /api/fluig/obras/{obraId}/tipos-documento/{tipoDocumentoId}:
+    parameters:
+      - { $ref: '#/components/parameters/ObraId' }
+      - { $ref: '#/components/parameters/TipoDocumentoId' }
+    put:
+      tags: [Fluig - Obras]
+      operationId: fluigMarcarTipoExigidoObra
+      summary: Marca o tipo POR_OBRA como exigido nesta obra (idempotente)
+      security: [{ fluigAuth: [] }]
+      x-requer-admin: true
+      responses:
+        '204': { description: Tipo marcado (agora ou antes) }
+        '400':
+          description: '`TIPO_NAO_E_POR_OBRA` (tipo de abrangência GERAL)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+    delete:
+      tags: [Fluig - Obras]
+      operationId: fluigDesmarcarTipoExigidoObra
+      summary: Deixa de exigir o tipo nesta obra (idempotente; envios preservados)
+      security: [{ fluigAuth: [] }]
+      x-requer-admin: true
+      responses:
+        '204': { description: Tipo desmarcado (agora ou antes) }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/SemPermissao' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /api/fluig/obras/{obraId}/empresas/{empresaId}/documentos:
+    parameters:
+      - { $ref: '#/components/parameters/ObraId' }
+      - { $ref: '#/components/parameters/EmpresaId' }
+    get:
+      tags: [Fluig - Análise]
+      operationId: fluigListarDocumentosEmpresaObra
+      summary: Situação de cada documento da obra para a empresa (tipos marcados; ordenado por nome do tipo)
+      description: |
+        Responde também com vínculo encerrado (para histórico). Sem vínculo (ativo ou encerrado) → 404.
+      security: [{ fluigAuth: [] }]
+      responses:
+        '200':
+          description: Documentos da obra
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DocumentoSituacao' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /api/fluig/obras/{obraId}/empresas/{empresaId}/documentos/{tipoDocumentoId}/envios:
+    parameters:
+      - { $ref: '#/components/parameters/ObraId' }
+      - { $ref: '#/components/parameters/EmpresaId' }
+      - { $ref: '#/components/parameters/TipoDocumentoId' }
+    get:
+      tags: [Fluig - Análise]
+      operationId: fluigListarHistoricoEnviosEmpresaObra
+      summary: Histórico de envios da empresa para o tipo nesta obra (mais recente primeiro; inclui tipos desmarcados)
+      security: [{ fluigAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/PeriodoInicio' }
+      responses:
+        '200':
+          description: Envios
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Envio' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /api/fluig/obras/{obraId}/empresas/{empresaId}/documentos/{tipoDocumentoId}/periodos:
+    parameters:
+      - { $ref: '#/components/parameters/ObraId' }
+      - { $ref: '#/components/parameters/EmpresaId' }
+      - { $ref: '#/components/parameters/TipoDocumentoId' }
+    get:
+      tags: [Fluig - Análise]
+      operationId: fluigListarPeriodosEmpresaObra
+      summary: Períodos exigidos do documento periódico da obra para a empresa (mais recente primeiro)
+      description: |
+        Responde também com vínculo encerrado (para histórico). Sem vínculo (ativo ou encerrado), tipo não
+        marcado na obra ou de periodicidade `UNICA` → 404.
+      security: [{ fluigAuth: [] }]
+      responses:
+        '200':
+          description: Períodos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Periodo' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
 
   /api/fluig/empresas:
@@ -373,6 +520,10 @@ paths:
         - name: comPendencia
           in: query
           description: true = somente empresas com documento pendente de envio ou rejeitado.
+          schema: { type: boolean }
+        - name: comAtraso
+          in: query
+          description: true = somente empresas com algum período de documento periódico atrasado.
           schema: { type: boolean }
         - { $ref: '#/components/parameters/Pagina' }
         - { $ref: '#/components/parameters/TamanhoPagina' }
@@ -516,6 +667,7 @@ paths:
       tags: [Fluig - Análise]
       operationId: fluigListarDocumentosEmpresa
       summary: Situação de cada tipo de documento ativo para a empresa (ordenado por nome do tipo)
+      description: Só documentos gerais (tipos `GERAL` ativos). Os da obra ficam em `/obras/{obraId}/empresas/{empresaId}/documentos`.
       security: [{ fluigAuth: [] }]
       responses:
         '200':
@@ -537,7 +689,10 @@ paths:
       tags: [Fluig - Análise]
       operationId: fluigListarHistoricoEnvios
       summary: Histórico de envios da empresa para o tipo (mais recente primeiro; inclui tipos inativos)
+      description: Só envios gerais. Tipo `POR_OBRA` → 404.
       security: [{ fluigAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/PeriodoInicio' }
       responses:
         '200':
           description: Envios
@@ -546,6 +701,29 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/Envio' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /api/fluig/empresas/{empresaId}/documentos/{tipoDocumentoId}/periodos:
+    parameters:
+      - { $ref: '#/components/parameters/EmpresaId' }
+      - { $ref: '#/components/parameters/TipoDocumentoId' }
+    get:
+      tags: [Fluig - Análise]
+      operationId: fluigListarPeriodosEmpresa
+      summary: Períodos exigidos do documento geral periódico da empresa (mais recente primeiro)
+      description: |
+        Do início da cobrança até o período em curso. Tipo `POR_OBRA` ou de periodicidade `UNICA` → 404.
+      security: [{ fluigAuth: [] }]
+      responses:
+        '200':
+          description: Períodos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Periodo' }
         '401': { $ref: '#/components/responses/NaoAutenticado' }
         '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
@@ -561,6 +739,14 @@ paths:
           in: query
           description: Filtra por ativo/inativo. Omitido = todos.
           schema: { type: boolean }
+        - name: abrangencia
+          in: query
+          description: Filtra por abrangência. Omitido = todas.
+          schema: { $ref: '#/components/schemas/Abrangencia' }
+        - name: periodico
+          in: query
+          description: true = só tipos periódicos (MESES/DIAS); false = só UNICA. Omitido = todos.
+          schema: { type: boolean }
       responses:
         '200':
           description: Tipos
@@ -574,7 +760,7 @@ paths:
     post:
       tags: [Fluig - Tipos de documento]
       operationId: fluigCriarTipoDocumento
-      summary: Cadastra tipo de documento (passa a ser exigido de todas as empresas ativas)
+      summary: Cadastra tipo de documento (GERAL é exigido de todas as empresas ativas; POR_OBRA, só nas obras que o marcarem)
       security: [{ fluigAuth: [] }]
       x-requer-admin: true
       requestBody:
@@ -620,6 +806,10 @@ paths:
       tags: [Fluig - Tipos de documento]
       operationId: fluigAtualizarTipoDocumento
       summary: Atualiza tipo de documento (inclui ativar/desativar)
+      description: |
+        Aceita `abrangencia`. Trocar a abrangência de tipo que já tem envios → 409 `ABRANGENCIA_IMUTAVEL`.
+        Aceita `periodicidade` (desde 1.4.0). Mudar unidade ou intervalo de tipo que já tem envios →
+        409 `PERIODICIDADE_IMUTAVEL`; `prazoDias` pode mudar sempre. `periodicidade` omitida (ou null) = mantém a atual.
       security: [{ fluigAuth: [] }]
       x-requer-admin: true
       requestBody:
@@ -638,7 +828,7 @@ paths:
         '403': { $ref: '#/components/responses/SemPermissao' }
         '404': { $ref: '#/components/responses/NaoEncontrado' }
         '409':
-          description: '`NOME_DUPLICADO`'
+          description: '`NOME_DUPLICADO`, `ABRANGENCIA_IMUTAVEL` ou `PERIODICIDADE_IMUTAVEL`'
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problema' }
@@ -660,14 +850,22 @@ paths:
             default: EM_ANALISE
         - name: obraId
           in: query
-          description: Envios de empresas vinculadas a esta obra.
+          description: Somente envios desta obra (documentos da obra). Não combina com `somenteGerais` (400).
           schema: { type: string, format: uuid }
+        - name: somenteGerais
+          in: query
+          description: true = somente envios de documentos gerais (sem obra). Não combina com `obraId` (400).
+          schema: { type: boolean }
         - name: empresaId
           in: query
           schema: { type: string, format: uuid }
         - name: tipoDocumentoId
           in: query
           schema: { type: string, format: uuid }
+        - name: comAtraso
+          in: query
+          description: true = somente envios feitos depois do prazo do período (`enviadoComAtraso`).
+          schema: { type: boolean }
         - { $ref: '#/components/parameters/Pagina' }
         - { $ref: '#/components/parameters/TamanhoPagina' }
       responses:
@@ -1034,7 +1232,9 @@ paths:
       tags: [Portal - Documentos]
       operationId: portalListarDocumentos
       summary: Documentos exigidos da empresa autenticada e a situação de cada um
-      description: Todos os tipos ativos, ordenados por situação (REJEITADO, PENDENTE_ENVIO, EM_ANALISE, APROVADO) e nome.
+      description: |
+        Só documentos gerais: todos os tipos `GERAL` ativos, ordenados por situação (REJEITADO,
+        PENDENTE_ENVIO, EM_ANALISE, APROVADO) e nome. Os da obra ficam em `/api/portal/obras/{obraId}/documentos`.
       security: [{ portalAuth: [] }]
       responses:
         '200':
@@ -1054,7 +1254,10 @@ paths:
       tags: [Portal - Documentos]
       operationId: portalListarHistoricoEnvios
       summary: Histórico de envios da própria empresa para o tipo (mais recente primeiro)
+      description: Só tipo `GERAL` (envios gerais). Tipo `POR_OBRA` → 404.
       security: [{ portalAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/PeriodoInicio' }
       responses:
         '200':
           description: Envios
@@ -1073,6 +1276,10 @@ paths:
       description: |
         Permitido somente quando a situação é `PENDENTE_ENVIO` ou `REJEITADO` e o tipo está ativo.
         O formato é validado pelo conteúdo do arquivo (assinatura de bytes), não pela extensão.
+        Só tipo `GERAL`; tipo `POR_OBRA` → 404 (use `/api/portal/obras/{obraId}/documentos/{tipoDocumentoId}/envios`).
+        Tipo periódico (desde 1.4.0): `periodoInicio` indica o período; a situação e o `podeEnviar` são
+        os desse período. Período não exigido (futuro, anterior ao início da cobrança ou data que não é
+        início de período) → 404.
       security: [{ portalAuth: [] }]
       requestBody:
         required: true
@@ -1085,6 +1292,10 @@ paths:
                 arquivo:
                   type: string
                   format: binary
+                periodoInicio:
+                  type: string
+                  format: date
+                  description: Início do período do envio. Obrigatório para tipo periódico; proibido para tipo único (→ 400 `PERIODO_OBRIGATORIO`).
       responses:
         '201':
           description: Envio registrado (status `EM_ANALISE`)
@@ -1092,7 +1303,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/EnvioPortal' }
         '400':
-          description: '`VALIDACAO` (campo ausente) ou `ARQUIVO_INVALIDO` (vazio/corrompido)'
+          description: '`VALIDACAO` (campo ausente), `ARQUIVO_INVALIDO` (vazio/corrompido) ou `PERIODO_OBRIGATORIO`'
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problema' }
@@ -1115,6 +1326,174 @@ paths:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problema' }
 
+  /api/portal/documentos/{tipoDocumentoId}/periodos:
+    parameters:
+      - { $ref: '#/components/parameters/TipoDocumentoId' }
+    get:
+      tags: [Portal - Documentos]
+      operationId: portalListarPeriodos
+      summary: Períodos exigidos do documento geral periódico da própria empresa (mais recente primeiro)
+      description: |
+        Diz, para cada período, a situação, se está atrasado e se dá para enviar. Tipo `POR_OBRA` ou de
+        periodicidade `UNICA` → 404.
+      security: [{ portalAuth: [] }]
+      responses:
+        '200':
+          description: Períodos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PeriodoPortal' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /api/portal/obras:
+    get:
+      tags: [Portal - Documentos]
+      operationId: portalListarObras
+      summary: Obras da empresa autenticada com a contagem dos documentos de cada uma
+      description: |
+        Obras ativas com vínculo ativo da empresa do token. Ordem: com pendência primeiro, depois nome.
+      security: [{ portalAuth: [] }]
+      responses:
+        '200':
+          description: Obras
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ObraPortal' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
+
+  /api/portal/obras/{obraId}/documentos:
+    parameters:
+      - { $ref: '#/components/parameters/ObraId' }
+    get:
+      tags: [Portal - Documentos]
+      operationId: portalListarDocumentosObra
+      summary: Documentos exigidos da empresa nesta obra e a situação de cada um
+      description: |
+        Tipos marcados e ativos na obra, ordenados por situação (REJEITADO, PENDENTE_ENVIO, EM_ANALISE,
+        APROVADO) e nome. `{obraId}` só é resolvido entre obras ativas com vínculo ativo da empresa do
+        token; fora disso → 404.
+      security: [{ portalAuth: [] }]
+      responses:
+        '200':
+          description: Documentos da obra
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DocumentoSituacaoPortal' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
+  /api/portal/obras/{obraId}/documentos/{tipoDocumentoId}/envios:
+    parameters:
+      - { $ref: '#/components/parameters/ObraId' }
+      - { $ref: '#/components/parameters/TipoDocumentoId' }
+    get:
+      tags: [Portal - Documentos]
+      operationId: portalListarHistoricoObra
+      summary: Histórico de envios da própria empresa para o tipo nesta obra (mais recente primeiro)
+      description: Obra fora do alcance da empresa (sem vínculo ativo ou inativa) ou tipo não marcado → 404.
+      security: [{ portalAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/PeriodoInicio' }
+      responses:
+        '200':
+          description: Envios
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EnvioPortal' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+    post:
+      tags: [Portal - Documentos]
+      operationId: portalEnviarDocumentoObra
+      summary: Envia arquivo para o documento da obra (PDF, JPEG ou PNG, até 10 MB)
+      description: |
+        Mesmas regras de `POST /api/portal/documentos/{tipoDocumentoId}/envios`, para o documento desta
+        obra: permitido somente quando a situação é `PENDENTE_ENVIO` ou `REJEITADO` e o documento é
+        exigido (tipo ativo e marcado na obra). Obra fora do alcance da empresa ou tipo não marcado → 404.
+        Tipo periódico: mesmas regras de `periodoInicio` do envio geral.
+      security: [{ portalAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [arquivo]
+              properties:
+                arquivo:
+                  type: string
+                  format: binary
+                periodoInicio:
+                  type: string
+                  format: date
+                  description: Início do período do envio. Obrigatório para tipo periódico; proibido para tipo único (→ 400 `PERIODO_OBRIGATORIO`).
+      responses:
+        '201':
+          description: Envio registrado (status `EM_ANALISE`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnvioPortal' }
+        '400':
+          description: '`VALIDACAO` (campo ausente), `ARQUIVO_INVALIDO` (vazio/corrompido) ou `PERIODO_OBRIGATORIO`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+        '409':
+          description: '`ENVIO_NAO_PERMITIDO` (documento em análise ou aprovado)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '413':
+          description: '`ARQUIVO_MUITO_GRANDE`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+        '415':
+          description: '`ARQUIVO_TIPO_NAO_SUPORTADO`'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problema' }
+
+  /api/portal/obras/{obraId}/documentos/{tipoDocumentoId}/periodos:
+    parameters:
+      - { $ref: '#/components/parameters/ObraId' }
+      - { $ref: '#/components/parameters/TipoDocumentoId' }
+    get:
+      tags: [Portal - Documentos]
+      operationId: portalListarPeriodosObra
+      summary: Períodos exigidos do documento periódico da obra para a própria empresa (mais recente primeiro)
+      description: |
+        Mesmo isolamento de `/api/portal/obras/{obraId}/documentos`: obra fora do alcance da empresa (sem
+        vínculo ativo ou inativa), tipo não marcado ou de periodicidade `UNICA` → 404.
+      security: [{ portalAuth: [] }]
+      responses:
+        '200':
+          description: Períodos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PeriodoPortal' }
+        '401': { $ref: '#/components/responses/NaoAutenticado' }
+        '403': { $ref: '#/components/responses/TrocaSenhaObrigatoria' }
+        '404': { $ref: '#/components/responses/NaoEncontrado' }
+
   /api/portal/envios/{envioId}/arquivo:
     parameters:
       - { $ref: '#/components/parameters/EnvioId' }
@@ -1122,6 +1501,7 @@ paths:
       tags: [Portal - Documentos]
       operationId: portalBaixarArquivoEnvio
       summary: Baixa arquivo de um envio da própria empresa (outra empresa → 404)
+      description: Envio de obra exige vínculo ativo com a obra e obra ativa; senão 404.
       security: [{ portalAuth: [] }]
       responses:
         '200': { $ref: '#/components/responses/Arquivo' }
@@ -1192,6 +1572,11 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    PeriodoInicio:
+      name: periodoInicio
+      in: query
+      description: Só os envios do período que começa nesta data (documentos periódicos). Omitido = todos.
+      schema: { type: string, format: date }
 
   responses:
     Validacao:
@@ -1289,6 +1674,10 @@ components:
         - ALTERACAO_PROPRIA_NAO_PERMITIDA
         - EMAIL_ACESSO_FALHOU
         - SO_LOGIN_LOCAL
+        - ABRANGENCIA_IMUTAVEL
+        - TIPO_NAO_E_POR_OBRA
+        - PERIODICIDADE_IMUTAVEL
+        - PERIODO_OBRIGATORIO
       description: |
         | code | status | mensagem padrão (title) |
         |---|---|---|
@@ -1324,6 +1713,10 @@ components:
         | ALTERACAO_PROPRIA_NAO_PERMITIDA | 409 | Você não pode desativar nem tirar o seu próprio acesso de administrador. Peça a outro administrador. |
         | EMAIL_ACESSO_FALHOU | 502 | Não conseguimos enviar o e-mail com a senha provisória. Tente de novo em alguns minutos. |
         | SO_LOGIN_LOCAL | 409 | Esta opção é só para quem entra com login e senha. |
+        | ABRANGENCIA_IMUTAVEL | 409 | A abrangência não pode ser alterada porque este tipo já tem envios. |
+        | TIPO_NAO_E_POR_OBRA | 400 | Só tipos de documento por obra podem ser exigidos de uma obra. |
+        | PERIODICIDADE_IMUTAVEL | 409 | A periodicidade só pode mudar enquanto o tipo não tiver envios. |
+        | PERIODO_OBRIGATORIO | 400 | Informe o período do envio (só para documentos periódicos). |
     Problema:
       type: object
       required: [type, title, status, code]
@@ -1374,6 +1767,14 @@ components:
     FormatoArquivo:
       type: string
       enum: [application/pdf, image/jpeg, image/png]
+    Abrangencia:
+      type: string
+      enum: [GERAL, POR_OBRA]
+      description: GERAL = da empresa, vale em todas as obras. POR_OBRA = cada obra exige e recebe o seu envio.
+    UnidadePeriodicidade:
+      type: string
+      enum: [UNICA, MESES, DIAS]
+      description: UNICA = um envio vale para sempre. MESES/DIAS = um envio por período de `intervalo` meses/dias.
 
     # ── Fluig: sessão ──
     UsuarioFluig:
@@ -1481,19 +1882,29 @@ components:
         nome: { type: string }
     Painel:
       type: object
-      required: [enviosEmAnalise, empresasComPendencia, empresasConvidadasSemAcesso, empresasAtivas, obrasAtivas]
+      required: [enviosEmAnalise, empresasComPendencia, empresasConvidadasSemAcesso, empresasAtivas, obrasAtivas, obrasComPendencia, empresasComAtraso]
       properties:
         enviosEmAnalise: { type: integer, minimum: 0 }
         empresasComPendencia:
           type: integer
           minimum: 0
-          description: Empresas ativas com ao menos um documento PENDENTE_ENVIO ou REJEITADO.
+          description: |
+            Empresas ativas com ao menos um documento PENDENTE_ENVIO ou REJEITADO — geral ou da obra
+            (em obra ativa com vínculo ativo).
+        obrasComPendencia:
+          type: integer
+          minimum: 0
+          description: Obras ativas com alguma empresa ativa (vínculo ativo) com documento da obra PENDENTE_ENVIO ou REJEITADO.
         empresasConvidadasSemAcesso:
           type: integer
           minimum: 0
           description: Empresas com situação CONVIDADA ou CONVITE_EXPIRADO.
         empresasAtivas: { type: integer, minimum: 0 }
         obrasAtivas: { type: integer, minimum: 0 }
+        empresasComAtraso:
+          type: integer
+          minimum: 0
+          description: Empresas ativas com algum período de documento periódico atrasado (geral ou da obra).
 
     # ── Obras ──
     ObraInput:
@@ -1526,19 +1937,44 @@ components:
       allOf:
         - $ref: '#/components/schemas/Obra'
         - type: object
-          required: [quantidadeEmpresas]
+          required: [quantidadeEmpresas, quantidadeTiposExigidos]
           properties:
             quantidadeEmpresas: { type: integer, minimum: 0 }
+            quantidadeTiposExigidos: { type: integer, minimum: 0, description: Tipos marcados como exigidos na obra. }
     ObraDetalhe:
       allOf:
         - $ref: '#/components/schemas/Obra'
         - type: object
-          required: [empresas]
+          required: [empresas, vinculosEncerrados, quantidadeTiposExigidos]
           properties:
             empresas:
               type: array
-              description: Empresas vinculadas, ordenadas por razão social.
+              description: Empresas com vínculo ativo, ordenadas por razão social.
               items: { $ref: '#/components/schemas/EmpresaNaObra' }
+            vinculosEncerrados:
+              type: array
+              description: Vínculos encerrados (histórico).
+              items: { $ref: '#/components/schemas/VinculoEncerrado' }
+            quantidadeTiposExigidos: { type: integer, minimum: 0, description: Tipos marcados como exigidos na obra. }
+    VinculoEncerrado:
+      type: object
+      required: [empresaId, razaoSocial, cnpj, encerradoEm, quantidadeEnvios]
+      properties:
+        empresaId: { type: string, format: uuid }
+        razaoSocial: { type: string }
+        cnpj: { type: string }
+        encerradoEm: { type: string, format: date-time }
+        encerradoPorLogin: { type: string, nullable: true }
+        quantidadeEnvios: { type: integer, minimum: 0, description: Envios da empresa nesta obra. }
+    TipoExigidoObra:
+      type: object
+      required: [tipoDocumento, exigido]
+      properties:
+        tipoDocumento:
+          allOf: [{ $ref: '#/components/schemas/TipoDocumento' }]
+          description: Só tipos POR_OBRA (ativos, e inativos marcados).
+        exigido: { type: boolean }
+        marcadoEm: { type: string, format: date-time, nullable: true }
     ObraRef:
       type: object
       required: [id, nome, cidade, uf]
@@ -1547,6 +1983,26 @@ components:
         nome: { type: string }
         cidade: { type: string }
         uf: { $ref: '#/components/schemas/Uf' }
+    ObraNaEmpresa:
+      allOf:
+        - $ref: '#/components/schemas/ObraRef'
+        - type: object
+          required: [vinculoAtivo, obraAtiva, documentos]
+          properties:
+            vinculoAtivo: { type: boolean }
+            obraAtiva: { type: boolean }
+            documentos:
+              allOf: [{ $ref: '#/components/schemas/ContagemDocumentos' }]
+              description: Contagem dos documentos da obra para esta empresa.
+    ObraPortal:
+      allOf:
+        - $ref: '#/components/schemas/ObraRef'
+        - type: object
+          required: [documentos]
+          properties:
+            documentos:
+              allOf: [{ $ref: '#/components/schemas/ContagemDocumentos' }]
+              description: Contagem dos documentos da obra para a empresa autenticada.
     PaginaObras:
       allOf:
         - $ref: '#/components/schemas/PaginaBase'
@@ -1586,13 +2042,17 @@ components:
             ativa: { type: boolean }
     ContagemDocumentos:
       type: object
-      required: [total, pendentes, emAnalise, aprovados, rejeitados]
+      required: [total, pendentes, emAnalise, aprovados, rejeitados, periodosAtrasados]
       properties:
-        total: { type: integer, minimum: 0, description: Tipos de documento ativos. }
+        total: { type: integer, minimum: 0, description: Documentos exigidos no contexto (tipos GERAL ativos na empresa; tipos marcados e ativos na obra). }
         pendentes: { type: integer, minimum: 0 }
         emAnalise: { type: integer, minimum: 0 }
         aprovados: { type: integer, minimum: 0 }
         rejeitados: { type: integer, minimum: 0 }
+        periodosAtrasados:
+          type: integer
+          minimum: 0
+          description: Soma dos períodos atrasados dos documentos periódicos (cada documento conta uma vez nas demais contagens, pela situação resumida).
     EmpresaResumo:
       type: object
       required: [id, razaoSocial, cnpj, emailContato, ativa, situacaoAcesso, documentos]
@@ -1604,7 +2064,14 @@ components:
         emailContato: { type: string }
         ativa: { type: boolean }
         situacaoAcesso: { $ref: '#/components/schemas/SituacaoAcesso' }
-        documentos: { $ref: '#/components/schemas/ContagemDocumentos' }
+        documentos:
+          allOf: [{ $ref: '#/components/schemas/ContagemDocumentos' }]
+          description: Só documentos gerais.
+        documentosObra:
+          type: object
+          allOf: [{ $ref: '#/components/schemas/ContagemDocumentos' }]
+          nullable: true
+          description: Documentos da obra; preenchido só quando a lista foi filtrada por `obraId`.
     Empresa:
       allOf:
         - $ref: '#/components/schemas/EmpresaResumo'
@@ -1615,7 +2082,8 @@ components:
             telefone: { type: string, nullable: true, description: Só dígitos. }
             obras:
               type: array
-              items: { $ref: '#/components/schemas/ObraRef' }
+              description: Obras vinculadas, inclusive vínculos encerrados (`vinculoAtivo=false`).
+              items: { $ref: '#/components/schemas/ObraNaEmpresa' }
             cnpjEditavel:
               type: boolean
               description: false depois do primeiro convite.
@@ -1627,14 +2095,23 @@ components:
             criadoEm: { type: string, format: date-time }
     EmpresaNaObra:
       type: object
-      required: [empresaId, razaoSocial, cnpj, situacaoAcesso, vinculadoEm, documentos]
+      required: [empresaId, razaoSocial, cnpj, situacaoAcesso, vinculadoEm, documentosObra, documentosGerais, quantidadeEnviosNaObra]
       properties:
         empresaId: { type: string, format: uuid }
         razaoSocial: { type: string }
         cnpj: { type: string }
         situacaoAcesso: { $ref: '#/components/schemas/SituacaoAcesso' }
         vinculadoEm: { type: string, format: date-time }
-        documentos: { $ref: '#/components/schemas/ContagemDocumentos' }
+        documentosObra:
+          allOf: [{ $ref: '#/components/schemas/ContagemDocumentos' }]
+          description: Contagem dos documentos desta obra para a empresa.
+        documentosGerais:
+          allOf: [{ $ref: '#/components/schemas/ContagemDocumentos' }]
+          description: Contagem dos documentos gerais da empresa.
+        quantidadeEnviosNaObra:
+          type: integer
+          minimum: 0
+          description: Envios da empresa nesta obra (para a confirmação de desvincular).
     EmpresaRef:
       type: object
       required: [id, razaoSocial, cnpj]
@@ -1683,10 +2160,14 @@ components:
     # ── Tipos de documento ──
     TipoDocumentoInput:
       type: object
-      required: [nome]
+      required: [nome, abrangencia]
       properties:
         nome: { type: string, minLength: 3, maxLength: 120 }
         instrucoes: { type: string, maxLength: 1000, nullable: true }
+        abrangencia: { $ref: '#/components/schemas/Abrangencia' }
+        periodicidade:
+          allOf: [{ $ref: '#/components/schemas/Periodicidade' }]
+          description: Omitido no cadastro = UNICA. Omitido (ou null) na atualização = mantém a periodicidade atual.
     TipoDocumentoAtualizacao:
       allOf:
         - $ref: '#/components/schemas/TipoDocumentoInput'
@@ -1696,35 +2177,131 @@ components:
             ativo: { type: boolean }
     TipoDocumento:
       type: object
-      required: [id, nome, ativo, criadoEm]
+      required: [id, nome, abrangencia, periodicidade, ativo, criadoEm]
       properties:
         id: { type: string, format: uuid }
         nome: { type: string }
         instrucoes: { type: string, nullable: true }
+        abrangencia: { $ref: '#/components/schemas/Abrangencia' }
+        periodicidade: { $ref: '#/components/schemas/Periodicidade' }
         ativo: { type: boolean }
         criadoEm: { type: string, format: date-time }
     TipoDocumentoRef:
       type: object
-      required: [id, nome]
+      required: [id, nome, abrangencia, periodicidade]
       properties:
         id: { type: string, format: uuid }
         nome: { type: string }
         instrucoes: { type: string, nullable: true }
+        abrangencia: { $ref: '#/components/schemas/Abrangencia' }
+        periodicidade: { $ref: '#/components/schemas/Periodicidade' }
+    Periodicidade:
+      type: object
+      required: [unidade]
+      properties:
+        unidade: { $ref: '#/components/schemas/UnidadePeriodicidade' }
+        intervalo:
+          type: integer
+          nullable: true
+          minimum: 1
+          maximum: 365
+          description: Null se UNICA; MESES 1–24; DIAS 1–365.
+        prazoDias:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 90
+          description: Dias depois do fim do período para enviar sem atraso. Null se UNICA; 0–90.
+        descricao:
+          type: string
+          readOnly: true
+          description: Texto pronto para exibir (só em respostas).
+          example: Mensal · até o dia 15 do mês seguinte
+
+    # ── Períodos (documentos periódicos) ──
+    PeriodoRef:
+      type: object
+      description: Período a que um envio se refere.
+      required: [inicio, fim, rotulo]
+      properties:
+        inicio: { type: string, format: date }
+        fim: { type: string, format: date }
+        rotulo: { type: string, example: Março/2026 }
+    PeriodoComPrazo:
+      allOf:
+        - $ref: '#/components/schemas/PeriodoRef'
+        - type: object
+          required: [prazo]
+          properties:
+            prazo: { type: string, format: date, description: Último dia para enviar sem atraso (fim + prazoDias). }
+    ResumoPeriodos:
+      type: object
+      description: Contagem dos períodos exigidos de um documento periódico. Cada período entra uma vez em pendentes, rejeitados, emAnalise ou aprovados; atrasados conta, à parte, quantos dos pendentes e rejeitados já passaram do prazo (se sobrepõe a eles).
+      required: [atrasados, pendentes, rejeitados, emAnalise, aprovados]
+      properties:
+        atrasados: { type: integer, minimum: 0, description: 'Subconjunto de pendentes + rejeitados com o prazo vencido.' }
+        pendentes: { type: integer, minimum: 0 }
+        rejeitados: { type: integer, minimum: 0 }
+        emAnalise: { type: integer, minimum: 0 }
+        aprovados: { type: integer, minimum: 0 }
+        proximo:
+          type: object
+          allOf: [{ $ref: '#/components/schemas/PeriodoComPrazo' }]
+          nullable: true
+          description: Primeiro período (o mais antigo) que pede ação; null se nenhum.
+    Periodo:
+      description: Visão da Jotanunes de um período exigido.
+      allOf:
+        - $ref: '#/components/schemas/PeriodoComPrazo'
+        - type: object
+          required: [situacao, atrasado, quantidadeEnvios]
+          properties:
+            situacao: { $ref: '#/components/schemas/SituacaoDocumento' }
+            atrasado: { type: boolean, description: Prazo vencido com situação PENDENTE_ENVIO ou REJEITADO. }
+            envioAtual:
+              type: object
+              allOf: [{ $ref: '#/components/schemas/Envio' }]
+              nullable: true
+              description: Envio que define a situação do período (null se PENDENTE_ENVIO).
+            quantidadeEnvios: { type: integer, minimum: 0 }
+    PeriodoPortal:
+      description: Visão da empresa de um período exigido.
+      allOf:
+        - $ref: '#/components/schemas/PeriodoComPrazo'
+        - type: object
+          required: [situacao, atrasado, podeEnviar]
+          properties:
+            situacao: { $ref: '#/components/schemas/SituacaoDocumento' }
+            atrasado: { type: boolean, description: Prazo vencido com situação PENDENTE_ENVIO ou REJEITADO. }
+            envioAtual:
+              type: object
+              allOf: [{ $ref: '#/components/schemas/EnvioPortal' }]
+              nullable: true
+            podeEnviar:
+              type: boolean
+              description: true quando a situação do período é PENDENTE_ENVIO ou REJEITADO e o documento é exigido.
 
     # ── Envios ──
     Envio:
       type: object
       description: Visão da Jotanunes (inclui quem analisou).
-      required: [id, empresaId, tipoDocumentoId, nomeArquivo, formato, tamanhoBytes, enviadoEm, status]
+      required: [id, empresaId, tipoDocumentoId, nomeArquivo, formato, tamanhoBytes, enviadoEm, status, enviadoComAtraso]
       properties:
         id: { type: string, format: uuid }
         empresaId: { type: string, format: uuid }
         tipoDocumentoId: { type: string, format: uuid }
+        obraId: { type: string, format: uuid, nullable: true, description: Obra do envio (null = documento geral). }
         nomeArquivo: { type: string }
         formato: { $ref: '#/components/schemas/FormatoArquivo' }
         tamanhoBytes: { type: integer, minimum: 1, maximum: 10485760 }
         enviadoEm: { type: string, format: date-time }
         status: { $ref: '#/components/schemas/StatusEnvio' }
+        periodo:
+          type: object
+          allOf: [{ $ref: '#/components/schemas/PeriodoRef' }]
+          nullable: true
+          description: Período do envio (null = tipo de periodicidade UNICA).
+        enviadoComAtraso: { type: boolean, description: Enviado depois do prazo do período (sempre false para UNICA). }
         analisadoEm: { type: string, format: date-time, nullable: true }
         analisadoPor:
           type: object
@@ -1739,6 +2316,11 @@ components:
           properties:
             empresa: { $ref: '#/components/schemas/EmpresaRef' }
             tipoDocumento: { $ref: '#/components/schemas/TipoDocumentoRef' }
+            obra:
+              type: object
+              allOf: [{ $ref: '#/components/schemas/ObraRef' }]
+              nullable: true
+              description: Obra do envio (null = documento geral).
     PaginaEnvios:
       allOf:
         - $ref: '#/components/schemas/PaginaBase'
@@ -1755,7 +2337,10 @@ components:
         motivo: { type: string, minLength: 5, maxLength: 500, description: Espaços nas pontas são removidos antes de validar. }
     DocumentoSituacao:
       type: object
-      required: [tipoDocumento, situacao]
+      description: |
+        Para tipo periódico, `situacao` e `envioAtual` são os do período resumido: algum atrasado
+        primeiro; senão REJEITADO > PENDENTE_ENVIO > EM_ANALISE > APROVADO.
+      required: [tipoDocumento, situacao, atrasado]
       properties:
         tipoDocumento: { $ref: '#/components/schemas/TipoDocumentoRef' }
         situacao: { $ref: '#/components/schemas/SituacaoDocumento' }
@@ -1765,6 +2350,12 @@ components:
           nullable: true
           description: Envio que define a situação (null se PENDENTE_ENVIO).
         quantidadeEnvios: { type: integer, minimum: 0 }
+        atrasado: { type: boolean, description: Algum período atrasado (sempre false para UNICA). }
+        periodos:
+          type: object
+          allOf: [{ $ref: '#/components/schemas/ResumoPeriodos' }]
+          nullable: true
+          description: Resumo dos períodos (null para tipo de periodicidade UNICA).
 
     # ── Portal ──
     LoginInput:
@@ -1802,20 +2393,29 @@ components:
     EnvioPortal:
       type: object
       description: Visão da empresa (NÃO inclui quem analisou).
-      required: [id, tipoDocumentoId, nomeArquivo, formato, tamanhoBytes, enviadoEm, status]
+      required: [id, tipoDocumentoId, nomeArquivo, formato, tamanhoBytes, enviadoEm, status, enviadoComAtraso]
       properties:
         id: { type: string, format: uuid }
         tipoDocumentoId: { type: string, format: uuid }
+        obraId: { type: string, format: uuid, nullable: true, description: Obra do envio (null = documento geral). }
         nomeArquivo: { type: string }
         formato: { $ref: '#/components/schemas/FormatoArquivo' }
         tamanhoBytes: { type: integer, minimum: 1, maximum: 10485760 }
         enviadoEm: { type: string, format: date-time }
         status: { $ref: '#/components/schemas/StatusEnvio' }
+        periodo:
+          type: object
+          allOf: [{ $ref: '#/components/schemas/PeriodoRef' }]
+          nullable: true
+          description: Período do envio (null = tipo de periodicidade UNICA).
+        enviadoComAtraso: { type: boolean, description: Enviado depois do prazo do período (sempre false para UNICA). }
         analisadoEm: { type: string, format: date-time, nullable: true }
         motivoRejeicao: { type: string, nullable: true }
     DocumentoSituacaoPortal:
       type: object
-      required: [tipoDocumento, situacao, podeEnviar]
+      description: |
+        Para tipo periódico, `situacao` e `envioAtual` são os do período resumido (ver `DocumentoSituacao`).
+      required: [tipoDocumento, situacao, podeEnviar, atrasado]
       properties:
         tipoDocumento: { $ref: '#/components/schemas/TipoDocumentoRef' }
         situacao: { $ref: '#/components/schemas/SituacaoDocumento' }
@@ -1826,3 +2426,9 @@ components:
         podeEnviar:
           type: boolean
           description: true quando situação é PENDENTE_ENVIO ou REJEITADO.
+        atrasado: { type: boolean, description: Algum período atrasado (sempre false para UNICA). }
+        periodos:
+          type: object
+          allOf: [{ $ref: '#/components/schemas/ResumoPeriodos' }]
+          nullable: true
+          description: Resumo dos períodos (null para tipo de periodicidade UNICA).

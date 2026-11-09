@@ -103,7 +103,10 @@ export function EmpresaDetalhe() {
               <ul className="jn-lista-simples" aria-label="Obras da empresa">
                 {empresa.obras.map((o) => (
                   <li key={o.id}>
-                    <Link to={`/obras/${o.id}`}>{o.nome}</Link>
+                    <span>
+                      <Link to={`/obras/${o.id}`}>{o.nome}</Link>
+                      {!o.vinculoAtivo ? <span className="jn-tabela__sub">Vínculo encerrado</span> : null}
+                    </span>
                     <span className="jn-meta jn-local">
                       <IconePin tamanho={16} /> {o.cidade}/{o.uf}
                     </span>
@@ -115,7 +118,7 @@ export function EmpresaDetalhe() {
         </div>
       </div>
 
-      <SecaoDocumentos empresaId={empresa.id} />
+      <SecaoDocumentos empresa={empresa} />
 
       <AlternarEmpresa
         empresa={alternando ? empresa : null}

@@ -35,6 +35,10 @@ public enum CodigoErro
     ALTERACAO_PROPRIA_NAO_PERMITIDA,
     EMAIL_ACESSO_FALHOU,
     SO_LOGIN_LOCAL,
+    ABRANGENCIA_IMUTAVEL,
+    TIPO_NAO_E_POR_OBRA,
+    PERIODICIDADE_IMUTAVEL,
+    PERIODO_OBRIGATORIO,
 }
 
 /// <summary>Status HTTP e mensagem padrão (title) de cada código — tabela do contrato.</summary>
@@ -74,6 +78,10 @@ public static class CatalogoErros
         CodigoErro.ALTERACAO_PROPRIA_NAO_PERMITIDA => (409, "Você não pode desativar nem tirar o seu próprio acesso de administrador. Peça a outro administrador."),
         CodigoErro.EMAIL_ACESSO_FALHOU => (502, "Não conseguimos enviar o e-mail com a senha provisória. Tente de novo em alguns minutos."),
         CodigoErro.SO_LOGIN_LOCAL => (409, "Esta opção é só para quem entra com login e senha."),
+        CodigoErro.ABRANGENCIA_IMUTAVEL => (409, "A abrangência não pode ser alterada porque este tipo já tem envios."),
+        CodigoErro.TIPO_NAO_E_POR_OBRA => (400, "Só tipos de documento por obra podem ser exigidos de uma obra."),
+        CodigoErro.PERIODICIDADE_IMUTAVEL => (409, "A periodicidade só pode mudar enquanto o tipo não tiver envios."),
+        CodigoErro.PERIODO_OBRIGATORIO => (400, "Informe o período do envio (só para documentos periódicos)."),
         _ => (500, "Algo deu errado do nosso lado. Tente de novo."),
     };
 }

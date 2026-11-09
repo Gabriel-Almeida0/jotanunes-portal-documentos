@@ -40,6 +40,10 @@ export const MENSAGENS_ERRO: Record<CodigoErro, string> = {
   EMAIL_ACESSO_FALHOU:
     'Não conseguimos enviar o e-mail com a senha provisória. Tente de novo em alguns minutos.',
   SO_LOGIN_LOCAL: 'Esta opção é só para quem entra com login e senha.',
+  ABRANGENCIA_IMUTAVEL: 'A abrangência não pode ser alterada porque este tipo já tem envios.',
+  TIPO_NAO_E_POR_OBRA: 'Só tipos de documento por obra podem ser exigidos de uma obra.',
+  PERIODICIDADE_IMUTAVEL: 'A periodicidade só pode mudar enquanto o tipo não tiver envios.',
+  PERIODO_OBRIGATORIO: 'Informe o período do envio (só para documentos periódicos).',
 };
 
 export const STATUS_ERRO: Record<CodigoErro, number> = {
@@ -76,6 +80,10 @@ export const STATUS_ERRO: Record<CodigoErro, number> = {
   ALTERACAO_PROPRIA_NAO_PERMITIDA: 409,
   EMAIL_ACESSO_FALHOU: 502,
   SO_LOGIN_LOCAL: 409,
+  ABRANGENCIA_IMUTAVEL: 409,
+  TIPO_NAO_E_POR_OBRA: 400,
+  PERIODICIDADE_IMUTAVEL: 409,
+  PERIODO_OBRIGATORIO: 400,
 };
 
 export const MENSAGEM_SEM_CONEXAO =

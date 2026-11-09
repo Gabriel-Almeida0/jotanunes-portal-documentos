@@ -5,7 +5,7 @@ namespace Jotanunes.Docs.Application.TiposDocumento;
 public sealed record TipoPadrao(string Nome, string Instrucoes);
 
 /// <summary>
-/// Os 10 tipos de documento criados numa instalação nova (data-model.md §4.1, FR-090). Depois de criados são tipos
+/// Os 10 tipos de documento criados numa instalação nova (data-model.md §4.1, FR-090), todos de abrangência GERAL (002). Depois de criados são tipos
 /// comuns: o administrador edita, desativa e complementa pela tela (FR-092).
 /// </summary>
 public static class CatalogoTiposPadrao

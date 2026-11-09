@@ -21,6 +21,7 @@ public sealed class DocsDbContext(DbContextOptions<DocsDbContext> options) : DbC
     public DbSet<Obra> Obras => Set<Obra>();
     public DbSet<Empresa> Empresas => Set<Empresa>();
     public DbSet<ObraEmpresa> ObraEmpresas => Set<ObraEmpresa>();
+    public DbSet<ObraTipoDocumento> ObraTiposDocumento => Set<ObraTipoDocumento>();
     public DbSet<TipoDocumento> TiposDocumento => Set<TipoDocumento>();
     public DbSet<Convite> Convites => Set<Convite>();
     public DbSet<EnvioDocumento> Envios => Set<EnvioDocumento>();
@@ -71,9 +72,24 @@ public sealed class DocsDbContext(DbContextOptions<DocsDbContext> options) : DbC
             e.ToTable("obra_empresas");
             e.HasKey(x => new { x.ObraId, x.EmpresaId });
             e.Property(x => x.VinculadoPorLogin).HasMaxLength(100).IsRequired();
+            // Vínculo encerrado em vez de apagado (002 research R5).
+            e.Property(x => x.Ativo).HasDefaultValue(true).HasSentinel(true).IsRequired();
+            e.Property(x => x.EncerradoPorLogin).HasMaxLength(100);
             e.HasOne<Obra>().WithMany().HasForeignKey(x => x.ObraId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<Empresa>().WithMany().HasForeignKey(x => x.EmpresaId).OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => x.EmpresaId);
+            e.HasIndex(x => x.EmpresaId, "ix_obra_empresas_empresa_ativo").HasFilter("ativo").HasDatabaseName("ix_obra_empresas_empresa_ativo");
+        });
+
+        b.Entity<ObraTipoDocumento>(e =>
+        {
+            // Tipos POR_OBRA exigidos em cada obra (002 data-model §2).
+            e.ToTable("obra_tipos_documento");
+            e.HasKey(x => new { x.ObraId, x.TipoDocumentoId });
+            e.Property(x => x.MarcadoPorLogin).HasMaxLength(100).IsRequired();
+            e.HasOne<Obra>().WithMany().HasForeignKey(x => x.ObraId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<TipoDocumento>().WithMany().HasForeignKey(x => x.TipoDocumentoId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.TipoDocumentoId);
         });
 
         b.Entity<TipoDocumento>(e =>
@@ -83,6 +99,21 @@ public sealed class DocsDbContext(DbContextOptions<DocsDbContext> options) : DbC
             e.Property(x => x.Id).ValueGeneratedNever();
             e.Property(x => x.Nome).HasMaxLength(120).IsRequired();
             e.Property(x => x.Instrucoes).HasMaxLength(1000);
+            e.Property(x => x.Abrangencia).HasConversion<string>().HasMaxLength(10).IsRequired().HasDefaultValueSql("'GERAL'").HasSentinel(Abrangencia.GERAL);
+            e.ToTable(t => t.HasCheckConstraint("ck_tipos_documento_abrangencia", "abrangencia IN ('GERAL', 'POR_OBRA')"));
+            // Periodicidade (003 data-model §1): três colunas; o value object é montado a partir delas.
+            e.Ignore(x => x.Periodicidade);
+            e.Property(x => x.PeriodicidadeUnidade).HasConversion<string>().HasMaxLength(10).IsRequired().HasDefaultValueSql("'UNICA'")
+                .HasSentinel(UnidadePeriodicidade.UNICA);
+            e.ToTable(t =>
+            {
+                t.HasCheckConstraint("ck_tipos_documento_periodicidade_unidade", "periodicidade_unidade IN ('UNICA', 'MESES', 'DIAS')");
+                t.HasCheckConstraint("ck_tipos_documento_periodicidade",
+                    "(periodicidade_unidade = 'UNICA' AND periodicidade_intervalo IS NULL AND prazo_dias IS NULL)"
+                    + " OR (periodicidade_unidade = 'MESES' AND periodicidade_intervalo BETWEEN 1 AND 24 AND prazo_dias BETWEEN 0 AND 90)"
+                    + " OR (periodicidade_unidade = 'DIAS' AND periodicidade_intervalo BETWEEN 1 AND 365 AND prazo_dias BETWEEN 0 AND 90)");
+            });
+            e.Property(x => x.CobrancaDesde).IsRequired();
             e.Property(x => x.CriadoPorLogin).HasMaxLength(100).IsRequired();
             e.Property(x => x.AtualizadoPorLogin).HasMaxLength(100);
             // índice único lower(nome): criado por SQL na migration (IndiceNomeTipo)
@@ -117,14 +148,30 @@ public sealed class DocsDbContext(DbContextOptions<DocsDbContext> options) : DbC
             e.Property(x => x.MotivoRejeicao).HasMaxLength(500);
             e.HasOne<Empresa>().WithMany().HasForeignKey(x => x.EmpresaId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<TipoDocumento>().WithMany().HasForeignKey(x => x.TipoDocumentoId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Obra>().WithMany().HasForeignKey(x => x.ObraId).OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => new { x.EmpresaId, x.TipoDocumentoId, x.EnviadoEm })
                 .IsDescending(false, false, true)
                 .HasDatabaseName("ix_envios_documento_empresa_tipo_enviado");
             e.HasIndex(x => new { x.Status, x.EnviadoEm }).HasDatabaseName("ix_envios_documento_status_enviado");
-            e.HasIndex(x => new { x.EmpresaId, x.TipoDocumentoId })
+            // Período do envio (003 data-model §2): ambos nulos (tipo único) ou ambos preenchidos.
+            e.ToTable(t => t.HasCheckConstraint("ck_envios_documento_periodo",
+                "(periodo_inicio IS NULL AND periodo_fim IS NULL) OR (periodo_inicio IS NOT NULL AND periodo_fim >= periodo_inicio)"));
+            // Um envio "vivo" por documento e período: geral (obra nula) por empresa × tipo; da obra por obra × empresa × tipo;
+            // período nulo para tipo único (NULLS NOT DISTINCT, PostgreSQL 15+; 002 R4, 003 R6). Mesmo nome → 23505 continua
+            // virando ENVIO_NAO_PERMITIDO.
+            e.HasIndex(x => new { x.EmpresaId, x.TipoDocumentoId, x.ObraId, x.PeriodoInicio })
                 .IsUnique()
+                .AreNullsDistinct(false)
                 .HasFilter("status <> 'REJEITADO'")
                 .HasDatabaseName(IndiceEnvioVivo);
+            e.HasIndex(x => new { x.EmpresaId, x.TipoDocumentoId, x.ObraId, x.PeriodoInicio, x.EnviadoEm })
+                .IsDescending(false, false, false, false, true)
+                .HasFilter("periodo_inicio IS NOT NULL")
+                .HasDatabaseName("ix_envios_documento_periodo");
+            e.HasIndex(x => new { x.ObraId, x.EmpresaId, x.TipoDocumentoId, x.EnviadoEm })
+                .IsDescending(false, false, false, true)
+                .HasFilter("obra_id IS NOT NULL")
+                .HasDatabaseName("ix_envios_documento_obra_empresa_tipo_enviado");
         });
 
         b.Entity<RegistroAuditoria>(e =>

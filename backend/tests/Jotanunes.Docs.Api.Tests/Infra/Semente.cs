@@ -24,6 +24,12 @@ public sealed class Semente(ApiFactory api)
 
     public DateTimeOffset Agora => api.Relogio.GetUtcNow();
 
+    /// <summary>Hoje no fuso de Brasília (relógio falso da API).</summary>
+    public DateOnly Hoje => DataLocal.De(Agora);
+
+    /// <summary>Meio-dia (horário de Brasília) do dia informado — marco de cobrança sem ambiguidade de fuso.</summary>
+    public static DateTimeOffset MeioDia(DateOnly dia) => new DateTimeOffset(dia.ToDateTime(new TimeOnly(12, 0)), TimeSpan.FromHours(-3)).ToUniversalTime();
+
     public async Task<Obra> ObraAsync(string? nome = null, string? codigo = null, bool ativa = true)
     {
         var o = Obra.Criar(nome ?? "Obra " + Guid.NewGuid().ToString("N")[..8], codigo, "Aracaju", "SE", "semente", Agora);
@@ -32,43 +38,76 @@ public sealed class Semente(ApiFactory api)
         return o;
     }
 
-    public async Task<TipoDocumento> TipoAsync(string? nome = null, bool ativo = true)
+    public async Task<TipoDocumento> TipoAsync(string? nome = null, bool ativo = true, Abrangencia abrangencia = Abrangencia.GERAL,
+        Periodicidade? periodicidade = null, DateTimeOffset? criadoEm = null)
     {
-        var t = TipoDocumento.Criar(nome ?? "Tipo " + Guid.NewGuid().ToString("N")[..8], "Instruções do tipo", "semente", Agora);
+        var t = TipoDocumento.Criar(nome ?? "Tipo " + Guid.NewGuid().ToString("N")[..8], "Instruções do tipo", "semente", criadoEm ?? Agora, abrangencia,
+            periodicidade);
         if (!ativo) t.Atualizar(t.Nome, t.Instrucoes, false, "semente", Agora);
         await api.NoBancoAsync(async db => { db.TiposDocumento.Add(t); await db.SaveChangesAsync(); });
         return t;
     }
 
-    public async Task<Empresa> EmpresaAsync(string? razao = null, string? cnpj = null, bool ativa = true, string? email = null)
+    public async Task<Empresa> EmpresaAsync(string? razao = null, string? cnpj = null, bool ativa = true, string? email = null,
+        DateTimeOffset? criadaEm = null)
     {
         var e = Empresa.Criar(razao ?? "Empresa " + Guid.NewGuid().ToString("N")[..8], null, cnpj ?? CnpjTeste.Gerar(),
-            email ?? $"contato-{Guid.NewGuid():N}@empresa.test", null, null, "semente", Agora);
+            email ?? $"contato-{Guid.NewGuid():N}@empresa.test", null, null, "semente", criadaEm ?? Agora);
         if (!ativa) e.Desativar("semente", Agora);
         await api.NoBancoAsync(async db => { db.Empresas.Add(e); await db.SaveChangesAsync(); });
         return e;
     }
 
     /// <summary>Empresa que já trocou a senha (situação ATIVA), com senha <see cref="SenhaPadrao"/>.</summary>
-    public async Task<(Empresa Empresa, string Token)> EmpresaComAcessoAsync(string? razao = null)
+    public async Task<(Empresa Empresa, string Token)> EmpresaComAcessoAsync(string? razao = null, DateTimeOffset? criadaEm = null)
     {
         var e = Empresa.Criar(razao ?? "Empresa " + Guid.NewGuid().ToString("N")[..8], null, CnpjTeste.Gerar(),
-            $"contato-{Guid.NewGuid():N}@empresa.test", null, null, "semente", Agora);
+            $"contato-{Guid.NewGuid():N}@empresa.test", null, null, "semente", criadaEm ?? Agora);
         e.RegistrarConvite(HashSenhaPadrao.Value, Agora);
         e.TrocarSenha(HashSenhaPadrao.Value, Agora);
         await api.NoBancoAsync(async db => { db.Empresas.Add(e); await db.SaveChangesAsync(); });
         return (e, Tokens.Portal(api, e.Id, e.Cnpj, e.VersaoCredencial, trocaSenha: false));
     }
 
-    public async Task VincularAsync(Obra obra, Empresa empresa) =>
-        await api.NoBancoAsync(async db => { db.ObraEmpresas.Add(new ObraEmpresa(obra.Id, empresa.Id, "semente", Agora)); await db.SaveChangesAsync(); });
+    /// <summary>Tipo POR_OBRA (002).</summary>
+    public Task<TipoDocumento> TipoPorObraAsync(string? nome = null, bool ativo = true) => TipoAsync(nome, ativo, Abrangencia.POR_OBRA);
+
+    /// <summary>Tipo periódico (003) com cobrança desde <paramref name="desde"/> (padrão: agora).</summary>
+    public Task<TipoDocumento> TipoPeriodicoAsync(string? nome, Periodicidade periodicidade, DateTimeOffset? desde = null,
+        Abrangencia abrangencia = Abrangencia.GERAL, bool ativo = true) => TipoAsync(nome, ativo, abrangencia, periodicidade, desde);
+
+    /// <summary>Vínculo ativo; com <paramref name="encerrado"/>, já encerrado (histórico).</summary>
+    public async Task VincularAsync(Obra obra, Empresa empresa, bool encerrado = false, DateTimeOffset? em = null) =>
+        await api.NoBancoAsync(async db =>
+        {
+            var v = new ObraEmpresa(obra.Id, empresa.Id, "semente", em ?? Agora);
+            if (encerrado) v.Encerrar("semente", Agora);
+            db.ObraEmpresas.Add(v);
+            await db.SaveChangesAsync();
+        });
+
+    /// <summary>Marca os tipos POR_OBRA como exigidos na obra.</summary>
+    public Task MarcarAsync(Obra obra, params TipoDocumento[] tipos) => MarcarEmAsync(obra, Agora, tipos);
+
+    public async Task MarcarEmAsync(Obra obra, DateTimeOffset em, params TipoDocumento[] tipos) =>
+        await api.NoBancoAsync(async db =>
+        {
+            foreach (var t in tipos) db.ObraTiposDocumento.Add(new ObraTipoDocumento(obra.Id, t.Id, "semente", em));
+            await db.SaveChangesAsync();
+        });
+
+    /// <summary>Envio por obra: tipo POR_OBRA e a obra informada.</summary>
+    public Task<EnvioDocumento> EnvioObraAsync(Obra obra, Empresa empresa, TipoDocumento tipo, StatusEnvio status = StatusEnvio.EM_ANALISE,
+        string motivo = "Documento ilegível", DateOnly? periodoInicio = null) => EnvioAsync(empresa, tipo, status, motivo, obra: obra, periodoInicio: periodoInicio);
 
     public async Task<EnvioDocumento> EnvioAsync(Empresa empresa, TipoDocumento tipo, StatusEnvio status = StatusEnvio.EM_ANALISE,
-        string motivo = "Documento ilegível", byte[]? conteudo = null)
+        string motivo = "Documento ilegível", byte[]? conteudo = null, Obra? obra = null, DateOnly? periodoInicio = null)
     {
         conteudo ??= ArquivosTeste.Pdf();
+        var periodo = periodoInicio is { } inicio ? CalendarioPeriodos.Periodo(tipo.Periodicidade, inicio) : null;
         var envio = EnvioDocumento.Criar(Guid.NewGuid(), empresa.Id, tipo.Id, "doc.pdf", "application/pdf", conteudo.Length,
-            Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(conteudo)).ToLowerInvariant(), Agora);
+            Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(conteudo)).ToLowerInvariant(), Agora, tipo.Abrangencia, obra?.Id,
+            tipo.Periodicidade.EhPeriodica, periodo);
         if (status == StatusEnvio.APROVADO) envio.Aprovar("analista", "Analista", Agora);
         if (status == StatusEnvio.REJEITADO) envio.Rejeitar("analista", "Analista", motivo, Agora);
         var caminho = Path.Combine(api.DiretorioArquivos, envio.ChaveArmazenamento);

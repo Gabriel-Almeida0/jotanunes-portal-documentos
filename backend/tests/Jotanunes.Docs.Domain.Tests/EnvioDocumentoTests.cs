@@ -1,5 +1,6 @@
 using Jotanunes.Docs.Domain.Comum;
 using Jotanunes.Docs.Domain.Envios;
+using Jotanunes.Docs.Domain.TiposDocumento;
 
 namespace Jotanunes.Docs.Domain.Tests;
 
@@ -76,5 +77,39 @@ public class EnvioDocumentoTests
         r.Rejeitar("m", "M", "motivo válido", Agora);
         Assert.Equal(TipoErroDominio.TransicaoInvalida, Assert.Throws<ErroDominio>(() => r.Aprovar("m", "M", Agora)).Tipo);
         Assert.Equal(StatusEnvio.REJEITADO, r.Status);
+    }
+
+    [Fact]
+    public void Envio_geral_nao_tem_obra()
+    {
+        var e = NovoEnvio();
+        Assert.Null(e.ObraId);
+    }
+
+    [Fact]
+    public void Envio_por_obra_guarda_a_obra_e_a_chave_nao_muda()
+    {
+        var obra = Guid.NewGuid();
+        var e = EnvioDocumento.Criar(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "art.pdf", "application/pdf", 100, new string('0', 64), Agora,
+            Abrangencia.POR_OBRA, obra);
+        Assert.Equal(obra, e.ObraId);
+        Assert.Equal($"empresas/{e.EmpresaId:N}/{e.Id:N}", e.ChaveArmazenamento);
+    }
+
+    [Fact]
+    public void Envio_geral_com_obra_e_recusado()
+    {
+        var erro = Assert.Throws<ErroDominio>(() => EnvioDocumento.Criar(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "a.pdf", "application/pdf", 100,
+            new string('0', 64), Agora, Abrangencia.GERAL, Guid.NewGuid()));
+        Assert.Equal(TipoErroDominio.Validacao, erro.Tipo);
+        Assert.True(erro.Erros.ContainsKey("obraId"));
+    }
+
+    [Fact]
+    public void Envio_por_obra_sem_obra_e_recusado()
+    {
+        var erro = Assert.Throws<ErroDominio>(() => EnvioDocumento.Criar(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "a.pdf", "application/pdf", 100,
+            new string('0', 64), Agora, Abrangencia.POR_OBRA, null));
+        Assert.True(erro.Erros.ContainsKey("obraId"));
     }
 }

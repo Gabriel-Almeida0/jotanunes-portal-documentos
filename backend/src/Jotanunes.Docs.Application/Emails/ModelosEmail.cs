@@ -62,13 +62,21 @@ public static class ModelosEmail
         return new MensagemEmail(para, assunto, html, texto);
     }
 
-    public static MensagemEmail Rejeicao(string para, string razaoSocial, string tipoDocumento, string motivo, string link)
+    /// <param name="obra">Nome da obra do envio (null = documento geral da empresa).</param>
+    /// <param name="periodo">Rótulo do período do envio (documento periódico, 003); null = documento único.</param>
+    public static MensagemEmail Rejeicao(string para, string razaoSocial, string tipoDocumento, string motivo, string link, string? obra = null,
+        string? periodo = null)
     {
-        var assunto = $"Jotanunes: o documento {tipoDocumento} precisa ser enviado de novo";
+        var complemento = string.Join(", ", new[] { periodo, obra is null ? null : $"obra {obra}" }.Where(x => x is not null));
+        var assunto = complemento.Length == 0
+            ? $"Jotanunes: o documento {tipoDocumento} precisa ser enviado de novo"
+            : $"Jotanunes: o documento {tipoDocumento} precisa ser enviado de novo ({complemento})";
+        var doPeriodo = periodo is null ? "" : $" do período {periodo}";
+        var naObra = doPeriodo + (obra is null ? "" : $" na obra {obra}");
         var texto = $"""
             Olá, {razaoSocial}!
 
-            Analisamos o documento "{tipoDocumento}" e ele precisa ser enviado de novo.
+            Analisamos o documento "{tipoDocumento}"{naObra} e ele precisa ser enviado de novo.
 
             Motivo: {motivo}
 
@@ -77,6 +85,8 @@ public static class ModelosEmail
             Jotanunes Construtora
             """;
         Func<string, string> e = s => WebUtility.HtmlEncode(s);
+        var naObraHtml = (periodo is null ? "" : $" do período <strong>{e(periodo)}</strong>")
+                         + (obra is null ? "" : $" na obra <strong>{e(obra)}</strong>");
         var html = $"""
             <!doctype html>
             <html lang="pt-BR"><body style="margin:0;padding:24px;background:#F2F2F2;font-family:Montserrat,Arial,sans-serif;color:#333333">
@@ -84,7 +94,7 @@ public static class ModelosEmail
             {Logo}
             <div style="width:50px;height:6px;background:#DF1A1A;margin-bottom:16px"></div>
             <h1 style="font-size:22px;margin:0 0 16px">Olá, {e(razaoSocial)}!</h1>
-            <p style="font-size:16px;line-height:1.5">Analisamos o documento <strong>{e(tipoDocumento)}</strong> e ele precisa ser enviado de novo.</p>
+            <p style="font-size:16px;line-height:1.5">Analisamos o documento <strong>{e(tipoDocumento)}</strong>{naObraHtml} e ele precisa ser enviado de novo.</p>
             <p style="font-size:16px;line-height:1.5"><strong>Motivo:</strong> {e(motivo)}</p>
             <p style="margin:24px 0"><a href="{e(link)}" style="background:#DF1A1A;color:#FFFFFF;text-decoration:none;padding:12px 24px;border-radius:30px;font-weight:600;display:inline-block">Enviar novo arquivo</a></p>
             <p style="font-size:14px">Jotanunes Construtora</p>

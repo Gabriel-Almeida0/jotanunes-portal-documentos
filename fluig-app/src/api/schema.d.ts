@@ -198,11 +198,123 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Vincula a empresa à obra (idempotente) */
+        /** Vincula ou reabre o vínculo (idempotente) */
         put: operations["fluigVincularEmpresaObra"];
         post?: never;
-        /** Remove o vínculo da empresa com a obra */
+        /** Encerra o vínculo (histórico preservado) */
         delete: operations["fluigDesvincularEmpresaObra"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fluig/obras/{obraId}/tipos-documento": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                obraId: components["parameters"]["ObraId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Tipos POR_OBRA e se cada um é exigido nesta obra (ordenados por nome)
+         * @description Todos os tipos `POR_OBRA` ativos e, dos inativos, só os marcados na obra.
+         */
+        get: operations["fluigListarTiposExigidosObra"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fluig/obras/{obraId}/tipos-documento/{tipoDocumentoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                obraId: components["parameters"]["ObraId"];
+                tipoDocumentoId: components["parameters"]["TipoDocumentoId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Marca o tipo POR_OBRA como exigido nesta obra (idempotente) */
+        put: operations["fluigMarcarTipoExigidoObra"];
+        post?: never;
+        /** Deixa de exigir o tipo nesta obra (idempotente; envios preservados) */
+        delete: operations["fluigDesmarcarTipoExigidoObra"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fluig/obras/{obraId}/empresas/{empresaId}/documentos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                obraId: components["parameters"]["ObraId"];
+                empresaId: components["parameters"]["EmpresaId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Situação de cada documento da obra para a empresa (tipos marcados; ordenado por nome do tipo)
+         * @description Responde também com vínculo encerrado (para histórico). Sem vínculo (ativo ou encerrado) → 404.
+         */
+        get: operations["fluigListarDocumentosEmpresaObra"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fluig/obras/{obraId}/empresas/{empresaId}/documentos/{tipoDocumentoId}/envios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                obraId: components["parameters"]["ObraId"];
+                empresaId: components["parameters"]["EmpresaId"];
+                tipoDocumentoId: components["parameters"]["TipoDocumentoId"];
+            };
+            cookie?: never;
+        };
+        /** Histórico de envios da empresa para o tipo nesta obra (mais recente primeiro; inclui tipos desmarcados) */
+        get: operations["fluigListarHistoricoEnviosEmpresaObra"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fluig/obras/{obraId}/empresas/{empresaId}/documentos/{tipoDocumentoId}/periodos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                obraId: components["parameters"]["ObraId"];
+                empresaId: components["parameters"]["EmpresaId"];
+                tipoDocumentoId: components["parameters"]["TipoDocumentoId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Períodos exigidos do documento periódico da obra para a empresa (mais recente primeiro)
+         * @description Responde também com vínculo encerrado (para histórico). Sem vínculo (ativo ou encerrado), tipo não
+         *     marcado na obra ou de periodicidade `UNICA` → 404.
+         */
+        get: operations["fluigListarPeriodosEmpresaObra"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -285,7 +397,10 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Situação de cada tipo de documento ativo para a empresa (ordenado por nome do tipo) */
+        /**
+         * Situação de cada tipo de documento ativo para a empresa (ordenado por nome do tipo)
+         * @description Só documentos gerais (tipos `GERAL` ativos). Os da obra ficam em `/obras/{obraId}/empresas/{empresaId}/documentos`.
+         */
         get: operations["fluigListarDocumentosEmpresa"];
         put?: never;
         post?: never;
@@ -305,8 +420,34 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Histórico de envios da empresa para o tipo (mais recente primeiro; inclui tipos inativos) */
+        /**
+         * Histórico de envios da empresa para o tipo (mais recente primeiro; inclui tipos inativos)
+         * @description Só envios gerais. Tipo `POR_OBRA` → 404.
+         */
         get: operations["fluigListarHistoricoEnvios"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fluig/empresas/{empresaId}/documentos/{tipoDocumentoId}/periodos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                empresaId: components["parameters"]["EmpresaId"];
+                tipoDocumentoId: components["parameters"]["TipoDocumentoId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Períodos exigidos do documento geral periódico da empresa (mais recente primeiro)
+         * @description Do início da cobrança até o período em curso. Tipo `POR_OBRA` ou de periodicidade `UNICA` → 404.
+         */
+        get: operations["fluigListarPeriodosEmpresa"];
         put?: never;
         post?: never;
         delete?: never;
@@ -325,7 +466,7 @@ export interface paths {
         /** Lista tipos de documento (ordenados por nome; sem paginação) */
         get: operations["fluigListarTiposDocumento"];
         put?: never;
-        /** Cadastra tipo de documento (passa a ser exigido de todas as empresas ativas) */
+        /** Cadastra tipo de documento (GERAL é exigido de todas as empresas ativas; POR_OBRA, só nas obras que o marcarem) */
         post: operations["fluigCriarTipoDocumento"];
         delete?: never;
         options?: never;
@@ -344,7 +485,12 @@ export interface paths {
         };
         /** Detalhe do tipo de documento */
         get: operations["fluigObterTipoDocumento"];
-        /** Atualiza tipo de documento (inclui ativar/desativar) */
+        /**
+         * Atualiza tipo de documento (inclui ativar/desativar)
+         * @description Aceita `abrangencia`. Trocar a abrangência de tipo que já tem envios → 409 `ABRANGENCIA_IMUTAVEL`.
+         *     Aceita `periodicidade` (desde 1.4.0). Mudar unidade ou intervalo de tipo que já tem envios →
+         *     409 `PERIODICIDADE_IMUTAVEL`; `prazoDias` pode mudar sempre.
+         */
         put: operations["fluigAtualizarTipoDocumento"];
         post?: never;
         delete?: never;
@@ -616,7 +762,8 @@ export interface paths {
         };
         /**
          * Documentos exigidos da empresa autenticada e a situação de cada um
-         * @description Todos os tipos ativos, ordenados por situação (REJEITADO, PENDENTE_ENVIO, EM_ANALISE, APROVADO) e nome.
+         * @description Só documentos gerais: todos os tipos `GERAL` ativos, ordenados por situação (REJEITADO,
+         *     PENDENTE_ENVIO, EM_ANALISE, APROVADO) e nome. Os da obra ficam em `/api/portal/obras/{obraId}/documentos`.
          */
         get: operations["portalListarDocumentos"];
         put?: never;
@@ -636,15 +783,143 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Histórico de envios da própria empresa para o tipo (mais recente primeiro) */
+        /**
+         * Histórico de envios da própria empresa para o tipo (mais recente primeiro)
+         * @description Só tipo `GERAL` (envios gerais). Tipo `POR_OBRA` → 404.
+         */
         get: operations["portalListarHistoricoEnvios"];
         put?: never;
         /**
          * Envia arquivo para o tipo de documento (PDF, JPEG ou PNG, até 10 MB)
          * @description Permitido somente quando a situação é `PENDENTE_ENVIO` ou `REJEITADO` e o tipo está ativo.
          *     O formato é validado pelo conteúdo do arquivo (assinatura de bytes), não pela extensão.
+         *     Só tipo `GERAL`; tipo `POR_OBRA` → 404 (use `/api/portal/obras/{obraId}/documentos/{tipoDocumentoId}/envios`).
+         *     Tipo periódico (desde 1.4.0): `periodoInicio` indica o período; a situação e o `podeEnviar` são
+         *     os desse período. Período não exigido (futuro, anterior ao início da cobrança ou data que não é
+         *     início de período) → 404.
          */
         post: operations["portalEnviarDocumento"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/documentos/{tipoDocumentoId}/periodos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tipoDocumentoId: components["parameters"]["TipoDocumentoId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Períodos exigidos do documento geral periódico da própria empresa (mais recente primeiro)
+         * @description Diz, para cada período, a situação, se está atrasado e se dá para enviar. Tipo `POR_OBRA` ou de
+         *     periodicidade `UNICA` → 404.
+         */
+        get: operations["portalListarPeriodos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/obras": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Obras da empresa autenticada com a contagem dos documentos de cada uma
+         * @description Obras ativas com vínculo ativo da empresa do token. Ordem: com pendência primeiro, depois nome.
+         */
+        get: operations["portalListarObras"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/obras/{obraId}/documentos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                obraId: components["parameters"]["ObraId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Documentos exigidos da empresa nesta obra e a situação de cada um
+         * @description Tipos marcados e ativos na obra, ordenados por situação (REJEITADO, PENDENTE_ENVIO, EM_ANALISE,
+         *     APROVADO) e nome. `{obraId}` só é resolvido entre obras ativas com vínculo ativo da empresa do
+         *     token; fora disso → 404.
+         */
+        get: operations["portalListarDocumentosObra"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/obras/{obraId}/documentos/{tipoDocumentoId}/envios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                obraId: components["parameters"]["ObraId"];
+                tipoDocumentoId: components["parameters"]["TipoDocumentoId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Histórico de envios da própria empresa para o tipo nesta obra (mais recente primeiro)
+         * @description Obra fora do alcance da empresa (sem vínculo ativo ou inativa) ou tipo não marcado → 404.
+         */
+        get: operations["portalListarHistoricoObra"];
+        put?: never;
+        /**
+         * Envia arquivo para o documento da obra (PDF, JPEG ou PNG, até 10 MB)
+         * @description Mesmas regras de `POST /api/portal/documentos/{tipoDocumentoId}/envios`, para o documento desta
+         *     obra: permitido somente quando a situação é `PENDENTE_ENVIO` ou `REJEITADO` e o documento é
+         *     exigido (tipo ativo e marcado na obra). Obra fora do alcance da empresa ou tipo não marcado → 404.
+         *     Tipo periódico: mesmas regras de `periodoInicio` do envio geral.
+         */
+        post: operations["portalEnviarDocumentoObra"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/obras/{obraId}/documentos/{tipoDocumentoId}/periodos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                obraId: components["parameters"]["ObraId"];
+                tipoDocumentoId: components["parameters"]["TipoDocumentoId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Períodos exigidos do documento periódico da obra para a própria empresa (mais recente primeiro)
+         * @description Mesmo isolamento de `/api/portal/obras/{obraId}/documentos`: obra fora do alcance da empresa (sem
+         *     vínculo ativo ou inativa), tipo não marcado ou de periodicidade `UNICA` → 404.
+         */
+        get: operations["portalListarPeriodosObra"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -660,7 +935,10 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Baixa arquivo de um envio da própria empresa (outra empresa → 404) */
+        /**
+         * Baixa arquivo de um envio da própria empresa (outra empresa → 404)
+         * @description Envio de obra exige vínculo ativo com a obra e obra ativa; senão 404.
+         */
         get: operations["portalBaixarArquivoEnvio"];
         put?: never;
         post?: never;
@@ -709,9 +987,13 @@ export interface components {
          *     | ALTERACAO_PROPRIA_NAO_PERMITIDA | 409 | Você não pode desativar nem tirar o seu próprio acesso de administrador. Peça a outro administrador. |
          *     | EMAIL_ACESSO_FALHOU | 502 | Não conseguimos enviar o e-mail com a senha provisória. Tente de novo em alguns minutos. |
          *     | SO_LOGIN_LOCAL | 409 | Esta opção é só para quem entra com login e senha. |
+         *     | ABRANGENCIA_IMUTAVEL | 409 | A abrangência não pode ser alterada porque este tipo já tem envios. |
+         *     | TIPO_NAO_E_POR_OBRA | 400 | Só tipos de documento por obra podem ser exigidos de uma obra. |
+         *     | PERIODICIDADE_IMUTAVEL | 409 | A periodicidade só pode mudar enquanto o tipo não tiver envios. |
+         *     | PERIODO_OBRIGATORIO | 400 | Informe o período do envio (só para documentos periódicos). |
          * @enum {string}
          */
-        CodigoErro: "VALIDACAO" | "NAO_AUTENTICADO" | "TROCA_SENHA_OBRIGATORIA" | "SEM_PERMISSAO" | "NAO_ENCONTRADO" | "CNPJ_DUPLICADO" | "CNPJ_IMUTAVEL" | "CODIGO_OBRA_DUPLICADO" | "NOME_DUPLICADO" | "EMPRESA_INATIVA" | "CREDENCIAIS_INVALIDAS" | "ACESSO_BLOQUEADO" | "CONVITE_INVALIDO" | "CONVITE_EXPIRADO" | "SENHA_FRACA" | "SENHA_ATUAL_INCORRETA" | "ENVIO_NAO_PERMITIDO" | "ENVIO_JA_ANALISADO" | "ARQUIVO_INVALIDO" | "ARQUIVO_MUITO_GRANDE" | "ARQUIVO_TIPO_NAO_SUPORTADO" | "EMAIL_FALHOU" | "LIMITE_REQUISICOES" | "ERRO_INTERNO" | "LOGIN_INVALIDO" | "USUARIO_INATIVO" | "SENHA_PROVISORIA_EXPIRADA" | "LOGIN_DUPLICADO" | "ULTIMO_ADMINISTRADOR" | "ALTERACAO_PROPRIA_NAO_PERMITIDA" | "EMAIL_ACESSO_FALHOU" | "SO_LOGIN_LOCAL";
+        CodigoErro: "VALIDACAO" | "NAO_AUTENTICADO" | "TROCA_SENHA_OBRIGATORIA" | "SEM_PERMISSAO" | "NAO_ENCONTRADO" | "CNPJ_DUPLICADO" | "CNPJ_IMUTAVEL" | "CODIGO_OBRA_DUPLICADO" | "NOME_DUPLICADO" | "EMPRESA_INATIVA" | "CREDENCIAIS_INVALIDAS" | "ACESSO_BLOQUEADO" | "CONVITE_INVALIDO" | "CONVITE_EXPIRADO" | "SENHA_FRACA" | "SENHA_ATUAL_INCORRETA" | "ENVIO_NAO_PERMITIDO" | "ENVIO_JA_ANALISADO" | "ARQUIVO_INVALIDO" | "ARQUIVO_MUITO_GRANDE" | "ARQUIVO_TIPO_NAO_SUPORTADO" | "EMAIL_FALHOU" | "LIMITE_REQUISICOES" | "ERRO_INTERNO" | "LOGIN_INVALIDO" | "USUARIO_INATIVO" | "SENHA_PROVISORIA_EXPIRADA" | "LOGIN_DUPLICADO" | "ULTIMO_ADMINISTRADOR" | "ALTERACAO_PROPRIA_NAO_PERMITIDA" | "EMAIL_ACESSO_FALHOU" | "SO_LOGIN_LOCAL" | "ABRANGENCIA_IMUTAVEL" | "TIPO_NAO_E_POR_OBRA" | "PERIODICIDADE_IMUTAVEL" | "PERIODO_OBRIGATORIO";
         Problema: {
             /** @example https://jotanunes.com/problemas/nao-encontrado */
             type: string;
@@ -749,6 +1031,16 @@ export interface components {
         SituacaoDocumento: "PENDENTE_ENVIO" | "EM_ANALISE" | "APROVADO" | "REJEITADO";
         /** @enum {string} */
         FormatoArquivo: "application/pdf" | "image/jpeg" | "image/png";
+        /**
+         * @description GERAL = da empresa, vale em todas as obras. POR_OBRA = cada obra exige e recebe o seu envio.
+         * @enum {string}
+         */
+        Abrangencia: "GERAL" | "POR_OBRA";
+        /**
+         * @description UNICA = um envio vale para sempre. MESES/DIAS = um envio por período de `intervalo` meses/dias.
+         * @enum {string}
+         */
+        UnidadePeriodicidade: "UNICA" | "MESES" | "DIAS";
         /**
          * @description Usuário atual da área Jotanunes (nome histórico do schema: desde 1.2.0 representa também a
          *     sessão do login próprio).
@@ -837,12 +1129,19 @@ export interface components {
         };
         Painel: {
             enviosEmAnalise: number;
-            /** @description Empresas ativas com ao menos um documento PENDENTE_ENVIO ou REJEITADO. */
+            /**
+             * @description Empresas ativas com ao menos um documento PENDENTE_ENVIO ou REJEITADO — geral ou da obra
+             *     (em obra ativa com vínculo ativo).
+             */
             empresasComPendencia: number;
+            /** @description Obras ativas com alguma empresa ativa (vínculo ativo) com documento da obra PENDENTE_ENVIO ou REJEITADO. */
+            obrasComPendencia: number;
             /** @description Empresas com situação CONVIDADA ou CONVITE_EXPIRADO. */
             empresasConvidadasSemAcesso: number;
             empresasAtivas: number;
             obrasAtivas: number;
+            /** @description Empresas ativas com algum período de documento periódico atrasado (geral ou da obra). */
+            empresasComAtraso: number;
         };
         ObraInput: {
             nome: string;
@@ -866,10 +1165,34 @@ export interface components {
         };
         ObraResumo: components["schemas"]["Obra"] & {
             quantidadeEmpresas: number;
+            /** @description Tipos marcados como exigidos na obra. */
+            quantidadeTiposExigidos: number;
         };
         ObraDetalhe: components["schemas"]["Obra"] & {
-            /** @description Empresas vinculadas, ordenadas por razão social. */
+            /** @description Empresas com vínculo ativo, ordenadas por razão social. */
             empresas: components["schemas"]["EmpresaNaObra"][];
+            /** @description Vínculos encerrados (histórico). */
+            vinculosEncerrados: components["schemas"]["VinculoEncerrado"][];
+            /** @description Tipos marcados como exigidos na obra. */
+            quantidadeTiposExigidos: number;
+        };
+        VinculoEncerrado: {
+            /** Format: uuid */
+            empresaId: string;
+            razaoSocial: string;
+            cnpj: string;
+            /** Format: date-time */
+            encerradoEm: string;
+            encerradoPorLogin?: string | null;
+            /** @description Envios da empresa nesta obra. */
+            quantidadeEnvios: number;
+        };
+        TipoExigidoObra: {
+            /** @description Só tipos POR_OBRA (ativos, e inativos marcados). */
+            tipoDocumento: components["schemas"]["TipoDocumento"];
+            exigido: boolean;
+            /** Format: date-time */
+            marcadoEm?: string | null;
         };
         ObraRef: {
             /** Format: uuid */
@@ -877,6 +1200,16 @@ export interface components {
             nome: string;
             cidade: string;
             uf: components["schemas"]["Uf"];
+        };
+        ObraNaEmpresa: components["schemas"]["ObraRef"] & {
+            vinculoAtivo: boolean;
+            obraAtiva: boolean;
+            /** @description Contagem dos documentos da obra para esta empresa. */
+            documentos: components["schemas"]["ContagemDocumentos"];
+        };
+        ObraPortal: components["schemas"]["ObraRef"] & {
+            /** @description Contagem dos documentos da obra para a empresa autenticada. */
+            documentos: components["schemas"]["ContagemDocumentos"];
         };
         PaginaObras: components["schemas"]["PaginaBase"] & {
             itens: components["schemas"]["ObraResumo"][];
@@ -899,12 +1232,14 @@ export interface components {
             ativa: boolean;
         };
         ContagemDocumentos: {
-            /** @description Tipos de documento ativos. */
+            /** @description Documentos exigidos no contexto (tipos GERAL ativos na empresa; tipos marcados e ativos na obra). */
             total: number;
             pendentes: number;
             emAnalise: number;
             aprovados: number;
             rejeitados: number;
+            /** @description Soma dos períodos atrasados dos documentos periódicos (cada documento conta uma vez nas demais contagens, pela situação resumida). */
+            periodosAtrasados: number;
         };
         EmpresaResumo: {
             /** Format: uuid */
@@ -916,13 +1251,17 @@ export interface components {
             emailContato: string;
             ativa: boolean;
             situacaoAcesso: components["schemas"]["SituacaoAcesso"];
+            /** @description Só documentos gerais. */
             documentos: components["schemas"]["ContagemDocumentos"];
+            /** @description Documentos da obra; preenchido só quando a lista foi filtrada por `obraId`. */
+            documentosObra?: components["schemas"]["ContagemDocumentos"] | null;
         };
         Empresa: components["schemas"]["EmpresaResumo"] & {
             nomeContato?: string | null;
             /** @description Só dígitos. */
             telefone?: string | null;
-            obras: components["schemas"]["ObraRef"][];
+            /** @description Obras vinculadas, inclusive vínculos encerrados (`vinculoAtivo=false`). */
+            obras: components["schemas"]["ObraNaEmpresa"][];
             /** @description false depois do primeiro convite. */
             cnpjEditavel: boolean;
             ultimoConvite?: components["schemas"]["Convite"] | null;
@@ -939,7 +1278,12 @@ export interface components {
             situacaoAcesso: components["schemas"]["SituacaoAcesso"];
             /** Format: date-time */
             vinculadoEm: string;
-            documentos: components["schemas"]["ContagemDocumentos"];
+            /** @description Contagem dos documentos desta obra para a empresa. */
+            documentosObra: components["schemas"]["ContagemDocumentos"];
+            /** @description Contagem dos documentos gerais da empresa. */
+            documentosGerais: components["schemas"]["ContagemDocumentos"];
+            /** @description Envios da empresa nesta obra (para a confirmação de desvincular). */
+            quantidadeEnviosNaObra: number;
         };
         EmpresaRef: {
             /** Format: uuid */
@@ -977,6 +1321,9 @@ export interface components {
         TipoDocumentoInput: {
             nome: string;
             instrucoes?: string | null;
+            abrangencia: components["schemas"]["Abrangencia"];
+            /** @description Omitido = UNICA. */
+            periodicidade?: components["schemas"]["Periodicidade"];
         };
         TipoDocumentoAtualizacao: components["schemas"]["TipoDocumentoInput"] & {
             ativo: boolean;
@@ -986,6 +1333,8 @@ export interface components {
             id: string;
             nome: string;
             instrucoes?: string | null;
+            abrangencia: components["schemas"]["Abrangencia"];
+            periodicidade: components["schemas"]["Periodicidade"];
             ativo: boolean;
             /** Format: date-time */
             criadoEm: string;
@@ -995,6 +1344,65 @@ export interface components {
             id: string;
             nome: string;
             instrucoes?: string | null;
+            abrangencia: components["schemas"]["Abrangencia"];
+            periodicidade: components["schemas"]["Periodicidade"];
+        };
+        Periodicidade: {
+            unidade: components["schemas"]["UnidadePeriodicidade"];
+            /** @description Null se UNICA; MESES 1–24; DIAS 1–365. */
+            intervalo?: number | null;
+            /** @description Dias depois do fim do período para enviar sem atraso. Null se UNICA; 0–90. */
+            prazoDias?: number | null;
+            /**
+             * @description Texto pronto para exibir (só em respostas).
+             * @example Mensal · até o dia 15 do mês seguinte
+             */
+            readonly descricao?: string;
+        };
+        /** @description Período a que um envio se refere. */
+        PeriodoRef: {
+            /** Format: date */
+            inicio: string;
+            /** Format: date */
+            fim: string;
+            /** @example Março/2026 */
+            rotulo: string;
+        };
+        PeriodoComPrazo: components["schemas"]["PeriodoRef"] & {
+            /**
+             * Format: date
+             * @description Último dia para enviar sem atraso (fim + prazoDias).
+             */
+            prazo: string;
+        };
+        /** @description Contagem dos períodos exigidos de um documento periódico. Cada período entra uma vez em pendentes, rejeitados, emAnalise ou aprovados; atrasados conta, à parte, quantos dos pendentes e rejeitados já passaram do prazo (se sobrepõe a eles). */
+        ResumoPeriodos: {
+            /** @description Subconjunto de pendentes + rejeitados com o prazo vencido. */
+            atrasados: number;
+            pendentes: number;
+            rejeitados: number;
+            emAnalise: number;
+            aprovados: number;
+            /** @description Primeiro período (o mais antigo) que pede ação; null se nenhum. */
+            proximo?: components["schemas"]["PeriodoComPrazo"] | null;
+        };
+        /** @description Visão da Jotanunes de um período exigido. */
+        Periodo: components["schemas"]["PeriodoComPrazo"] & {
+            situacao: components["schemas"]["SituacaoDocumento"];
+            /** @description Prazo vencido com situação PENDENTE_ENVIO ou REJEITADO. */
+            atrasado: boolean;
+            /** @description Envio que define a situação do período (null se PENDENTE_ENVIO). */
+            envioAtual?: components["schemas"]["Envio"] | null;
+            quantidadeEnvios: number;
+        };
+        /** @description Visão da empresa de um período exigido. */
+        PeriodoPortal: components["schemas"]["PeriodoComPrazo"] & {
+            situacao: components["schemas"]["SituacaoDocumento"];
+            /** @description Prazo vencido com situação PENDENTE_ENVIO ou REJEITADO. */
+            atrasado: boolean;
+            envioAtual?: components["schemas"]["EnvioPortal"] | null;
+            /** @description true quando a situação do período é PENDENTE_ENVIO ou REJEITADO e o documento é exigido. */
+            podeEnviar: boolean;
         };
         /** @description Visão da Jotanunes (inclui quem analisou). */
         Envio: {
@@ -1004,12 +1412,21 @@ export interface components {
             empresaId: string;
             /** Format: uuid */
             tipoDocumentoId: string;
+            /**
+             * Format: uuid
+             * @description Obra do envio (null = documento geral).
+             */
+            obraId?: string | null;
             nomeArquivo: string;
             formato: components["schemas"]["FormatoArquivo"];
             tamanhoBytes: number;
             /** Format: date-time */
             enviadoEm: string;
             status: components["schemas"]["StatusEnvio"];
+            /** @description Período do envio (null = tipo de periodicidade UNICA). */
+            periodo?: components["schemas"]["PeriodoRef"] | null;
+            /** @description Enviado depois do prazo do período (sempre false para UNICA). */
+            enviadoComAtraso: boolean;
             /** Format: date-time */
             analisadoEm?: string | null;
             analisadoPor?: components["schemas"]["AutorFluig"] | null;
@@ -1018,6 +1435,8 @@ export interface components {
         EnvioFila: components["schemas"]["Envio"] & {
             empresa: components["schemas"]["EmpresaRef"];
             tipoDocumento: components["schemas"]["TipoDocumentoRef"];
+            /** @description Obra do envio (null = documento geral). */
+            obra?: components["schemas"]["ObraRef"] | null;
         };
         PaginaEnvios: components["schemas"]["PaginaBase"] & {
             itens: components["schemas"]["EnvioFila"][];
@@ -1026,12 +1445,20 @@ export interface components {
             /** @description Espaços nas pontas são removidos antes de validar. */
             motivo: string;
         };
+        /**
+         * @description Para tipo periódico, `situacao` e `envioAtual` são os do período resumido: algum atrasado
+         *     primeiro; senão REJEITADO > PENDENTE_ENVIO > EM_ANALISE > APROVADO.
+         */
         DocumentoSituacao: {
             tipoDocumento: components["schemas"]["TipoDocumentoRef"];
             situacao: components["schemas"]["SituacaoDocumento"];
             /** @description Envio que define a situação (null se PENDENTE_ENVIO). */
             envioAtual?: components["schemas"]["Envio"] | null;
             quantidadeEnvios?: number;
+            /** @description Algum período atrasado (sempre false para UNICA). */
+            atrasado: boolean;
+            /** @description Resumo dos períodos (null para tipo de periodicidade UNICA). */
+            periodos?: components["schemas"]["ResumoPeriodos"] | null;
         };
         LoginInput: {
             cnpj: string;
@@ -1063,22 +1490,36 @@ export interface components {
             id: string;
             /** Format: uuid */
             tipoDocumentoId: string;
+            /**
+             * Format: uuid
+             * @description Obra do envio (null = documento geral).
+             */
+            obraId?: string | null;
             nomeArquivo: string;
             formato: components["schemas"]["FormatoArquivo"];
             tamanhoBytes: number;
             /** Format: date-time */
             enviadoEm: string;
             status: components["schemas"]["StatusEnvio"];
+            /** @description Período do envio (null = tipo de periodicidade UNICA). */
+            periodo?: components["schemas"]["PeriodoRef"] | null;
+            /** @description Enviado depois do prazo do período (sempre false para UNICA). */
+            enviadoComAtraso: boolean;
             /** Format: date-time */
             analisadoEm?: string | null;
             motivoRejeicao?: string | null;
         };
+        /** @description Para tipo periódico, `situacao` e `envioAtual` são os do período resumido (ver `DocumentoSituacao`). */
         DocumentoSituacaoPortal: {
             tipoDocumento: components["schemas"]["TipoDocumentoRef"];
             situacao: components["schemas"]["SituacaoDocumento"];
             envioAtual?: components["schemas"]["EnvioPortal"] | null;
             /** @description true quando situação é PENDENTE_ENVIO ou REJEITADO. */
             podeEnviar: boolean;
+            /** @description Algum período atrasado (sempre false para UNICA). */
+            atrasado: boolean;
+            /** @description Resumo dos períodos (null para tipo de periodicidade UNICA). */
+            periodos?: components["schemas"]["ResumoPeriodos"] | null;
         };
     };
     responses: {
@@ -1184,6 +1625,8 @@ export interface components {
         TipoDocumentoId: string;
         EnvioId: string;
         UsuarioId: string;
+        /** @description Só os envios do período que começa nesta data (documentos periódicos). Omitido = todos. */
+        PeriodoInicio: string;
     };
     requestBodies: never;
     headers: never;
@@ -1402,6 +1845,8 @@ export interface operations {
                 busca?: components["parameters"]["Busca"];
                 /** @description Filtra por ativa/inativa. Omitido = todas. */
                 ativa?: boolean;
+                /** @description true = somente obras ativas com alguma empresa (vínculo ativo) com documento da obra pendente de envio ou rejeitado. */
+                comPendencia?: boolean;
                 pagina?: components["parameters"]["Pagina"];
                 tamanhoPagina?: components["parameters"]["TamanhoPagina"];
             };
@@ -1538,7 +1983,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Vínculo existe (criado agora ou antes) */
+            /** @description Vínculo ativo (criado agora, reaberto ou já existente) */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -1562,7 +2007,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Vínculo removido */
+            /** @description Vínculo encerrado (agora ou antes) */
             204: {
                 headers: {
                     [name: string]: unknown;
@@ -1571,6 +2016,171 @@ export interface operations {
             };
             401: components["responses"]["NaoAutenticado"];
             403: components["responses"]["SemPermissao"];
+            404: components["responses"]["NaoEncontrado"];
+        };
+    };
+    fluigListarTiposExigidosObra: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                obraId: components["parameters"]["ObraId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tipos da obra */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TipoExigidoObra"][];
+                };
+            };
+            401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
+            404: components["responses"]["NaoEncontrado"];
+        };
+    };
+    fluigMarcarTipoExigidoObra: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                obraId: components["parameters"]["ObraId"];
+                tipoDocumentoId: components["parameters"]["TipoDocumentoId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tipo marcado (agora ou antes) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `TIPO_NAO_E_POR_OBRA` (tipo de abrangência GERAL) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["SemPermissao"];
+            404: components["responses"]["NaoEncontrado"];
+        };
+    };
+    fluigDesmarcarTipoExigidoObra: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                obraId: components["parameters"]["ObraId"];
+                tipoDocumentoId: components["parameters"]["TipoDocumentoId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tipo desmarcado (agora ou antes) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["SemPermissao"];
+            404: components["responses"]["NaoEncontrado"];
+        };
+    };
+    fluigListarDocumentosEmpresaObra: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                obraId: components["parameters"]["ObraId"];
+                empresaId: components["parameters"]["EmpresaId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Documentos da obra */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentoSituacao"][];
+                };
+            };
+            401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
+            404: components["responses"]["NaoEncontrado"];
+        };
+    };
+    fluigListarHistoricoEnviosEmpresaObra: {
+        parameters: {
+            query?: {
+                /** @description Só os envios do período que começa nesta data (documentos periódicos). Omitido = todos. */
+                periodoInicio?: components["parameters"]["PeriodoInicio"];
+            };
+            header?: never;
+            path: {
+                obraId: components["parameters"]["ObraId"];
+                empresaId: components["parameters"]["EmpresaId"];
+                tipoDocumentoId: components["parameters"]["TipoDocumentoId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Envios */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envio"][];
+                };
+            };
+            401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
+            404: components["responses"]["NaoEncontrado"];
+        };
+    };
+    fluigListarPeriodosEmpresaObra: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                obraId: components["parameters"]["ObraId"];
+                empresaId: components["parameters"]["EmpresaId"];
+                tipoDocumentoId: components["parameters"]["TipoDocumentoId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Períodos */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Periodo"][];
+                };
+            };
+            401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
             404: components["responses"]["NaoEncontrado"];
         };
     };
@@ -1584,6 +2194,8 @@ export interface operations {
                 situacaoAcesso?: components["schemas"]["SituacaoAcesso"];
                 /** @description true = somente empresas com documento pendente de envio ou rejeitado. */
                 comPendencia?: boolean;
+                /** @description true = somente empresas com algum período de documento periódico atrasado. */
+                comAtraso?: boolean;
                 pagina?: components["parameters"]["Pagina"];
                 tamanhoPagina?: components["parameters"]["TamanhoPagina"];
             };
@@ -1803,7 +2415,10 @@ export interface operations {
     };
     fluigListarHistoricoEnvios: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Só os envios do período que começa nesta data (documentos periódicos). Omitido = todos. */
+                periodoInicio?: components["parameters"]["PeriodoInicio"];
+            };
             header?: never;
             path: {
                 empresaId: components["parameters"]["EmpresaId"];
@@ -1827,11 +2442,41 @@ export interface operations {
             404: components["responses"]["NaoEncontrado"];
         };
     };
+    fluigListarPeriodosEmpresa: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                empresaId: components["parameters"]["EmpresaId"];
+                tipoDocumentoId: components["parameters"]["TipoDocumentoId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Períodos */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Periodo"][];
+                };
+            };
+            401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
+            404: components["responses"]["NaoEncontrado"];
+        };
+    };
     fluigListarTiposDocumento: {
         parameters: {
             query?: {
                 /** @description Filtra por ativo/inativo. Omitido = todos. */
                 ativo?: boolean;
+                /** @description Filtra por abrangência. Omitido = todas. */
+                abrangencia?: components["schemas"]["Abrangencia"];
+                /** @description true = só tipos periódicos (MESES/DIAS); false = só UNICA. Omitido = todos. */
+                periodico?: boolean;
             };
             header?: never;
             path?: never;
@@ -1942,7 +2587,7 @@ export interface operations {
             401: components["responses"]["NaoAutenticado"];
             403: components["responses"]["SemPermissao"];
             404: components["responses"]["NaoEncontrado"];
-            /** @description `NOME_DUPLICADO` */
+            /** @description `NOME_DUPLICADO`, `ABRANGENCIA_IMUTAVEL` ou `PERIODICIDADE_IMUTAVEL` */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1957,10 +2602,14 @@ export interface operations {
         parameters: {
             query?: {
                 status?: components["schemas"]["StatusEnvio"];
-                /** @description Envios de empresas vinculadas a esta obra. */
+                /** @description Somente envios desta obra (documentos da obra). Não combina com `somenteGerais` (400). */
                 obraId?: string;
+                /** @description true = somente envios de documentos gerais (sem obra). Não combina com `obraId` (400). */
+                somenteGerais?: boolean;
                 empresaId?: string;
                 tipoDocumentoId?: string;
+                /** @description true = somente envios feitos depois do prazo do período (`enviadoComAtraso`). */
+                comAtraso?: boolean;
                 pagina?: components["parameters"]["Pagina"];
                 tamanhoPagina?: components["parameters"]["TamanhoPagina"];
             };
@@ -2451,7 +3100,10 @@ export interface operations {
     };
     portalListarHistoricoEnvios: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Só os envios do período que começa nesta data (documentos periódicos). Omitido = todos. */
+                periodoInicio?: components["parameters"]["PeriodoInicio"];
+            };
             header?: never;
             path: {
                 tipoDocumentoId: components["parameters"]["TipoDocumentoId"];
@@ -2488,6 +3140,11 @@ export interface operations {
                 "multipart/form-data": {
                     /** Format: binary */
                     arquivo: string;
+                    /**
+                     * Format: date
+                     * @description Início do período do envio. Obrigatório para tipo periódico; proibido para tipo único (→ 400 `PERIODO_OBRIGATORIO`).
+                     */
+                    periodoInicio?: string;
                 };
             };
         };
@@ -2501,7 +3158,7 @@ export interface operations {
                     "application/json": components["schemas"]["EnvioPortal"];
                 };
             };
-            /** @description `VALIDACAO` (campo ausente) ou `ARQUIVO_INVALIDO` (vazio/corrompido) */
+            /** @description `VALIDACAO` (campo ausente), `ARQUIVO_INVALIDO` (vazio/corrompido) ou `PERIODO_OBRIGATORIO` */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2540,6 +3197,207 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problema"];
                 };
             };
+        };
+    };
+    portalListarPeriodos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tipoDocumentoId: components["parameters"]["TipoDocumentoId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Períodos */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeriodoPortal"][];
+                };
+            };
+            401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
+            404: components["responses"]["NaoEncontrado"];
+        };
+    };
+    portalListarObras: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Obras */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObraPortal"][];
+                };
+            };
+            401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
+        };
+    };
+    portalListarDocumentosObra: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                obraId: components["parameters"]["ObraId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Documentos da obra */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentoSituacaoPortal"][];
+                };
+            };
+            401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
+            404: components["responses"]["NaoEncontrado"];
+        };
+    };
+    portalListarHistoricoObra: {
+        parameters: {
+            query?: {
+                /** @description Só os envios do período que começa nesta data (documentos periódicos). Omitido = todos. */
+                periodoInicio?: components["parameters"]["PeriodoInicio"];
+            };
+            header?: never;
+            path: {
+                obraId: components["parameters"]["ObraId"];
+                tipoDocumentoId: components["parameters"]["TipoDocumentoId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Envios */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvioPortal"][];
+                };
+            };
+            401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
+            404: components["responses"]["NaoEncontrado"];
+        };
+    };
+    portalEnviarDocumentoObra: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                obraId: components["parameters"]["ObraId"];
+                tipoDocumentoId: components["parameters"]["TipoDocumentoId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    arquivo: string;
+                    /**
+                     * Format: date
+                     * @description Início do período do envio. Obrigatório para tipo periódico; proibido para tipo único (→ 400 `PERIODO_OBRIGATORIO`).
+                     */
+                    periodoInicio?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Envio registrado (status `EM_ANALISE`) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvioPortal"];
+                };
+            };
+            /** @description `VALIDACAO` (campo ausente), `ARQUIVO_INVALIDO` (vazio/corrompido) ou `PERIODO_OBRIGATORIO` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
+            404: components["responses"]["NaoEncontrado"];
+            /** @description `ENVIO_NAO_PERMITIDO` (documento em análise ou aprovado) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description `ARQUIVO_MUITO_GRANDE` */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+            /** @description `ARQUIVO_TIPO_NAO_SUPORTADO` */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problema"];
+                };
+            };
+        };
+    };
+    portalListarPeriodosObra: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                obraId: components["parameters"]["ObraId"];
+                tipoDocumentoId: components["parameters"]["TipoDocumentoId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Períodos */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeriodoPortal"][];
+                };
+            };
+            401: components["responses"]["NaoAutenticado"];
+            403: components["responses"]["TrocaSenhaObrigatoria"];
+            404: components["responses"]["NaoEncontrado"];
         };
     };
     portalBaixarArquivoEnvio: {

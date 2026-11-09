@@ -1,0 +1,45 @@
+.jn-app .jn-exigidos {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: var(--jn-border-card);
+  border-radius: var(--jn-radius-control);
+  background: var(--jn-white);
+}
+
+.jn-app .jn-exigidos__item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--jn-space-1) var(--jn-space-3);
+  padding: var(--jn-space-3) var(--jn-space-4);
+  border-bottom: 1px solid var(--jn-divider);
+}
+
+.jn-app .jn-exigidos__item:last-child {
+  border-bottom: 0;
+}
+
+.jn-app .jn-exigidos__marcacao {
+  min-height: 32px;
+}
+
+.jn-app .jn-exigidos__nome {
+  font-weight: 600;
+  color: var(--jn-gray-900);
+}
+
+.jn-app .jn-exigidos__selos {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--jn-space-2);
+  justify-self: end;
+}
+
+.jn-app .jn-exigidos__instrucoes {
+  grid-column: 1 / -1;
+}
+
+.jn-app .jn-exigidos__contagem {
+  margin: 0 0 var(--jn-space-3);
+}

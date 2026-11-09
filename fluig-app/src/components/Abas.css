@@ -1,0 +1,55 @@
+.jn-app .jn-abas__lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--jn-space-1);
+  border-bottom: 1px solid var(--jn-gray-400);
+  margin-bottom: var(--jn-space-5);
+}
+
+.jn-app .jn-abas__aba {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--jn-space-2);
+  margin: 0 0 -1px;
+  padding: var(--jn-space-3) var(--jn-space-4);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  font: 500 15px/1.35 var(--jn-font);
+  color: var(--jn-gray-600);
+  cursor: pointer;
+}
+
+.jn-app .jn-abas__aba:hover {
+  color: var(--jn-gray-900);
+  background: var(--jn-gray-50);
+}
+
+.jn-app .jn-abas__aba[aria-selected='true'] {
+  color: var(--jn-red-700);
+  font-weight: 600;
+  border-bottom-color: var(--jn-red-600);
+}
+
+.jn-app .jn-abas__aba:focus-visible {
+  outline: 3px solid var(--jn-red-700);
+  outline-offset: -3px;
+}
+
+.jn-app .jn-abas__painel:focus-visible {
+  outline: 3px solid var(--jn-red-700);
+  outline-offset: 4px;
+}
+
+/* Contador ao lado do rótulo da aba (ex.: "Empresas 3"). */
+.jn-app .jn-abas__contador {
+  display: inline-block;
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: var(--jn-radius-pill);
+  background: var(--jn-gray-100);
+  color: var(--jn-gray-900);
+  font: var(--jn-text-xs);
+  text-align: center;
+}

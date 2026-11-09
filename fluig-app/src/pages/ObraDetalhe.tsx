@@ -1,38 +1,53 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ErroApi, ehSemPermissao, mensagemDeErro } from '../api/client';
 import { api } from '../api/fluig';
-import type { EmpresaNaObra, EmpresaResumo, ObraDetalhe as TObraDetalhe } from '../api/tipos';
+import type { EmpresaNaObra, EmpresaResumo, ObraDetalhe as TObraDetalhe, VinculoEncerrado } from '../api/tipos';
 import { useConsulta } from '../api/useConsulta';
-import { useEhAdmin } from '../auth/contexto';
 import { Alerta } from '../components/Alerta';
 import { AvisoPagina } from '../components/AvisoPagina';
 import { AvisoSomenteAdmin } from '../components/AvisoSomenteAdmin';
 import { Botao, BotaoLink } from '../components/Botao';
 import { Campo } from '../components/Campo';
-import { Carregando, EstadoErro, EstadoVazio } from '../components/Estados';
+import { Abas } from '../components/Abas';
+import { Carregando, EstadoErro } from '../components/Estados';
 import { FormularioObra } from '../components/FormularioObra';
-import { IconeEmpresa, IconeLapis, IconeMais, IconePin, IconeSeta } from '../components/icons';
+import { IconeLapis, IconePin } from '../components/icons';
 import { Modal, ModalConfirmacao } from '../components/Modal';
-import { ResumoDocumentos } from '../components/ResumoDocumentos';
-import { SeloAtivo, SeloSituacao } from '../components/Selo';
+import { SeloAtivo } from '../components/Selo';
 import { SomenteAdmin } from '../components/SomenteAdmin';
-import { Tabela } from '../components/Tabela';
 import { TituloPagina } from '../components/TituloPagina';
 import { useAviso } from '../hooks/useAviso';
 import { formatarCnpj } from '../utils/cnpj';
 import { formatarData } from '../utils/datas';
+import { AbaDocumentosExigidos } from './obra/AbaDocumentosExigidos';
+import { AbaEmpresas } from './obra/AbaEmpresas';
+import { AbaVinculosEncerrados } from './obra/AbaVinculosEncerrados';
 import './ObraDetalhe.css';
+
+type IdAba = 'empresas' | 'documentos' | 'encerrados';
+const ABAS: IdAba[] = ['empresas', 'documentos', 'encerrados'];
 
 export function ObraDetalhe() {
   const { obraId = '' } = useParams();
+  const [params, setParams] = useSearchParams();
   const consulta = useConsulta((sinal) => api.obterObra(obraId, sinal), [obraId]);
   const [aviso, mostrarAviso] = useAviso();
   const [editando, setEditando] = useState(false);
   const [alternando, setAlternando] = useState(false);
   const [vinculando, setVinculando] = useState(false);
-  const [desvinculando, setDesvinculando] = useState<EmpresaNaObra | null>(null);
-  const ehAdmin = useEhAdmin();
+  const [encerrando, setEncerrando] = useState<EmpresaNaObra | null>(null);
+  const [reabrindoId, setReabrindoId] = useState<string | null>(null);
+
+  const abaParam = params.get('aba') as IdAba | null;
+  const aba: IdAba = abaParam && ABAS.includes(abaParam) ? abaParam : 'empresas';
+
+  function trocarAba(id: string) {
+    const novo = new URLSearchParams(params);
+    if (id === 'empresas') novo.delete('aba');
+    else novo.set('aba', id);
+    setParams(novo, { replace: true });
+  }
 
   if (consulta.carregando && !consulta.dados) return <Carregando texto="Carregando obra…" />;
   if (consulta.erro || !consulta.dados) {
@@ -52,8 +67,22 @@ export function ObraDetalhe() {
     setEditando(false);
     setAlternando(false);
     setVinculando(false);
-    setDesvinculando(null);
+    setEncerrando(null);
     mostrarAviso({ tom: 'erro', texto: mensagem });
+  }
+
+  async function reabrir(v: VinculoEncerrado) {
+    setReabrindoId(v.empresaId);
+    try {
+      await api.vincularEmpresa(obra.id, v.empresaId);
+      consulta.recarregar();
+      mostrarAviso({ tom: 'sucesso', texto: textoReaberto(v.razaoSocial) });
+    } catch (e) {
+      if (ehSemPermissao(e)) semPermissao(e.title);
+      else mostrarAviso({ tom: 'erro', texto: mensagemDeErro(e) });
+    } finally {
+      setReabrindoId(null);
+    }
   }
 
   return (
@@ -86,96 +115,39 @@ export function ObraDetalhe() {
 
       {!obra.ativa ? (
         <div className="jn-avisos">
-          <Alerta tom="info">Esta obra está inativa. Ela não aparece nos filtros padrão, mas os vínculos continuam.</Alerta>
+          <Alerta tom="info">
+            Esta obra está inativa. Os documentos dela saem do portal e das pendências; os vínculos e o histórico
+            continuam guardados.
+          </Alerta>
         </div>
       ) : null}
 
-      <section className="jn-secao" aria-labelledby="jn-empresas-da-obra">
-        <div className="jn-secao__cabecalho">
-          <div>
-            <h2 className="jn-secao__titulo" id="jn-empresas-da-obra">
-              Empresas da obra
-            </h2>
-            <p className="jn-secao__descricao">
-              {obra.empresas.length === 1 ? '1 empresa vinculada' : `${obra.empresas.length} empresas vinculadas`}
-            </p>
-          </div>
-          <SomenteAdmin>
-            <Botao icone={<IconeMais tamanho={18} />} onClick={() => setVinculando(true)}>
-              Vincular empresa
-            </Botao>
-          </SomenteAdmin>
-        </div>
-
-        {obra.empresas.length === 0 ? (
-          <EstadoVazio
-            icone={<IconeEmpresa tamanho={32} />}
-            titulo="Nenhuma empresa vinculada a esta obra."
-            texto={
-              ehAdmin
-                ? 'Vincule as empresas terceirizadas que trabalham aqui para acompanhar os documentos delas.'
-                : 'Quando um administrador vincular empresas a esta obra, elas aparecem aqui.'
-            }
-            acao={
-              ehAdmin ? (
-                <Botao icone={<IconeMais tamanho={18} />} onClick={() => setVinculando(true)}>
-                  Vincular empresa
-                </Botao>
-              ) : undefined
-            }
-          />
-        ) : (
-          <Tabela rotulo="Empresas da obra">
-            <thead>
-              <tr>
-                <th scope="col">Empresa</th>
-                <th scope="col">Acesso ao portal</th>
-                <th scope="col">Documentos</th>
-                <th scope="col">Vinculada em</th>
-                <th scope="col" className="jn-tabela__acoes">
-                  <span className="jn-sr-only">Ações</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {obra.empresas.map((e) => (
-                <tr key={e.empresaId}>
-                  <td>
-                    <Link to={`/empresas/${e.empresaId}`} className="jn-tabela__principal">
-                      {e.razaoSocial}
-                    </Link>
-                    <span className="jn-tabela__sub jn-mono">{formatarCnpj(e.cnpj)}</span>
-                  </td>
-                  <td>
-                    <SeloSituacao situacao={e.situacaoAcesso} />
-                  </td>
-                  <td>
-                    <ResumoDocumentos contagem={e.documentos} />
-                  </td>
-                  <td className="jn-tabela__nowrap">{formatarData(e.vinculadoEm)}</td>
-                  <td className="jn-tabela__acoes">
-                    <span className="jn-acoes-linha">
-                      <Link className="jn-link-acao" to={`/empresas/${e.empresaId}`} aria-label={`Ver empresa ${e.razaoSocial}`}>
-                        Ver empresa <IconeSeta tamanho={16} />
-                      </Link>
-                      <SomenteAdmin>
-                        <Botao
-                          variante="fantasma"
-                          tamanho="pequeno"
-                          onClick={() => setDesvinculando(e)}
-                          aria-label={`Desvincular ${e.razaoSocial}`}
-                        >
-                          Desvincular
-                        </Botao>
-                      </SomenteAdmin>
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Tabela>
-        )}
-      </section>
+      <Abas
+        rotulo="Seções da obra"
+        ativa={aba}
+        onTrocar={trocarAba}
+        abas={[
+          {
+            id: 'empresas',
+            rotulo: <RotuloAba texto="Empresas" contador={obra.empresas.length} />,
+            conteudo: (
+              <AbaEmpresas obra={obra} onVincular={() => setVinculando(true)} onEncerrar={setEncerrando} />
+            ),
+          },
+          {
+            id: 'documentos',
+            rotulo: <RotuloAba texto="Documentos exigidos" contador={obra.quantidadeTiposExigidos} />,
+            conteudo: (
+              <AbaDocumentosExigidos obraId={obra.id} onAlterado={consulta.recarregar} onSemPermissao={semPermissao} />
+            ),
+          },
+          {
+            id: 'encerrados',
+            rotulo: <RotuloAba texto="Vínculos encerrados" contador={obra.vinculosEncerrados.length} />,
+            conteudo: <AbaVinculosEncerrados obra={obra} reabrindoId={reabrindoId} onReabrir={reabrir} />,
+          },
+        ]}
+      />
 
       {editando ? (
         <FormularioObra
@@ -206,25 +178,46 @@ export function ObraDetalhe() {
           obra={obra}
           onFechar={() => setVinculando(false)}
           onSemPermissao={semPermissao}
-          onVinculada={(empresa) => {
+          onVinculada={(empresa, reaberto) => {
             setVinculando(false);
             consulta.recarregar();
-            mostrarAviso({ tom: 'sucesso', texto: `${empresa.razaoSocial} foi vinculada à obra.` });
+            mostrarAviso({
+              tom: 'sucesso',
+              texto: reaberto ? textoReaberto(empresa.razaoSocial) : `${empresa.razaoSocial} foi vinculada à obra.`,
+            });
           }}
         />
       ) : null}
 
-      <Desvincular
+      <EncerrarVinculo
         obraId={obra.id}
-        empresa={desvinculando}
-        onFechar={() => setDesvinculando(null)}
+        empresa={encerrando}
+        onFechar={() => setEncerrando(null)}
         onSemPermissao={semPermissao}
         onConcluido={(empresa) => {
-          setDesvinculando(null);
-          consulta.definirDados({ ...obra, empresas: obra.empresas.filter((x) => x.empresaId !== empresa.empresaId) });
-          mostrarAviso({ tom: 'sucesso', texto: `${empresa.razaoSocial} foi desvinculada da obra.` });
+          setEncerrando(null);
+          consulta.recarregar();
+          mostrarAviso({
+            tom: 'sucesso',
+            texto: `O vínculo de ${empresa.razaoSocial} com a obra foi encerrado. O histórico está em “Vínculos encerrados”.`,
+          });
         }}
       />
+    </>
+  );
+}
+
+function textoReaberto(razaoSocial: string): string {
+  return `O vínculo de ${razaoSocial} com a obra foi reaberto. Os documentos e o histórico desta obra voltaram a valer.`;
+}
+
+function RotuloAba({ texto, contador }: { texto: string; contador: number }) {
+  return (
+    <>
+      {texto}
+      <span className="jn-abas__contador" aria-label={`(${contador})`}>
+        {contador}
+      </span>
     </>
   );
 }
@@ -287,7 +280,14 @@ function AlternarObra({
   );
 }
 
-function Desvincular({
+function textoEnviosNaObra(n: number): string {
+  if (n === 0) return 'A empresa ainda não enviou documentos nesta obra.';
+  if (n === 1) return 'A empresa já enviou 1 documento nesta obra.';
+  return `A empresa já enviou ${n} documentos nesta obra.`;
+}
+
+/** Desvincular encerra o vínculo e preserva o histórico (US5, FR-220/FR-222). */
+function EncerrarVinculo({
   obraId,
   empresa,
   onFechar,
@@ -321,14 +321,19 @@ function Desvincular({
   return (
     <ModalConfirmacao
       aberto={Boolean(empresa)}
-      titulo="Desvincular empresa?"
+      titulo="Encerrar vínculo?"
       mensagem={
-        <p>
-          <strong>{empresa?.razaoSocial}</strong> deixa de aparecer nesta obra. Os documentos e o acesso da empresa ao
-          portal não mudam.
-        </p>
+        <>
+          <p>
+            <strong>{empresa?.razaoSocial}</strong> deixa de ver esta obra no portal e sai das pendências dela.
+          </p>
+          <p>
+            {textoEnviosNaObra(empresa?.quantidadeEnviosNaObra ?? 0)} O histórico continua guardado e volta se você
+            vincular de novo.
+          </p>
+        </>
       }
-      rotuloConfirmar="Desvincular"
+      rotuloConfirmar="Encerrar vínculo"
       variante="perigo"
       carregando={carregando}
       erro={erro}
@@ -349,7 +354,7 @@ function ModalVincularEmpresa({
 }: {
   obra: TObraDetalhe;
   onFechar: () => void;
-  onVinculada: (empresa: EmpresaResumo) => void;
+  onVinculada: (empresa: EmpresaResumo, reaberto: boolean) => void;
   onSemPermissao: (mensagem: string) => void;
 }) {
   const [busca, setBusca] = useState('');
@@ -367,13 +372,14 @@ function ModalVincularEmpresa({
     [termo],
   );
   const vinculadas = new Set(obra.empresas.map((e) => e.empresaId));
+  const encerradas = new Set(obra.vinculosEncerrados.map((v) => v.empresaId));
 
   async function vincular(empresa: EmpresaResumo) {
     setVinculandoId(empresa.id);
     setErro(null);
     try {
       await api.vincularEmpresa(obra.id, empresa.id);
-      onVinculada(empresa);
+      onVinculada(empresa, encerradas.has(empresa.id));
     } catch (e) {
       setVinculandoId(null);
       if (ehSemPermissao(e)) onSemPermissao(e.title);
@@ -411,6 +417,7 @@ function ModalVincularEmpresa({
             <ul className="jn-lista-simples jn-vincular__lista" aria-label="Empresas encontradas">
               {itens.map((e) => {
                 const jaVinculada = vinculadas.has(e.id);
+                const encerrada = encerradas.has(e.id);
                 return (
                   <li key={e.id}>
                     <div className="jn-vincular__empresa">
@@ -418,6 +425,7 @@ function ModalVincularEmpresa({
                       <span className="jn-tabela__sub jn-mono">
                         {formatarCnpj(e.cnpj)}
                         {!e.ativa ? ' · Desativada' : ''}
+                        {encerrada ? ' · Vínculo encerrado (o histórico volta ao reabrir)' : ''}
                       </span>
                     </div>
                     {jaVinculada ? (
@@ -429,9 +437,9 @@ function ModalVincularEmpresa({
                         carregando={vinculandoId === e.id}
                         disabled={Boolean(vinculandoId)}
                         onClick={() => vincular(e)}
-                        aria-label={`Vincular ${e.razaoSocial}`}
+                        aria-label={encerrada ? `Reabrir vínculo de ${e.razaoSocial}` : `Vincular ${e.razaoSocial}`}
                       >
-                        Vincular
+                        {encerrada ? 'Reabrir vínculo' : 'Vincular'}
                       </Botao>
                     )}
                   </li>

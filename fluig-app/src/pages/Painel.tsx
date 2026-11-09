@@ -7,7 +7,15 @@ import { AvisoPagina } from '../components/AvisoPagina';
 import { useAviso } from '../hooks/useAviso';
 import { AvisoSomenteAdmin } from '../components/AvisoSomenteAdmin';
 import { Carregando, EstadoErro } from '../components/Estados';
-import { IconeAlerta, IconeEmail, IconeEmpresa, IconeFila, IconeObra, IconeSeta } from '../components/icons';
+import {
+  IconeAlerta,
+  IconeEmail,
+  IconeEmpresa,
+  IconeFila,
+  IconeObra,
+  IconeRelogio,
+  IconeSeta,
+} from '../components/icons';
 import { TituloPagina } from '../components/TituloPagina';
 import './Painel.css';
 
@@ -75,7 +83,7 @@ export function Painel() {
             <h2 className="jn-secao__titulo" id="jn-painel-atencao">
               Precisa de atenção
             </h2>
-            <div className="jn-painel__grade">
+            <div className="jn-painel__grade jn-painel__grade--atencao">
               <CartaoIndicador
                 destaque
                 icone={<IconeFila tamanho={40} />}
@@ -89,10 +97,32 @@ export function Painel() {
                 numero={p.empresasComPendencia}
                 texto={
                   p.empresasComPendencia === 1
-                    ? 'empresa com pendência (documento pendente ou rejeitado)'
-                    : 'empresas com pendência (documento pendente ou rejeitado)'
+                    ? 'empresa com pendência (documento geral ou da obra pendente ou rejeitado)'
+                    : 'empresas com pendência (documento geral ou da obra pendente ou rejeitado)'
                 }
                 links={[{ para: '/empresas?comPendencia=true', rotulo: 'Ver empresas com pendência' }]}
+              />
+              <CartaoIndicador
+                destaque
+                icone={<IconeObra tamanho={40} />}
+                numero={p.obrasComPendencia}
+                texto={
+                  p.obrasComPendencia === 1
+                    ? 'obra com pendência (documento da obra pendente ou rejeitado)'
+                    : 'obras com pendência (documento da obra pendente ou rejeitado)'
+                }
+                links={[{ para: '/obras?comPendencia=true', rotulo: 'Ver obras com pendência' }]}
+              />
+              <CartaoIndicador
+                destaque
+                icone={<IconeRelogio tamanho={40} />}
+                numero={p.empresasComAtraso}
+                texto={
+                  p.empresasComAtraso === 1
+                    ? 'empresa com período atrasado (documento periódico com prazo vencido)'
+                    : 'empresas com período atrasado (documento periódico com prazo vencido)'
+                }
+                links={[{ para: '/empresas?comAtraso=true', rotulo: 'Ver empresas com atraso' }]}
               />
               <CartaoIndicador
                 destaque

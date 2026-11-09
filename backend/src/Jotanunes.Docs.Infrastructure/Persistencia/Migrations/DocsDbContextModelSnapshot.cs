@@ -306,6 +306,10 @@ namespace Jotanunes.Docs.Infrastructure.Persistencia.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("empresa_id");
 
+                    b.Property<bool>("EnviadoComAtraso")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enviado_com_atraso");
+
                     b.Property<DateTimeOffset>("EnviadoEm")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("enviado_em");
@@ -320,6 +324,18 @@ namespace Jotanunes.Docs.Infrastructure.Persistencia.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("nome_arquivo");
+
+                    b.Property<Guid?>("ObraId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("obra_id");
+
+                    b.Property<DateOnly?>("PeriodoFim")
+                        .HasColumnType("date")
+                        .HasColumnName("periodo_fim");
+
+                    b.Property<DateOnly?>("PeriodoInicio")
+                        .HasColumnType("date")
+                        .HasColumnName("periodo_inicio");
 
                     b.Property<string>("Sha256")
                         .IsRequired()
@@ -346,11 +362,6 @@ namespace Jotanunes.Docs.Infrastructure.Persistencia.Migrations
                     b.HasIndex("TipoDocumentoId")
                         .HasDatabaseName("ix_envios_documento_tipo_documento_id");
 
-                    b.HasIndex("EmpresaId", "TipoDocumentoId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_envios_documento_vivo")
-                        .HasFilter("status <> 'REJEITADO'");
-
                     b.HasIndex("Status", "EnviadoEm")
                         .HasDatabaseName("ix_envios_documento_status_enviado");
 
@@ -358,7 +369,27 @@ namespace Jotanunes.Docs.Infrastructure.Persistencia.Migrations
                         .IsDescending(false, false, true)
                         .HasDatabaseName("ix_envios_documento_empresa_tipo_enviado");
 
-                    b.ToTable("envios_documento", (string)null);
+                    b.HasIndex("EmpresaId", "TipoDocumentoId", "ObraId", "PeriodoInicio")
+                        .IsUnique()
+                        .HasDatabaseName("ix_envios_documento_vivo")
+                        .HasFilter("status <> 'REJEITADO'");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("EmpresaId", "TipoDocumentoId", "ObraId", "PeriodoInicio"), false);
+
+                    b.HasIndex("ObraId", "EmpresaId", "TipoDocumentoId", "EnviadoEm")
+                        .IsDescending(false, false, false, true)
+                        .HasDatabaseName("ix_envios_documento_obra_empresa_tipo_enviado")
+                        .HasFilter("obra_id IS NOT NULL");
+
+                    b.HasIndex("EmpresaId", "TipoDocumentoId", "ObraId", "PeriodoInicio", "EnviadoEm")
+                        .IsDescending(false, false, false, false, true)
+                        .HasDatabaseName("ix_envios_documento_periodo")
+                        .HasFilter("periodo_inicio IS NOT NULL");
+
+                    b.ToTable("envios_documento", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_envios_documento_periodo", "(periodo_inicio IS NULL AND periodo_fim IS NULL) OR (periodo_inicio IS NOT NULL AND periodo_fim >= periodo_inicio)");
+                        });
                 });
 
             modelBuilder.Entity("Jotanunes.Docs.Domain.Obras.Obra", b =>
@@ -431,6 +462,21 @@ namespace Jotanunes.Docs.Infrastructure.Persistencia.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("empresa_id");
 
+                    b.Property<bool>("Ativo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("ativo");
+
+                    b.Property<DateTimeOffset?>("EncerradoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("encerrado_em");
+
+                    b.Property<string>("EncerradoPorLogin")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("encerrado_por_login");
+
                     b.Property<DateTimeOffset>("VinculadoEm")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("vinculado_em");
@@ -447,7 +493,40 @@ namespace Jotanunes.Docs.Infrastructure.Persistencia.Migrations
                     b.HasIndex("EmpresaId")
                         .HasDatabaseName("ix_obra_empresas_empresa_id");
 
+                    b.HasIndex(new[] { "EmpresaId" }, "ix_obra_empresas_empresa_ativo")
+                        .HasDatabaseName("ix_obra_empresas_empresa_ativo")
+                        .HasFilter("ativo");
+
                     b.ToTable("obra_empresas", (string)null);
+                });
+
+            modelBuilder.Entity("Jotanunes.Docs.Domain.Obras.ObraTipoDocumento", b =>
+                {
+                    b.Property<Guid>("ObraId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("obra_id");
+
+                    b.Property<Guid>("TipoDocumentoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tipo_documento_id");
+
+                    b.Property<DateTimeOffset>("MarcadoEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("marcado_em");
+
+                    b.Property<string>("MarcadoPorLogin")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("marcado_por_login");
+
+                    b.HasKey("ObraId", "TipoDocumentoId")
+                        .HasName("pk_obra_tipos_documento");
+
+                    b.HasIndex("TipoDocumentoId")
+                        .HasDatabaseName("ix_obra_tipos_documento_tipo_documento_id");
+
+                    b.ToTable("obra_tipos_documento", (string)null);
                 });
 
             modelBuilder.Entity("Jotanunes.Docs.Domain.TiposDocumento.TipoDocumento", b =>
@@ -455,6 +534,14 @@ namespace Jotanunes.Docs.Infrastructure.Persistencia.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<string>("Abrangencia")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("abrangencia")
+                        .HasDefaultValueSql("'GERAL'");
 
                     b.Property<bool>("Ativo")
                         .HasColumnType("boolean")
@@ -468,6 +555,10 @@ namespace Jotanunes.Docs.Infrastructure.Persistencia.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("atualizado_por_login");
+
+                    b.Property<DateTimeOffset>("CobrancaDesde")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cobranca_desde");
 
                     b.Property<DateTimeOffset>("CriadoEm")
                         .HasColumnType("timestamp with time zone")
@@ -490,10 +581,33 @@ namespace Jotanunes.Docs.Infrastructure.Persistencia.Migrations
                         .HasColumnType("character varying(120)")
                         .HasColumnName("nome");
 
+                    b.Property<int?>("PeriodicidadeIntervalo")
+                        .HasColumnType("integer")
+                        .HasColumnName("periodicidade_intervalo");
+
+                    b.Property<string>("PeriodicidadeUnidade")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("periodicidade_unidade")
+                        .HasDefaultValueSql("'UNICA'");
+
+                    b.Property<int?>("PrazoDias")
+                        .HasColumnType("integer")
+                        .HasColumnName("prazo_dias");
+
                     b.HasKey("Id")
                         .HasName("pk_tipos_documento");
 
-                    b.ToTable("tipos_documento", (string)null);
+                    b.ToTable("tipos_documento", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_tipos_documento_abrangencia", "abrangencia IN ('GERAL', 'POR_OBRA')");
+
+                            t.HasCheckConstraint("ck_tipos_documento_periodicidade", "(periodicidade_unidade = 'UNICA' AND periodicidade_intervalo IS NULL AND prazo_dias IS NULL) OR (periodicidade_unidade = 'MESES' AND periodicidade_intervalo BETWEEN 1 AND 24 AND prazo_dias BETWEEN 0 AND 90) OR (periodicidade_unidade = 'DIAS' AND periodicidade_intervalo BETWEEN 1 AND 365 AND prazo_dias BETWEEN 0 AND 90)");
+
+                            t.HasCheckConstraint("ck_tipos_documento_periodicidade_unidade", "periodicidade_unidade IN ('UNICA', 'MESES', 'DIAS')");
+                        });
                 });
 
             modelBuilder.Entity("Jotanunes.Docs.Domain.UsuariosInternos.UsuarioInterno", b =>
@@ -609,6 +723,12 @@ namespace Jotanunes.Docs.Infrastructure.Persistencia.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_envios_documento_empresas_empresa_id");
 
+                    b.HasOne("Jotanunes.Docs.Domain.Obras.Obra", null)
+                        .WithMany()
+                        .HasForeignKey("ObraId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_envios_documento_obras_obra_id");
+
                     b.HasOne("Jotanunes.Docs.Domain.TiposDocumento.TipoDocumento", null)
                         .WithMany()
                         .HasForeignKey("TipoDocumentoId")
@@ -632,6 +752,23 @@ namespace Jotanunes.Docs.Infrastructure.Persistencia.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_obra_empresas_obras_obra_id");
+                });
+
+            modelBuilder.Entity("Jotanunes.Docs.Domain.Obras.ObraTipoDocumento", b =>
+                {
+                    b.HasOne("Jotanunes.Docs.Domain.Obras.Obra", null)
+                        .WithMany()
+                        .HasForeignKey("ObraId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_obra_tipos_documento_obras_obra_id");
+
+                    b.HasOne("Jotanunes.Docs.Domain.TiposDocumento.TipoDocumento", null)
+                        .WithMany()
+                        .HasForeignKey("TipoDocumentoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_obra_tipos_documento_tipos_documento_tipo_documento_id");
                 });
 #pragma warning restore 612, 618
         }

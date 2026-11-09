@@ -69,7 +69,7 @@ describe('TrocaSenha', () => {
     expect(screen.getByLabelText('Senha atual')).toHaveFocus();
   });
 
-  it('troca bem-sucedida leva a "Meus documentos" com os 3 pendentes', async () => {
+  it('troca bem-sucedida leva a "Meus documentos" com os 4 pendentes', async () => {
     const { user } = await abrirTroca();
     await user.type(screen.getByLabelText('Senha atual'), SENHA_TEMPORARIA_EXEMPLO);
     await user.type(screen.getByLabelText('Nova senha'), SENHA_NOVA_EXEMPLO);
@@ -77,8 +77,9 @@ describe('TrocaSenha', () => {
     await user.click(screen.getByRole('button', { name: 'Salvar e continuar' }));
 
     expect(await screen.findByRole('heading', { name: 'Meus documentos' })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getAllByText('Pendente de envio')).toHaveLength(3));
+    await waitFor(() => expect(screen.getAllByText('Pendente de envio')).toHaveLength(4));
     expect(screen.getByText('Senha criada. Agora é só enviar os documentos.')).toBeInTheDocument();
+    expect(screen.getByText(/Você ainda não está em nenhuma obra\./)).toBeInTheDocument();
     expect(rotaAtual()).toBe('/documentos');
   });
 

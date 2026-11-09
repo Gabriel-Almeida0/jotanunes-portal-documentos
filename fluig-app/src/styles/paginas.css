@@ -193,3 +193,108 @@
   font-weight: 400;
   color: var(--jn-gray-500);
 }
+
+/* Grupo de opções (rádios) com legenda no padrão do rótulo de campo. */
+.jn-app .jn-opcoes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-1);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.jn-app .jn-opcoes > legend {
+  padding: 0;
+  margin-bottom: var(--jn-space-1);
+}
+
+.jn-app .jn-opcoes .jn-caixa-marcacao {
+  align-items: flex-start;
+  font-weight: 400;
+}
+
+.jn-app .jn-opcoes .jn-caixa-marcacao input {
+  flex: none;
+  margin-top: 2px;
+}
+
+.jn-app .jn-opcoes--erro .jn-caixa-marcacao input {
+  outline: 1px solid var(--jn-danger-fg);
+  outline-offset: 1px;
+}
+
+/* Periodicidade no formulário de tipo (003): campos + prévia da regra em texto. */
+.jn-app .jn-form-tipo__periodicidade {
+  gap: var(--jn-space-3);
+}
+
+.jn-app .jn-form-tipo__previa {
+  margin: 0;
+  padding: var(--jn-space-3) var(--jn-space-4);
+  border-left: 3px solid var(--jn-navy-800);
+  background: var(--jn-gray-50);
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-800);
+}
+
+/* Seção recolhível (<details> nativo): vínculos encerrados, obras encerradas. */
+.jn-app .jn-recolhivel {
+  border: var(--jn-border-card);
+  border-radius: var(--jn-radius-control);
+  background: var(--jn-white);
+}
+
+.jn-app .jn-recolhivel > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--jn-space-2);
+  padding: var(--jn-space-3) var(--jn-space-4);
+  font: var(--jn-text-h3);
+  font-size: 16px;
+  color: var(--jn-gray-900);
+  cursor: pointer;
+  list-style: none;
+}
+
+.jn-app .jn-recolhivel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.jn-app .jn-recolhivel > summary::before {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--jn-red-700);
+  border-bottom: 2px solid var(--jn-red-700);
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+.jn-app .jn-recolhivel[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.jn-app .jn-recolhivel > summary:focus-visible {
+  outline: 3px solid var(--jn-red-700);
+  outline-offset: 2px;
+}
+
+.jn-app .jn-recolhivel__corpo {
+  padding: 0 var(--jn-space-4) var(--jn-space-4);
+}
+
+.jn-app .jn-recolhivel__resumo {
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-500);
+}
+
+/* Duas contagens de documentos na mesma célula (da obra e gerais). */
+.jn-app .jn-contagens {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-2);
+  min-width: 220px;
+}

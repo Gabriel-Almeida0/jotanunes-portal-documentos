@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import { http } from 'msw';
-import { IDS } from '../mocks/dados';
+import { DATA_FIXA_TESTES, IDS, fixarRelogioMock, reiniciarDados } from '../mocks/dados';
 import { server } from '../mocks/server';
 import { renderizarRota } from '../test/renderizar';
 
@@ -44,6 +44,18 @@ describe('Empresas', () => {
       .map((l) => within(l).getAllByRole('cell')[0].querySelector('a')?.textContent);
     expect(nomes).toEqual(['Alfa Engenharia Ltda', 'Delta Pinturas e Acabamentos ME']);
     expect(local()).toContain(`obraId=${IDS.obraFlorDeSal}`);
+    // Filtrada por obra: contagem da obra e dos gerais, identificadas separadamente.
+    const alfa = within(tabela).getByText('Alfa Engenharia Ltda').closest('tr')!;
+    expect(within(alfa).getByText('Desta obra: 0 de 1 aprovados')).toBeInTheDocument();
+    expect(within(alfa).getByText('Gerais: 2 de 5 aprovados')).toBeInTheDocument();
+  });
+
+  it('sem filtro de obra mostra só a contagem dos gerais, sem rótulo', async () => {
+    renderizarRota('/empresas');
+    const tabela = await screen.findByRole('table', { name: 'Empresas' });
+    const alfa = within(tabela).getByText('Alfa Engenharia Ltda').closest('tr')!;
+    expect(within(alfa).getByText('2 de 5 aprovados')).toBeInTheDocument();
+    expect(within(alfa).queryByText(/Desta obra/)).not.toBeInTheDocument();
   });
 
   it('filtra por situação de acesso', async () => {
@@ -124,5 +136,20 @@ describe('Empresas', () => {
     await usuario.type(within(dialogo).getByLabelText(/E-mail de contato/), 'x@y.test');
     await usuario.click(within(dialogo).getByRole('button', { name: 'Salvar' }));
     expect(await within(dialogo).findByText('E-mail inválido.')).toBeInTheDocument();
+  });
+
+  it('filtra "Com atraso": só empresas com período atrasado (003)', async () => {
+    fixarRelogioMock(DATA_FIXA_TESTES);
+    reiniciarDados();
+    renderizarRota('/empresas?comAtraso=true');
+    const tabela = await screen.findByRole('table', { name: 'Empresas' });
+    const nomes = within(tabela)
+      .getAllByRole('row')
+      .slice(1)
+      .map((l) => within(l).getAllByRole('cell')[0].querySelector('a')?.textContent);
+    // Guia do FGTS de setembro sem envio, prazo 15/10 vencido.
+    expect(nomes).toEqual(['Alfa Engenharia Ltda', 'Delta Pinturas e Acabamentos ME']);
+    const alfa = within(tabela).getByText('Alfa Engenharia Ltda').closest('tr')!;
+    expect(within(alfa).getByText('1 período atrasado')).toBeInTheDocument();
   });
 });

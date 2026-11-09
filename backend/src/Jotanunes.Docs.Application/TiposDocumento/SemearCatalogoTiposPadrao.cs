@@ -32,7 +32,7 @@ public sealed class SemearCatalogoTiposPadrao(ITipoDocumentoRepositorio tipos, I
         var agora = relogio.GetUtcNow();
         foreach (var item in CatalogoTiposPadrao.Itens)
         {
-            tipos.Adicionar(TipoDocumento.Criar(item.Nome, item.Instrucoes, CatalogoTiposPadrao.Autor, agora));
+            tipos.Adicionar(TipoDocumento.Criar(item.Nome, item.Instrucoes, CatalogoTiposPadrao.Autor, agora, Abrangencia.GERAL));
         }
         try
         {

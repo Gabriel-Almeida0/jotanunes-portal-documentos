@@ -26,29 +26,42 @@ export function Obras() {
   const [params, setParams] = useSearchParams();
   const busca = params.get('busca') ?? '';
   const situacao = (params.get('situacao') as FiltroSituacao | null) ?? 'ativas';
+  const comPendencia = params.get('comPendencia') === 'true';
   const pagina = Math.max(1, Number(params.get('pagina') ?? '1') || 1);
 
   const [rascunhoBusca, setRascunhoBusca] = useState(busca);
   const [rascunhoSituacao, setRascunhoSituacao] = useState<FiltroSituacao>(situacao);
+  const [rascunhoPendencia, setRascunhoPendencia] = useState(comPendencia);
   const [criando, setCriando] = useState(false);
   const [aviso, mostrarAviso] = useAviso();
   const ehAdmin = useEhAdmin();
 
   const ativa = situacao === 'ativas' ? true : situacao === 'inativas' ? false : undefined;
   const consulta = useConsulta(
-    (sinal) => api.listarObras({ busca: busca || undefined, ativa, pagina, tamanhoPagina: TAMANHO_PAGINA }, sinal),
-    [busca, ativa, pagina],
+    (sinal) =>
+      api.listarObras(
+        {
+          busca: busca || undefined,
+          ativa,
+          comPendencia: comPendencia || undefined,
+          pagina,
+          tamanhoPagina: TAMANHO_PAGINA,
+        },
+        sinal,
+      ),
+    [busca, ativa, comPendencia, pagina],
   );
 
-  function aplicar(novoBusca: string, novaSituacao: FiltroSituacao, novaPagina = 1) {
+  function aplicar(novoBusca: string, novaSituacao: FiltroSituacao, novaPendencia: boolean, novaPagina = 1) {
     const novo = new URLSearchParams();
     if (novoBusca.trim()) novo.set('busca', novoBusca.trim());
     if (novaSituacao !== 'ativas') novo.set('situacao', novaSituacao);
+    if (novaPendencia) novo.set('comPendencia', 'true');
     if (novaPagina > 1) novo.set('pagina', String(novaPagina));
     setParams(novo);
   }
 
-  const filtrado = Boolean(busca) || situacao !== 'ativas';
+  const filtrado = Boolean(busca) || situacao !== 'ativas' || comPendencia;
   const obras = consulta.dados?.itens ?? [];
 
   return (
@@ -73,13 +86,14 @@ export function Obras() {
 
       <Filtros
         titulo="Encontre a obra"
-        onPesquisar={() => aplicar(rascunhoBusca, rascunhoSituacao)}
+        onPesquisar={() => aplicar(rascunhoBusca, rascunhoSituacao, rascunhoPendencia)}
         onLimpar={
           filtrado
             ? () => {
                 setRascunhoBusca('');
                 setRascunhoSituacao('ativas');
-                aplicar('', 'ativas');
+                setRascunhoPendencia(false);
+                aplicar('', 'ativas', false);
               }
             : undefined
         }
@@ -101,6 +115,14 @@ export function Obras() {
           <option value="inativas">Inativas</option>
           <option value="todas">Todas</option>
         </CampoSelecao>
+        <label className="jn-caixa-marcacao jn-obras__pendencia">
+          <input
+            type="checkbox"
+            checked={rascunhoPendencia}
+            onChange={(e) => setRascunhoPendencia(e.target.checked)}
+          />
+          Com pendência
+        </label>
       </Filtros>
 
       <AvisoPagina aviso={aviso} onFechar={() => mostrarAviso(null)} />
@@ -111,7 +133,10 @@ export function Obras() {
         <EstadoErro erro={consulta.erro} onTentarDeNovo={consulta.recarregar} />
       ) : obras.length === 0 ? (
         filtrado ? (
-          <EstadoVazio titulo="Nenhuma obra encontrada com esses filtros." texto="Tente outro nome, código ou cidade." />
+          <EstadoVazio
+            titulo="Nenhuma obra encontrada com esses filtros."
+            texto={comPendencia ? 'Nenhuma obra com documento da obra pendente ou rejeitado.' : 'Tente outro nome, código ou cidade.'}
+          />
         ) : (
           <EstadoVazio
             icone={<IconeObra tamanho={32} />}
@@ -140,6 +165,9 @@ export function Obras() {
                 <th scope="col" className="jn-tabela__num">
                   Empresas
                 </th>
+                <th scope="col" className="jn-tabela__num">
+                  Docs exigidos
+                </th>
                 <th scope="col">Situação</th>
                 <th scope="col" className="jn-tabela__acoes">
                   <span className="jn-sr-only">Ações</span>
@@ -161,6 +189,7 @@ export function Obras() {
                     </span>
                   </td>
                   <td className="jn-tabela__num">{o.quantidadeEmpresas}</td>
+                  <td className="jn-tabela__num">{o.quantidadeTiposExigidos}</td>
                   <td>
                     <SeloAtivo ativo={o.ativa} feminino />
                   </td>
@@ -178,7 +207,7 @@ export function Obras() {
             tamanhoPagina={consulta.dados?.tamanhoPagina ?? TAMANHO_PAGINA}
             total={consulta.dados?.total ?? 0}
             rotuloItens="obras"
-            onMudar={(p) => aplicar(busca, situacao, p)}
+            onMudar={(p) => aplicar(busca, situacao, comPendencia, p)}
           />
         </>
       )}

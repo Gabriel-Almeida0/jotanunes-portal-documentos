@@ -10,6 +10,12 @@ public enum TipoErroDominio
     TransicaoInvalida,
     /// <summary>CNPJ não pode mudar depois do primeiro convite.</summary>
     CnpjImutavel,
+    /// <summary>Abrangência do tipo de documento não pode mudar depois do primeiro envio.</summary>
+    AbrangenciaImutavel,
+    /// <summary>Unidade/intervalo da periodicidade não podem mudar depois do primeiro envio (003).</summary>
+    PeriodicidadeImutavel,
+    /// <summary>Envio de tipo periódico sem período, ou de tipo único com período (003).</summary>
+    PeriodoObrigatorio,
 }
 
 /// <summary>Violação de regra de negócio. A camada de aplicação traduz para um código de erro estável.</summary>

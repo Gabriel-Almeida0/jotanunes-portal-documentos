@@ -78,7 +78,8 @@ troca_senha_obrigatoria = false                                → ATIVA
 | vinculado_em / vinculado_por_login | timestamptz / varchar(100) | |
 
 Vincular de novo é idempotente (204). Desvincular remove a linha (não afeta documentos — decisão do
-clarify: documentos são por empresa).
+clarify: documentos são por empresa). **Desde a 002**: desvincular encerra o vínculo (`ativo`,
+`encerrado_em/por`) e vincular reabre — ver [002/data-model §3](../002-documentos-por-obra/data-model.md).
 
 ## 4. Tipo de documento (`tipos_documento`)
 
@@ -91,7 +92,8 @@ clarify: documentos são por empresa).
 | criado_em / criado_por_login / atualizado_em / atualizado_por_login | | |
 
 Regra (clarify, **validada** em 2026-09-29): **todo tipo ativo é exigido de toda empresa ativa**.
-Não há tabela de exigência por empresa.
+Não há tabela de exigência por empresa. **Desde a 002**: vale para tipos `GERAL`; tipos `POR_OBRA` são
+exigidos pelas obras que os marcam (`obra_tipos_documento`, [002/data-model](../002-documentos-por-obra/data-model.md)).
 
 Escrita (criar, editar, ativar/desativar) só por **administrador** (§9); leitura por qualquer
 usuário Fluig.
@@ -175,6 +177,8 @@ validade" é só orientação para a empresa.
 - Tipo de documento inativo: não aceita novos envios; envios `EM_ANALISE` ainda podem ser analisados.
 
 ### Situação do documento (derivada por empresa × tipo ativo)
+
+> **Desde a 003** ([documentos periódicos](../003-documentos-periodicos/spec.md)): tipos podem ser periódicos (um envio por período, com prazo e atraso); esta regra vale para cada período.
 
 ```text
 existe envio não rejeitado  → status desse envio (EM_ANALISE | APROVADO)

@@ -29,18 +29,22 @@ function cartao(nome: string): HTMLElement {
 afterEach(() => vi.restoreAllMocks());
 
 describe('MeusDocumentos', () => {
-  it('mostra os 3 documentos exigidos como "Pendente de envio", com nome e instruções', async () => {
+  it('mostra os 4 documentos exigidos como "Pendente de envio", com nome e instruções', async () => {
     await conectarEmpresaNova();
     renderizarPortal('/documentos');
 
-    expect(await screen.findAllByText('Pendente de envio')).toHaveLength(3);
+    expect(await screen.findAllByText('Pendente de envio')).toHaveLength(4);
     for (const nome of ['Cartão CNPJ', 'Certidão Negativa de Débitos Federais', 'PCMSO']) {
       expect(
         within(cartao(nome)).getByRole('button', { name: 'Enviar documento' }),
       ).toBeInTheDocument();
     }
     expect(within(cartao('Cartão CNPJ')).getByText(/Receita Federal/)).toBeInTheDocument();
-    expect(screen.getByText(/Faltam 3 documentos/)).toBeInTheDocument();
+    // Periódico (empresa recém-cadastrada: só o período em curso): envio pela página de períodos.
+    const fgts = within(cartao('Guia do FGTS'));
+    expect(fgts.queryByRole('button', { name: /Enviar/ })).not.toBeInTheDocument();
+    expect(fgts.getByRole('link', { name: 'Ver períodos de Guia do FGTS' })).toBeInTheDocument();
+    expect(screen.getByText(/Faltam 4 documentos/)).toBeInTheDocument();
   });
 
   it('enviar um PDF muda a situação para "Em análise" e some o botão de envio', async () => {
@@ -58,7 +62,7 @@ describe('MeusDocumentos', () => {
     expect(doCartao.getByRole('button', { name: 'Baixar cartao.pdf' })).toBeInTheDocument();
     expect(doCartao.getByText(/enviado em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}/)).toBeInTheDocument();
     expect(screen.getByText(/Recebemos o arquivo de Cartão CNPJ/)).toBeInTheDocument();
-    expect(screen.getByText(/Faltam 2 documentos/)).toBeInTheDocument();
+    expect(screen.getByText(/Faltam 3 documentos/)).toBeInTheDocument();
   });
 
   it('exibe ENVIO_NAO_PERMITIDO vindo do servidor', async () => {
@@ -83,7 +87,7 @@ describe('MeusDocumentos', () => {
     expect(
       await screen.findByText('Nenhum documento pendente. Tudo certo por aqui.'),
     ).toBeInTheDocument();
-    expect(screen.getAllByText('Aprovado')).toHaveLength(3);
+    expect(screen.getAllByText('Aprovado')).toHaveLength(4);
     expect(screen.queryByRole('button', { name: /Enviar/ })).not.toBeInTheDocument();
   });
 
@@ -106,7 +110,7 @@ describe('MeusDocumentos', () => {
       await screen.findByText('Algo deu errado do nosso lado. Tente de novo.'),
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Tentar de novo' }));
-    expect(await screen.findAllByText('Pendente de envio')).toHaveLength(3);
+    expect(await screen.findAllByText('Pendente de envio')).toHaveLength(4);
   });
 
   it('download chama a URL do envio com o Bearer da sessão', async () => {

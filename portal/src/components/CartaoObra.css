@@ -1,0 +1,125 @@
+.jn-obra {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-3);
+  min-width: 0;
+  padding: var(--jn-space-5);
+  border: var(--jn-border-card);
+  border-radius: var(--jn-radius-card);
+  background: var(--jn-white);
+}
+
+.jn-obra--pendente {
+  border-color: var(--jn-warning-fg);
+  box-shadow: inset 4px 0 0 var(--jn-warning-fg);
+}
+
+.jn-obra:hover {
+  box-shadow: var(--jn-shadow-sm);
+}
+
+.jn-obra--pendente:hover {
+  box-shadow:
+    inset 4px 0 0 var(--jn-warning-fg),
+    var(--jn-shadow-sm);
+}
+
+.jn-obra__nome {
+  font: var(--jn-text-h3);
+  font-size: 19px;
+  overflow-wrap: anywhere;
+}
+
+.jn-obra__link {
+  color: var(--jn-gray-900);
+  text-decoration: none;
+}
+
+/* O cartão inteiro é clicável; o link continua sendo o nome da obra. */
+.jn-obra__link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.jn-obra__link:focus-visible {
+  outline: none;
+}
+
+.jn-obra__link:focus-visible::after {
+  box-shadow: var(--jn-focus-ring);
+}
+
+.jn-obra__local {
+  display: flex;
+  align-items: center;
+  gap: var(--jn-space-1);
+  font: var(--jn-text-sm);
+  color: var(--jn-gray-600);
+}
+
+.jn-obra__pin {
+  flex: none;
+  color: var(--jn-red-700);
+}
+
+.jn-obra__progresso {
+  display: flex;
+  flex-direction: column;
+  gap: var(--jn-space-1);
+}
+
+.jn-obra__progresso-texto {
+  font: 600 15px/1.4 var(--jn-font);
+  color: var(--jn-gray-900);
+}
+
+.jn-obra__barra {
+  display: block;
+  height: 6px;
+  border-radius: var(--jn-radius-pill);
+  background: var(--jn-gray-100);
+  overflow: hidden;
+}
+
+.jn-obra__barra > span {
+  display: block;
+  height: 100%;
+  background: var(--jn-success-fg);
+}
+
+.jn-obra__selos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--jn-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.jn-selo--neutro {
+  color: var(--jn-neutral-fg);
+  background: var(--jn-neutral-bg);
+}
+
+.jn-obra__abrir {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--jn-space-1);
+  margin-top: auto;
+  font: 600 14px/1.4 var(--jn-font);
+  color: var(--jn-red-700);
+}
+
+.jn-obra:hover .jn-obra__abrir {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 420px) {
+  .jn-obra {
+    padding: var(--jn-space-4);
+  }
+}

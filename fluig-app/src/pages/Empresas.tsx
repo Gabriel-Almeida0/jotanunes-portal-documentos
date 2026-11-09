@@ -34,6 +34,8 @@ interface FiltrosEmpresas {
   obraId: string;
   situacaoAcesso: string;
   comPendencia: boolean;
+  /** 003: empresas com algum período atrasado. */
+  comAtraso: boolean;
 }
 
 function lerFiltros(params: URLSearchParams): FiltrosEmpresas {
@@ -43,6 +45,7 @@ function lerFiltros(params: URLSearchParams): FiltrosEmpresas {
     obraId: params.get('obraId') ?? '',
     situacaoAcesso: SITUACOES_ACESSO.includes(situacao as SituacaoAcesso) ? situacao : '',
     comPendencia: params.get('comPendencia') === 'true',
+    comAtraso: params.get('comAtraso') === 'true',
   };
 }
 
@@ -73,12 +76,13 @@ export function Empresas() {
           obraId: filtros.obraId || undefined,
           situacaoAcesso: (filtros.situacaoAcesso || undefined) as SituacaoAcesso | undefined,
           comPendencia: filtros.comPendencia || undefined,
+          comAtraso: filtros.comAtraso || undefined,
           pagina,
           tamanhoPagina: TAMANHO_PAGINA,
         },
         sinal,
       ),
-    [filtros.busca, filtros.obraId, filtros.situacaoAcesso, filtros.comPendencia, pagina],
+    [filtros.busca, filtros.obraId, filtros.situacaoAcesso, filtros.comPendencia, filtros.comAtraso, pagina],
   );
 
   function aplicar(f: FiltrosEmpresas, novaPagina = 1) {
@@ -87,12 +91,15 @@ export function Empresas() {
     if (f.obraId) novo.set('obraId', f.obraId);
     if (f.situacaoAcesso) novo.set('situacaoAcesso', f.situacaoAcesso);
     if (f.comPendencia) novo.set('comPendencia', 'true');
+    if (f.comAtraso) novo.set('comAtraso', 'true');
     if (novaPagina > 1) novo.set('pagina', String(novaPagina));
     setParams(novo);
   }
 
-  const vazio: FiltrosEmpresas = { busca: '', obraId: '', situacaoAcesso: '', comPendencia: false };
-  const filtrado = Boolean(filtros.busca || filtros.obraId || filtros.situacaoAcesso || filtros.comPendencia);
+  const vazio: FiltrosEmpresas = { busca: '', obraId: '', situacaoAcesso: '', comPendencia: false, comAtraso: false };
+  const filtrado = Boolean(
+    filtros.busca || filtros.obraId || filtros.situacaoAcesso || filtros.comPendencia || filtros.comAtraso,
+  );
   const empresas = consulta.dados?.itens ?? [];
 
   return (
@@ -165,6 +172,14 @@ export function Empresas() {
           />
           Com pendência
         </label>
+        <label className="jn-caixa-marcacao jn-empresas__pendencia">
+          <input
+            type="checkbox"
+            checked={rascunho.comAtraso}
+            onChange={(e) => setRascunho({ ...rascunho, comAtraso: e.target.checked })}
+          />
+          Com atraso
+        </label>
       </Filtros>
 
       <AvisoPagina aviso={aviso} onFechar={() => mostrarAviso(null)} />
@@ -222,7 +237,14 @@ export function Empresas() {
                     <SeloSituacao situacao={e.situacaoAcesso} />
                   </td>
                   <td>
-                    <ResumoDocumentos contagem={e.documentos} />
+                    {e.documentosObra ? (
+                      <div className="jn-contagens">
+                        <ResumoDocumentos contagem={e.documentosObra} rotulo="Desta obra" />
+                        <ResumoDocumentos contagem={e.documentos} rotulo="Gerais" compacto />
+                      </div>
+                    ) : (
+                      <ResumoDocumentos contagem={e.documentos} />
+                    )}
                   </td>
                   <td className="jn-tabela__acoes">
                     <Link className="jn-link-acao" to={`/empresas/${e.id}`} aria-label={`Ver empresa ${e.razaoSocial}`}>

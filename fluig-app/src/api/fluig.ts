@@ -26,10 +26,12 @@ import type {
   PaginaObras,
   PaginaUsuariosInternos,
   Painel,
+  Periodo,
   SessaoJotanunes,
   TipoDocumento,
   TipoDocumentoAtualizacao,
   TipoDocumentoInput,
+  TipoExigidoObra,
   TrocaSenhaInput,
   UsuarioFluig,
   UsuarioInterno,
@@ -76,8 +78,45 @@ export const api = {
     requisicao<Obra>('PUT', `/api/fluig/obras/${id(obraId)}`, { corpo: dados }),
   vincularEmpresa: (obraId: string, empresaId: string) =>
     requisicao<void>('PUT', `/api/fluig/obras/${id(obraId)}/empresas/${id(empresaId)}`),
+  /** Encerra o vínculo (histórico preservado; 002). */
   desvincularEmpresa: (obraId: string, empresaId: string) =>
     requisicao<void>('DELETE', `/api/fluig/obras/${id(obraId)}/empresas/${id(empresaId)}`),
+
+  // Documentos exigidos da obra (tipos POR_OBRA; 002)
+  listarTiposExigidosObra: (obraId: string, sinal?: AbortSignal) =>
+    requisicao<TipoExigidoObra[]>('GET', `/api/fluig/obras/${id(obraId)}/tipos-documento`, { sinal }),
+  marcarTipoExigidoObra: (obraId: string, tipoDocumentoId: string) =>
+    requisicao<void>('PUT', `/api/fluig/obras/${id(obraId)}/tipos-documento/${id(tipoDocumentoId)}`),
+  desmarcarTipoExigidoObra: (obraId: string, tipoDocumentoId: string) =>
+    requisicao<void>('DELETE', `/api/fluig/obras/${id(obraId)}/tipos-documento/${id(tipoDocumentoId)}`),
+
+  // Documentos da empresa na obra (responde também com vínculo encerrado; 002)
+  listarDocumentosEmpresaObra: (obraId: string, empresaId: string, sinal?: AbortSignal) =>
+    requisicao<DocumentoSituacao[]>(
+      'GET',
+      `/api/fluig/obras/${id(obraId)}/empresas/${id(empresaId)}/documentos`,
+      { sinal },
+    ),
+  /** `periodoInicio` (003): só os envios daquele período. */
+  listarHistoricoEnviosEmpresaObra: (
+    obraId: string,
+    empresaId: string,
+    tipoDocumentoId: string,
+    sinal?: AbortSignal,
+    periodoInicio?: string,
+  ) =>
+    requisicao<Envio[]>(
+      'GET',
+      `/api/fluig/obras/${id(obraId)}/empresas/${id(empresaId)}/documentos/${id(tipoDocumentoId)}/envios`,
+      { sinal, consulta: { periodoInicio } },
+    ),
+  /** Períodos do documento periódico da obra (003), mais recente primeiro. */
+  listarPeriodosEmpresaObra: (obraId: string, empresaId: string, tipoDocumentoId: string, sinal?: AbortSignal) =>
+    requisicao<Periodo[]>(
+      'GET',
+      `/api/fluig/obras/${id(obraId)}/empresas/${id(empresaId)}/documentos/${id(tipoDocumentoId)}/periodos`,
+      { sinal },
+    ),
 
   // Empresas
   listarEmpresas: (consulta: ConsultaEmpresas = {}, sinal?: AbortSignal) =>
@@ -95,15 +134,22 @@ export const api = {
   enviarConvite: (empresaId: string) =>
     requisicao<Convite>('POST', `/api/fluig/empresas/${id(empresaId)}/convites`),
 
-  // Documentos da empresa
+  // Documentos gerais da empresa
   listarDocumentosEmpresa: (empresaId: string, sinal?: AbortSignal) =>
     requisicao<DocumentoSituacao[]>('GET', `/api/fluig/empresas/${id(empresaId)}/documentos`, {
       sinal,
     }),
-  listarHistoricoEnvios: (empresaId: string, tipoDocumentoId: string, sinal?: AbortSignal) =>
+  listarHistoricoEnvios: (empresaId: string, tipoDocumentoId: string, sinal?: AbortSignal, periodoInicio?: string) =>
     requisicao<Envio[]>(
       'GET',
       `/api/fluig/empresas/${id(empresaId)}/documentos/${id(tipoDocumentoId)}/envios`,
+      { sinal, consulta: { periodoInicio } },
+    ),
+  /** Períodos do documento geral periódico (003), mais recente primeiro. */
+  listarPeriodosEmpresa: (empresaId: string, tipoDocumentoId: string, sinal?: AbortSignal) =>
+    requisicao<Periodo[]>(
+      'GET',
+      `/api/fluig/empresas/${id(empresaId)}/documentos/${id(tipoDocumentoId)}/periodos`,
       { sinal },
     ),
 

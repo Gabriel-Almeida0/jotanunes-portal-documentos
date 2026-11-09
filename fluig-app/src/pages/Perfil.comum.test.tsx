@@ -19,6 +19,8 @@ const ACOES_ADMIN = [
   /ativar/i, // "Ativar" e "Desativar"
   /Vincular empresa/i,
   /Desvincular/i,
+  /Encerrar vínculo/i,
+  /Reabrir vínculo/i,
   /Aprovar/i,
   /Rejeitar/i,
   /Descartar alterações/i,
@@ -67,6 +69,27 @@ describe('Perfil comum', () => {
     semAcoesDeAdmin();
   });
 
+  it('Obra: "Documentos exigidos" em modo leitura (sem caixas de seleção)', async () => {
+    const { usuario } = renderizarRota(`/obras/${IDS.obraVistaDoRio}`);
+    await screen.findByRole('heading', { level: 1, name: 'Residencial Vista do Rio' });
+    await usuario.click(screen.getByRole('tab', { name: /Documentos exigidos/ }));
+    const lista = await screen.findByRole('list', { name: 'Documentos por obra' });
+    expect(within(lista).getByText('ART da obra')).toBeInTheDocument();
+    expect(within(lista).queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.queryByRole('link', { name: 'Cadastrar tipo por obra' })).not.toBeInTheDocument();
+    avisoUmaVez();
+    semAcoesDeAdmin();
+  });
+
+  it('Obra: "Vínculos encerrados" mostra o histórico sem reabrir', async () => {
+    renderizarRota(`/obras/${IDS.obraVistaDoRio}?aba=encerrados`);
+    const tabela = await screen.findByRole('table', { name: 'Vínculos encerrados' });
+    expect(within(tabela).getByText('Gama Instalações Elétricas Ltda')).toBeInTheDocument();
+    expect(within(tabela).getByRole('link', { name: /Ver histórico de Gama/ })).toBeInTheDocument();
+    avisoUmaVez();
+    semAcoesDeAdmin();
+  });
+
   it('Empresas: lista as empresas sem "Nova empresa"', async () => {
     renderizarRota('/empresas');
     const tabela = await screen.findByRole('table', { name: 'Empresas' });
@@ -83,7 +106,8 @@ describe('Perfil comum', () => {
     expect(within(dados).getByText('Razão social')).toBeInTheDocument();
     expect(within(dados).getByText('contato@alfa.test')).toBeInTheDocument();
     expect(within(dados).getByText('Carlos Menezes')).toBeInTheDocument();
-    expect(await screen.findByRole('table', { name: /Documentos/ })).toBeInTheDocument();
+    expect(await screen.findByRole('table', { name: 'Documentos gerais da empresa' })).toBeInTheDocument();
+    expect(await screen.findByRole('table', { name: 'Documentos da obra Residencial Vista do Rio' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /Histórico de/ }).length).toBeGreaterThan(0);
     expect(screen.queryAllByRole('link', { name: /^Analisar/ })).toHaveLength(0);
     avisoUmaVez();

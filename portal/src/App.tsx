@@ -5,7 +5,9 @@ import { Cabecalho } from './components/Cabecalho';
 import { Rodape } from './components/Rodape';
 import { Acesso } from './pages/Acesso';
 import { DocumentoHistorico } from './pages/DocumentoHistorico';
+import { DocumentosObra } from './pages/DocumentosObra';
 import { MeusDocumentos } from './pages/MeusDocumentos';
+import { PeriodosDocumento } from './pages/PeriodosDocumento';
 import { TrocaSenha } from './pages/TrocaSenha';
 
 function Layout() {
@@ -51,6 +53,38 @@ export function Rotas() {
             element={
               <RotaProtegida>
                 <DocumentoHistorico />
+              </RotaProtegida>
+            }
+          />
+          <Route
+            path="/documentos/:tipoDocumentoId/periodos"
+            element={
+              <RotaProtegida>
+                <PeriodosDocumento />
+              </RotaProtegida>
+            }
+          />
+          <Route
+            path="/obras/:obraId"
+            element={
+              <RotaProtegida>
+                <DocumentosObra />
+              </RotaProtegida>
+            }
+          />
+          <Route
+            path="/obras/:obraId/documentos/:tipoDocumentoId"
+            element={
+              <RotaProtegida>
+                <DocumentoHistorico />
+              </RotaProtegida>
+            }
+          />
+          <Route
+            path="/obras/:obraId/documentos/:tipoDocumentoId/periodos"
+            element={
+              <RotaProtegida>
+                <PeriodosDocumento />
               </RotaProtegida>
             }
           />

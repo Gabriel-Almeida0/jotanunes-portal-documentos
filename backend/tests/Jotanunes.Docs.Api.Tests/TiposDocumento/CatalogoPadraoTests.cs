@@ -93,7 +93,7 @@ public class CatalogoPadraoTests(ApiFactory api) : TesteApi(api)
             var cartao = (await (await admin.GetAsync("/api/fluig/tipos-documento")).LerAsync()).EnumerateArray().Single(t => t.Str("nome") == "Cartão CNPJ");
             id = cartao.Id();
             var r = await admin.PutAsJsonAsync($"/api/fluig/tipos-documento/{id}",
-                new { nome = "Cartão CNPJ (emitido há 30 dias)", instrucoes = "Texto ajustado pelo administrador.", ativo = false });
+                new { nome = "Cartão CNPJ (emitido há 30 dias)", instrucoes = "Texto ajustado pelo administrador.", abrangencia = "GERAL", ativo = false });
             Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         }
 

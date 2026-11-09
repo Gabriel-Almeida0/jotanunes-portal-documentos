@@ -1,7 +1,25 @@
 import { http, HttpResponse } from 'msw';
 import type { ObraDetalhe, ObraResumo, Problema, Uf } from '../../api/tipos';
 import { UFS } from '../../utils/formatos';
-import { agoraIso, db, novoId, paraEmpresaNaObra, paraObra, type ObraDb } from '../dados';
+import {
+  agoraIso,
+  db,
+  enviosDe,
+  novoId,
+  obraTemPendencia,
+  paraDocumentoSituacao,
+  paraEmpresaNaObra,
+  paraEnvio,
+  paraObra,
+  paraPeriodo,
+  periodosDe,
+  paraTipoExigidoObra,
+  paraVinculoEncerrado,
+  tiposMarcadosAtivos,
+  vinculoDe,
+  vinculosAtivosDaObra,
+  type ObraDb,
+} from '../dados';
 import {
   API,
   adicionarErro,
@@ -11,6 +29,7 @@ import {
   latencia,
   paginar,
   problema,
+  sessaoDe,
   simplificar,
   texto,
   textoOpcional,
@@ -46,19 +65,31 @@ function codigoDuplicado(codigo: string | null, ignorarId?: string): boolean {
 }
 
 function resumo(o: ObraDb): ObraResumo {
-  return { ...paraObra(o), quantidadeEmpresas: db.vinculos.filter((v) => v.obraId === o.id).length };
+  return {
+    ...paraObra(o),
+    quantidadeEmpresas: vinculosAtivosDaObra(o.id).length,
+    quantidadeTiposExigidos: tiposMarcadosAtivos(o.id).length,
+  };
 }
 
+const porRazaoSocial = (a: { razaoSocial: string }, b: { razaoSocial: string }) =>
+  a.razaoSocial.localeCompare(b.razaoSocial, 'pt-BR');
+
 function detalhe(o: ObraDb): ObraDetalhe {
-  const empresas = db.vinculos
-    .filter((v) => v.obraId === o.id)
-    .map((v) => {
-      const e = db.empresas.find((x) => x.id === v.empresaId)!;
-      return paraEmpresaNaObra(e, v);
-    })
-    .sort((a, b) => a.razaoSocial.localeCompare(b.razaoSocial, 'pt-BR'));
-  return { ...paraObra(o), empresas };
+  const daObra = db.vinculos.filter((v) => v.obraId === o.id);
+  const empresaDe = (id: string) => db.empresas.find((x) => x.id === id)!;
+  const empresas = daObra
+    .filter((v) => v.ativo)
+    .map((v) => paraEmpresaNaObra(empresaDe(v.empresaId), v))
+    .sort(porRazaoSocial);
+  const vinculosEncerrados = daObra
+    .filter((v) => !v.ativo)
+    .map((v) => paraVinculoEncerrado(empresaDe(v.empresaId), v))
+    .sort(porRazaoSocial);
+  return { ...paraObra(o), empresas, vinculosEncerrados, quantidadeTiposExigidos: tiposMarcadosAtivos(o.id).length };
 }
+
+const loginDe = (request: Request) => sessaoDe(request)?.usuario.login ?? 'desconhecido';
 
 export const handlersObras = [
   http.get(`${API}/obras`, async ({ request }) => {
@@ -68,8 +99,10 @@ export const handlersObras = [
     const url = new URL(request.url);
     const busca = simplificar(url.searchParams.get('busca'));
     const ativa = booleano(url.searchParams.get('ativa'));
+    const comPendencia = booleano(url.searchParams.get('comPendencia'));
     const lista = db.obras
       .filter((o) => ativa === undefined || o.ativa === ativa)
+      .filter((o) => comPendencia !== true || obraTemPendencia(o))
       .filter((o) => !busca || [o.nome, o.codigo, o.cidade].some((c) => simplificar(c).includes(busca)))
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
       .map(resumo);
@@ -120,8 +153,12 @@ export const handlersObras = [
     const obra = db.obras.find((o) => o.id === params.obraId);
     const empresa = db.empresas.find((e) => e.id === params.empresaId);
     if (!obra || !empresa) return problema('NAO_ENCONTRADO');
-    if (!db.vinculos.some((v) => v.obraId === obra.id && v.empresaId === empresa.id)) {
-      db.vinculos.push({ obraId: obra.id, empresaId: empresa.id, vinculadoEm: agoraIso() });
+    const existente = vinculoDe(obra.id, empresa.id);
+    if (!existente) {
+      db.vinculos.push({ obraId: obra.id, empresaId: empresa.id, vinculadoEm: agoraIso(), ativo: true, encerradoEm: null, encerradoPorLogin: null });
+    } else if (!existente.ativo) {
+      // Reabre o mesmo vínculo: histórico e situações anteriores voltam a valer (FR-221).
+      Object.assign(existente, { ativo: true, encerradoEm: null, encerradoPorLogin: null, vinculadoEm: agoraIso() });
     }
     return new HttpResponse(null, { status: 204 });
   }),
@@ -130,9 +167,93 @@ export const handlersObras = [
     await latencia();
     const negado = exigirFluig(request) ?? exigirAdmin(request);
     if (negado) return negado;
-    const i = db.vinculos.findIndex((v) => v.obraId === params.obraId && v.empresaId === params.empresaId);
-    if (i < 0) return problema('NAO_ENCONTRADO');
-    db.vinculos.splice(i, 1);
+    const vinculo = vinculoDe(String(params.obraId), String(params.empresaId));
+    if (!vinculo) return problema('NAO_ENCONTRADO');
+    // Encerra em vez de apagar (FR-220); já encerrado → 204 sem mudança.
+    if (vinculo.ativo) {
+      Object.assign(vinculo, { ativo: false, encerradoEm: agoraIso(), encerradoPorLogin: loginDe(request) });
+    }
     return new HttpResponse(null, { status: 204 });
+  }),
+
+  // ── Tipos exigidos da obra (002, US1) ──
+  http.get(`${API}/obras/:obraId/tipos-documento`, async ({ request, params }) => {
+    await latencia();
+    const negado = exigirFluig(request);
+    if (negado) return negado;
+    const obra = db.obras.find((o) => o.id === params.obraId);
+    if (!obra) return problema('NAO_ENCONTRADO');
+    const marcados = new Set(db.obraTipos.filter((m) => m.obraId === obra.id).map((m) => m.tipoDocumentoId));
+    const lista = db.tipos
+      .filter((t) => t.abrangencia === 'POR_OBRA' && (t.ativo || marcados.has(t.id)))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+      .map((t) => paraTipoExigidoObra(obra.id, t));
+    return HttpResponse.json(lista);
+  }),
+
+  http.put(`${API}/obras/:obraId/tipos-documento/:tipoId`, async ({ request, params }) => {
+    await latencia();
+    const negado = exigirFluig(request) ?? exigirAdmin(request);
+    if (negado) return negado;
+    const obra = db.obras.find((o) => o.id === params.obraId);
+    const tipo = db.tipos.find((t) => t.id === params.tipoId);
+    if (!obra || !tipo) return problema('NAO_ENCONTRADO');
+    if (tipo.abrangencia !== 'POR_OBRA') return problema('TIPO_NAO_E_POR_OBRA');
+    if (!db.obraTipos.some((m) => m.obraId === obra.id && m.tipoDocumentoId === tipo.id)) {
+      db.obraTipos.push({ obraId: obra.id, tipoDocumentoId: tipo.id, marcadoEm: agoraIso(), marcadoPorLogin: loginDe(request) });
+    }
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.delete(`${API}/obras/:obraId/tipos-documento/:tipoId`, async ({ request, params }) => {
+    await latencia();
+    const negado = exigirFluig(request) ?? exigirAdmin(request);
+    if (negado) return negado;
+    const obra = db.obras.find((o) => o.id === params.obraId);
+    const tipo = db.tipos.find((t) => t.id === params.tipoId);
+    if (!obra || !tipo) return problema('NAO_ENCONTRADO');
+    const i = db.obraTipos.findIndex((m) => m.obraId === obra.id && m.tipoDocumentoId === tipo.id);
+    if (i >= 0) db.obraTipos.splice(i, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  // ── Documentos da empresa na obra (002, US4); responde também com vínculo encerrado ──
+  http.get(`${API}/obras/:obraId/empresas/:empresaId/documentos`, async ({ request, params }) => {
+    await latencia();
+    const negado = exigirFluig(request);
+    if (negado) return negado;
+    const obraId = String(params.obraId);
+    const empresaId = String(params.empresaId);
+    if (!vinculoDe(obraId, empresaId)) return problema('NAO_ENCONTRADO');
+    const lista = tiposMarcadosAtivos(obraId).map((t) => paraDocumentoSituacao(empresaId, t, obraId));
+    return HttpResponse.json(lista);
+  }),
+
+  http.get(`${API}/obras/:obraId/empresas/:empresaId/documentos/:tipoId/envios`, async ({ request, params }) => {
+    await latencia();
+    const negado = exigirFluig(request);
+    if (negado) return negado;
+    const obraId = String(params.obraId);
+    const empresaId = String(params.empresaId);
+    const tipo = db.tipos.find((t) => t.id === params.tipoId);
+    if (!vinculoDe(obraId, empresaId) || !tipo || tipo.abrangencia !== 'POR_OBRA') return problema('NAO_ENCONTRADO');
+    const periodoInicio = new URL(request.url).searchParams.get('periodoInicio');
+    const envios = enviosDe(empresaId, tipo.id, obraId).filter((e) => !periodoInicio || e.periodoInicio === periodoInicio);
+    return HttpResponse.json(envios.map(paraEnvio));
+  }),
+
+  // 003: períodos do documento periódico da obra (responde também com vínculo encerrado).
+  http.get(`${API}/obras/:obraId/empresas/:empresaId/documentos/:tipoId/periodos`, async ({ request, params }) => {
+    await latencia();
+    const negado = exigirFluig(request);
+    if (negado) return negado;
+    const obraId = String(params.obraId);
+    const empresaId = String(params.empresaId);
+    const tipo = db.tipos.find((t) => t.id === params.tipoId);
+    const marcado = db.obraTipos.some((m) => m.obraId === obraId && m.tipoDocumentoId === tipo?.id);
+    if (!vinculoDe(obraId, empresaId) || !tipo || !marcado || tipo.periodicidade.unidade === 'UNICA') {
+      return problema('NAO_ENCONTRADO');
+    }
+    return HttpResponse.json(periodosDe(empresaId, tipo, obraId).map(paraPeriodo));
   }),
 ];

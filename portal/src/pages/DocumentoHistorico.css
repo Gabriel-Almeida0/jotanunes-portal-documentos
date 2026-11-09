@@ -122,3 +122,22 @@
     padding: var(--jn-space-4);
   }
 }
+
+/* Documento periódico (feature 003) */
+.jn-historico__periodo {
+  font: 600 16px/1.4 var(--jn-font);
+  color: var(--jn-gray-900);
+}
+
+.jn-historico__periodo-envio {
+  font: var(--jn-text-sm);
+  font-weight: 600;
+  color: var(--jn-gray-700);
+}
+
+/* "Enviado com atraso" (também na página de períodos). */
+.jn-periodo__marca-atraso {
+  font: var(--jn-text-xs);
+  font-weight: 600;
+  color: var(--jn-warning-fg);
+}
