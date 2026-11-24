@@ -6,7 +6,8 @@ namespace Jotanunes.Docs.Application.Painel;
 
 public sealed class ObterPainel(IConsultaDocumentos consulta, TimeProvider relogio) : ICasoDeUso
 {
-    public Task<PainelDto> ExecutarAsync(CancellationToken ct = default) => consulta.ObterPainelAsync(relogio.GetUtcNow(), ct);
+    public Task<PainelDto> ExecutarAsync(Guid? obraId = null, CancellationToken ct = default) =>
+        consulta.ObterPainelAsync(relogio.GetUtcNow(), obraId, ct);
 }
 
 /// <summary>

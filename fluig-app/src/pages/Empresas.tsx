@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { api, listarTodasObras } from '../api/fluig';
-import type { SituacaoAcesso } from '../api/tipos';
+import { api } from '../api/fluig';
+import type { ObraResumo, SituacaoAcesso } from '../api/tipos';
 import { ehSemPermissao } from '../api/client';
 import { useConsulta } from '../api/useConsulta';
 import { useEhAdmin } from '../auth/contexto';
@@ -24,14 +24,15 @@ import { SomenteAdmin } from '../components/SomenteAdmin';
 import { Tabela } from '../components/Tabela';
 import { TituloPagina } from '../components/TituloPagina';
 import { useAviso } from '../hooks/useAviso';
+import { useObraSelecionada } from '../obra/contexto';
 import { formatarCnpj } from '../utils/cnpj';
 
 const TAMANHO_PAGINA = 20;
 const SITUACOES_ACESSO: SituacaoAcesso[] = ['NAO_CONVIDADA', 'CONVIDADA', 'CONVITE_EXPIRADO', 'ATIVA', 'DESATIVADA'];
 
+/** A obra não é filtro da página: vem do filtro geral (menu lateral). */
 interface FiltrosEmpresas {
   busca: string;
-  obraId: string;
   situacaoAcesso: string;
   comPendencia: boolean;
 }
@@ -40,7 +41,6 @@ function lerFiltros(params: URLSearchParams): FiltrosEmpresas {
   const situacao = params.get('situacaoAcesso') ?? '';
   return {
     busca: params.get('busca') ?? '',
-    obraId: params.get('obraId') ?? '',
     situacaoAcesso: SITUACOES_ACESSO.includes(situacao as SituacaoAcesso) ? situacao : '',
     comPendencia: params.get('comPendencia') === 'true',
   };
@@ -64,13 +64,13 @@ export function Empresas() {
     setRascunho(filtros);
   }
 
-  const obras = useConsulta((sinal) => listarTodasObras(sinal), []);
+  const { obraId, obra } = useObraSelecionada();
   const consulta = useConsulta(
     (sinal) =>
       api.listarEmpresas(
         {
           busca: filtros.busca || undefined,
-          obraId: filtros.obraId || undefined,
+          obraId: obraId || undefined,
           situacaoAcesso: (filtros.situacaoAcesso || undefined) as SituacaoAcesso | undefined,
           comPendencia: filtros.comPendencia || undefined,
           pagina,
@@ -78,28 +78,31 @@ export function Empresas() {
         },
         sinal,
       ),
-    [filtros.busca, filtros.obraId, filtros.situacaoAcesso, filtros.comPendencia, pagina],
+    [filtros.busca, obraId, filtros.situacaoAcesso, filtros.comPendencia, pagina],
   );
 
   function aplicar(f: FiltrosEmpresas, novaPagina = 1) {
     const novo = new URLSearchParams();
     if (f.busca.trim()) novo.set('busca', f.busca.trim());
-    if (f.obraId) novo.set('obraId', f.obraId);
     if (f.situacaoAcesso) novo.set('situacaoAcesso', f.situacaoAcesso);
     if (f.comPendencia) novo.set('comPendencia', 'true');
     if (novaPagina > 1) novo.set('pagina', String(novaPagina));
     setParams(novo);
   }
 
-  const vazio: FiltrosEmpresas = { busca: '', obraId: '', situacaoAcesso: '', comPendencia: false };
-  const filtrado = Boolean(filtros.busca || filtros.obraId || filtros.situacaoAcesso || filtros.comPendencia);
+  const vazio: FiltrosEmpresas = { busca: '', situacaoAcesso: '', comPendencia: false };
+  const filtrado = Boolean(filtros.busca || filtros.situacaoAcesso || filtros.comPendencia);
   const empresas = consulta.dados?.itens ?? [];
 
   return (
     <>
       <TituloPagina
         titulo="Empresas"
-        descricao="Empresas terceirizadas, situação de acesso ao portal e andamento dos documentos."
+        descricao={
+          obra
+            ? `Empresas terceirizadas vinculadas à obra ${obra.nome}, situação de acesso ao portal e andamento dos documentos.`
+            : 'Empresas terceirizadas, situação de acesso ao portal e andamento dos documentos.'
+        }
         acoes={
           <SomenteAdmin>
             <Botao icone={<IconeMais tamanho={18} />} onClick={() => setCriando(true)}>
@@ -132,20 +135,6 @@ export function Empresas() {
           onChange={(e) => setRascunho({ ...rascunho, busca: e.target.value })}
         />
         <CampoSelecao
-          rotulo="Obra"
-          value={rascunho.obraId}
-          onChange={(e) => setRascunho({ ...rascunho, obraId: e.target.value })}
-          disabled={obras.carregando && !obras.dados}
-        >
-          <option value="">Todas as obras</option>
-          {(obras.dados ?? []).map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.nome}
-              {o.ativa ? '' : ' (inativa)'}
-            </option>
-          ))}
-        </CampoSelecao>
-        <CampoSelecao
           rotulo="Situação de acesso"
           value={rascunho.situacaoAcesso}
           onChange={(e) => setRascunho({ ...rascunho, situacaoAcesso: e.target.value })}
@@ -176,6 +165,12 @@ export function Empresas() {
       ) : empresas.length === 0 ? (
         filtrado ? (
           <EstadoVazio titulo="Nenhuma empresa encontrada com esses filtros." texto="Confira a busca ou limpe os filtros." />
+        ) : obra ? (
+          <EstadoVazio
+            icone={<IconeEmpresa tamanho={32} />}
+            titulo={`Nenhuma empresa vinculada à obra ${obra.nome}.`}
+            texto="Vincule empresas na página da obra ou escolha “Todas as obras” no menu lateral."
+          />
         ) : (
           <EstadoVazio
             icone={<IconeEmpresa tamanho={32} />}
@@ -245,17 +240,20 @@ export function Empresas() {
 
       {criando ? (
         <NovaEmpresa
+          obra={obra}
           onFechar={() => setCriando(false)}
           onSemPermissao={(mensagem) => {
             setCriando(false);
             mostrarAviso({ tom: 'erro', texto: mensagem });
           }}
-          onCriada={(id) =>
+          onCriada={(id, vinculadaA) =>
             navigate(`/empresas/${id}`, {
               state: {
                 aviso: {
                   tom: 'sucesso',
-                  texto: 'Empresa cadastrada. Vincule a empresa a uma obra e envie o convite para o portal.',
+                  texto: vinculadaA
+                    ? `Empresa cadastrada e vinculada à obra ${vinculadaA}. Envie o convite para o portal.`
+                    : 'Empresa cadastrada. Vincule a empresa a uma obra e envie o convite para o portal.',
                 },
               },
             })
@@ -267,16 +265,20 @@ export function Empresas() {
 }
 
 function NovaEmpresa({
+  obra,
   onFechar,
   onCriada,
   onSemPermissao,
 }: {
+  /** Obra do filtro geral: a nova empresa já nasce vinculada a ela (se a opção ficar marcada). */
+  obra: ObraResumo | undefined;
   onFechar: () => void;
-  onCriada: (id: string) => void;
+  onCriada: (id: string, vinculadaA: string | null) => void;
   onSemPermissao: (mensagem: string) => void;
 }) {
   const form = useFormularioEmpresa(null);
   const [salvando, setSalvando] = useState(false);
+  const [vincular, setVincular] = useState(true);
 
   async function salvar(e: FormEvent) {
     e.preventDefault();
@@ -285,7 +287,17 @@ function NovaEmpresa({
     setSalvando(true);
     try {
       const criada = await api.criarEmpresa(dados);
-      onCriada(criada.id);
+      let vinculadaA: string | null = null;
+      if (obra && vincular) {
+        // Se o vínculo falhar, a empresa já existe: segue para a página dela, onde dá para vincular.
+        try {
+          await api.vincularEmpresa(obra.id, criada.id);
+          vinculadaA = obra.nome;
+        } catch {
+          vinculadaA = null;
+        }
+      }
+      onCriada(criada.id, vinculadaA);
     } catch (erro) {
       setSalvando(false);
       if (ehSemPermissao(erro)) onSemPermissao(erro.title);
@@ -318,6 +330,12 @@ function NovaEmpresa({
           </div>
         ) : null}
         <CamposEmpresa form={form} />
+        {obra ? (
+          <label className="jn-caixa-marcacao jn-grade-form__inteiro">
+            <input type="checkbox" checked={vincular} onChange={(e) => setVincular(e.target.checked)} />
+            Vincular à obra {obra.nome}
+          </label>
+        ) : null}
       </form>
     </Modal>
   );

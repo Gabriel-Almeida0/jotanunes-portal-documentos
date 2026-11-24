@@ -169,5 +169,6 @@ public interface IConsultaDocumentos
 {
     Task<IReadOnlyDictionary<Guid, ContagemDocumentosDto>> ContarPorEmpresaAsync(IReadOnlyCollection<Guid> empresaIds, CancellationToken ct = default);
 
-    Task<PainelDto> ObterPainelAsync(DateTimeOffset agora, CancellationToken ct = default);
+    /// <param name="obraId">Quando informado, conta só as empresas vinculadas à obra (e os envios delas).</param>
+    Task<PainelDto> ObterPainelAsync(DateTimeOffset agora, Guid? obraId = null, CancellationToken ct = default);
 }

@@ -66,13 +66,22 @@ public sealed class ConsultaDocumentosEf(DocsDbContext db) : IConsultaDocumentos
         return resultado;
     }
 
-    public async Task<PainelDto> ObterPainelAsync(DateTimeOffset agora, CancellationToken ct = default)
+    public async Task<PainelDto> ObterPainelAsync(DateTimeOffset agora, Guid? obraId = null, CancellationToken ct = default)
     {
-        var enviosEmAnalise = await db.Envios.CountAsync(e => e.Status == StatusEnvio.EM_ANALISE, ct);
-        var comPendencia = await ConsultasEmpresa.ComPendencia(db.Empresas.AsNoTracking(), db).CountAsync(ct);
-        var convidadas = await ConsultasEmpresa.ComSituacao(db.Empresas.AsNoTracking(), SituacaoAcesso.CONVIDADA, agora).CountAsync(ct)
-                         + await ConsultasEmpresa.ComSituacao(db.Empresas.AsNoTracking(), SituacaoAcesso.CONVITE_EXPIRADO, agora).CountAsync(ct);
-        var empresasAtivas = await db.Empresas.CountAsync(e => e.Ativa, ct);
+        // Com obra selecionada, tudo é recortado pelas empresas vinculadas a ela (documentos são da empresa, não da obra).
+        var empresas = db.Empresas.AsNoTracking();
+        var envios = db.Envios.AsNoTracking();
+        if (obraId is { } id)
+        {
+            empresas = empresas.Where(e => db.ObraEmpresas.Any(v => v.ObraId == id && v.EmpresaId == e.Id));
+            envios = envios.Where(e => db.ObraEmpresas.Any(v => v.ObraId == id && v.EmpresaId == e.EmpresaId));
+        }
+
+        var enviosEmAnalise = await envios.CountAsync(e => e.Status == StatusEnvio.EM_ANALISE, ct);
+        var comPendencia = await ConsultasEmpresa.ComPendencia(empresas, db).CountAsync(ct);
+        var convidadas = await ConsultasEmpresa.ComSituacao(empresas, SituacaoAcesso.CONVIDADA, agora).CountAsync(ct)
+                         + await ConsultasEmpresa.ComSituacao(empresas, SituacaoAcesso.CONVITE_EXPIRADO, agora).CountAsync(ct);
+        var empresasAtivas = await empresas.CountAsync(e => e.Ativa, ct);
         var obrasAtivas = await db.Obras.CountAsync(o => o.Ativa, ct);
         return new PainelDto(enviosEmAnalise, comPendencia, convidadas, empresasAtivas, obrasAtivas);
     }

@@ -12,7 +12,7 @@ import { Botao, BotaoLink } from '../components/Botao';
 import { Campo } from '../components/Campo';
 import { Carregando, EstadoErro, EstadoVazio } from '../components/Estados';
 import { FormularioObra } from '../components/FormularioObra';
-import { IconeEmpresa, IconeLapis, IconeMais, IconePin, IconeSeta } from '../components/icons';
+import { IconeEmpresa, IconeLapis, IconeMais, IconeObra, IconePin, IconeSeta } from '../components/icons';
 import { Modal, ModalConfirmacao } from '../components/Modal';
 import { ResumoDocumentos } from '../components/ResumoDocumentos';
 import { SeloAtivo, SeloSituacao } from '../components/Selo';
@@ -20,6 +20,7 @@ import { SomenteAdmin } from '../components/SomenteAdmin';
 import { Tabela } from '../components/Tabela';
 import { TituloPagina } from '../components/TituloPagina';
 import { useAviso } from '../hooks/useAviso';
+import { useObraSelecionada } from '../obra/contexto';
 import { formatarCnpj } from '../utils/cnpj';
 import { formatarData } from '../utils/datas';
 import './ObraDetalhe.css';
@@ -33,6 +34,7 @@ export function ObraDetalhe() {
   const [vinculando, setVinculando] = useState(false);
   const [desvinculando, setDesvinculando] = useState<EmpresaNaObra | null>(null);
   const ehAdmin = useEhAdmin();
+  const obraSelecionada = useObraSelecionada();
 
   if (consulta.carregando && !consulta.dados) return <Carregando texto="Carregando obra…" />;
   if (consulta.erro || !consulta.dados) {
@@ -62,14 +64,28 @@ export function ObraDetalhe() {
         titulo={obra.nome}
         voltar={{ para: '/obras', rotulo: 'Obras' }}
         acoes={
-          <SomenteAdmin>
-            <Botao variante="secundario" icone={<IconeLapis tamanho={18} />} onClick={() => setEditando(true)}>
-              Editar dados
-            </Botao>
-            <Botao variante="fantasma" onClick={() => setAlternando(true)}>
-              {obra.ativa ? 'Desativar obra' : 'Ativar obra'}
-            </Botao>
-          </SomenteAdmin>
+          <>
+            {obraSelecionada.obraId !== obra.id ? (
+              <Botao
+                variante="secundario"
+                icone={<IconeObra tamanho={18} />}
+                onClick={() => {
+                  obraSelecionada.selecionar(obra.id);
+                  mostrarAviso({ tom: 'sucesso', texto: `Painel, empresas e fila de análise agora mostram só a obra ${obra.nome}.` });
+                }}
+              >
+                Filtrar o sistema por esta obra
+              </Botao>
+            ) : null}
+            <SomenteAdmin>
+              <Botao variante="secundario" icone={<IconeLapis tamanho={18} />} onClick={() => setEditando(true)}>
+                Editar dados
+              </Botao>
+              <Botao variante="fantasma" onClick={() => setAlternando(true)}>
+                {obra.ativa ? 'Desativar obra' : 'Ativar obra'}
+              </Botao>
+            </SomenteAdmin>
+          </>
         }
       >
         <SeloAtivo ativo={obra.ativa} feminino />
@@ -197,6 +213,7 @@ export function ObraDetalhe() {
         onConcluido={(ativa) => {
           setAlternando(false);
           consulta.definirDados({ ...obra, ativa });
+          obraSelecionada.recarregarObras();
           mostrarAviso({ tom: 'sucesso', texto: ativa ? 'Obra ativada.' : 'Obra desativada.' });
         }}
       />

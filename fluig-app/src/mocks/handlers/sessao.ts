@@ -15,14 +15,19 @@ export const handlersSessao = [
     await latencia();
     const negado = exigirFluig(request);
     if (negado) return negado;
-    const ativas = db.empresas.filter((e) => e.ativa);
+    // Filtro geral por obra: só empresas vinculadas a ela (e os envios delas).
+    const obraId = new URL(request.url).searchParams.get('obraId');
+    const daObra = (empresaId: string) =>
+      !obraId || db.vinculos.some((v) => v.obraId === obraId && v.empresaId === empresaId);
+    const empresas = db.empresas.filter((e) => daObra(e.id));
+    const ativas = empresas.filter((e) => e.ativa);
     const painel: Painel = {
-      enviosEmAnalise: db.envios.filter((e) => e.status === 'EM_ANALISE').length,
+      enviosEmAnalise: db.envios.filter((e) => e.status === 'EM_ANALISE' && daObra(e.empresaId)).length,
       empresasComPendencia: ativas.filter((e) => {
         const c = contagemDocumentos(e.id);
         return c.pendentes + c.rejeitados > 0;
       }).length,
-      empresasConvidadasSemAcesso: db.empresas.filter((e) => {
+      empresasConvidadasSemAcesso: empresas.filter((e) => {
         const s = situacaoAcesso(e);
         return s === 'CONVIDADA' || s === 'CONVITE_EXPIRADO';
       }).length,

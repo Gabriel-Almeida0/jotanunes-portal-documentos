@@ -26,6 +26,24 @@ describe('Fila de análise', () => {
     expect(within(tabela).getAllByText('Zeta Andaimes e Equipamentos Ltda')).toHaveLength(2);
   });
 
+  it('com obra no filtro geral mostra só os envios das empresas dela e limita o filtro de empresa', async () => {
+    const { usuario } = renderizarRota('/analise');
+    await screen.findByRole('table', { name: 'Envios aguardando análise' });
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Condomínio Flor de Sal' })).toBeInTheDocument());
+    await usuario.selectOptions(screen.getByLabelText('Obra'), IDS.obraFlorDeSal);
+
+    await waitFor(() =>
+      expect(within(screen.getByRole('table', { name: 'Envios aguardando análise' })).queryByText('Cartão CNPJ')).not.toBeInTheDocument(),
+    );
+    const tabela = screen.getByRole('table', { name: 'Envios aguardando análise' });
+    const documentos = within(tabela).getAllByRole('row').slice(1).map((l) => within(l).getAllByRole('cell')[1].textContent);
+    expect(documentos).toEqual(['PCMSO']);
+    await waitFor(() =>
+      expect(within(screen.getByLabelText('Empresa')).queryByRole('option', { name: 'Zeta Andaimes e Equipamentos Ltda' })).not.toBeInTheDocument(),
+    );
+    expect(within(screen.getByLabelText('Empresa')).getByRole('option', { name: 'Delta Pinturas e Acabamentos ME' })).toBeInTheDocument();
+  });
+
   it('mostra o estado vazio quando não há nada para analisar', async () => {
     const { usuario } = renderizarRota('/analise');
     await screen.findByRole('table', { name: 'Envios aguardando análise' });

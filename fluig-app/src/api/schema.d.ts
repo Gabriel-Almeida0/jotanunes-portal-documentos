@@ -1375,7 +1375,10 @@ export interface operations {
     };
     fluigObterPainel: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Recorta os indicadores pela obra selecionada no filtro geral: só empresas vinculadas a ela (e os envios delas). `obrasAtivas` continua sendo o total geral. Omitido = todas as obras. */
+                obraId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;

@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from 'react';
 import { HashRouter, Route, Routes, useParams } from 'react-router-dom';
 import { Layout } from './components/Layout';
+import { ObraSelecionadaProvider } from './obra/ObraSelecionada';
 import { EmpresaDetalhe } from './pages/EmpresaDetalhe';
 import { Empresas } from './pages/Empresas';
 import { EnvioAnalise } from './pages/EnvioAnalise';
@@ -30,21 +31,23 @@ function PorParametro({ nome, children }: { nome: string; children: ReactNode })
 export function RotasApp() {
   return (
     <div className="jn-app">
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Painel />} />
-          <Route path="/obras" element={<Obras />} />
-          <Route path="/obras/:obraId" element={<PorParametro nome="obraId"><ObraDetalhe /></PorParametro>} />
-          <Route path="/empresas" element={<Empresas />} />
-          <Route path="/empresas/:empresaId" element={<PorParametro nome="empresaId"><EmpresaDetalhe /></PorParametro>} />
-          <Route path="/tipos-documento" element={<TiposDocumento />} />
-          <Route path="/analise" element={<FilaAnalise />} />
-          <Route path="/analise/:envioId" element={<PorParametro nome="envioId"><EnvioAnalise /></PorParametro>} />
-          <Route path="/usuarios" element={<Usuarios />} />
-          <Route path="/trocar-senha" element={<TrocaSenha modo="voluntario" />} />
-          <Route path="*" element={<NaoEncontrada />} />
-        </Routes>
-      </Layout>
+      <ObraSelecionadaProvider>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Painel />} />
+            <Route path="/obras" element={<Obras />} />
+            <Route path="/obras/:obraId" element={<PorParametro nome="obraId"><ObraDetalhe /></PorParametro>} />
+            <Route path="/empresas" element={<Empresas />} />
+            <Route path="/empresas/:empresaId" element={<PorParametro nome="empresaId"><EmpresaDetalhe /></PorParametro>} />
+            <Route path="/tipos-documento" element={<TiposDocumento />} />
+            <Route path="/analise" element={<FilaAnalise />} />
+            <Route path="/analise/:envioId" element={<PorParametro nome="envioId"><EnvioAnalise /></PorParametro>} />
+            <Route path="/usuarios" element={<Usuarios />} />
+            <Route path="/trocar-senha" element={<TrocaSenha modo="voluntario" />} />
+            <Route path="*" element={<NaoEncontrada />} />
+          </Routes>
+        </Layout>
+      </ObraSelecionadaProvider>
     </div>
   );
 }

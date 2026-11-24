@@ -16,5 +16,6 @@ afterEach(() => {
   reiniciarSessaoMock();
   reiniciarDados();
   window.sessionStorage.clear();
+  window.localStorage.clear();
 });
 afterAll(() => server.close());

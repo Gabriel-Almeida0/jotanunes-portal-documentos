@@ -13,6 +13,7 @@ import {
   IconeUsuario,
   IconeUsuarios,
 } from './icons';
+import { SeletorObra } from './SeletorObra';
 import './Layout.css';
 
 const ITENS = [
@@ -79,6 +80,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <span>Menu</span>
           </button>
         </div>
+        <SeletorObra />
         <nav
           id="jn-menu-principal"
           className={`jn-layout__nav ${menuAberto ? 'jn-layout__nav--aberto' : ''}`}

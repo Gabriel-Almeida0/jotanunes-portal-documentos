@@ -29,12 +29,11 @@ describe('Empresas', () => {
     expect(screen.getByText('Gama Instalações Elétricas Ltda')).toBeInTheDocument();
   });
 
-  it('filtra por obra', async () => {
+  it('segue o filtro geral de obra do menu lateral (sem botão Pesquisar)', async () => {
     const { usuario, local } = renderizarRota('/empresas');
     await screen.findByRole('table', { name: 'Empresas' });
     await waitFor(() => expect(screen.getByRole('option', { name: 'Condomínio Flor de Sal' })).toBeInTheDocument());
     await usuario.selectOptions(screen.getByLabelText('Obra'), IDS.obraFlorDeSal);
-    await usuario.click(screen.getByRole('button', { name: 'Pesquisar' }));
 
     await waitFor(() => expect(screen.queryByText('Zeta Andaimes e Equipamentos Ltda')).not.toBeInTheDocument());
     const tabela = screen.getByRole('table', { name: 'Empresas' });
@@ -43,7 +42,22 @@ describe('Empresas', () => {
       .slice(1)
       .map((l) => within(l).getAllByRole('cell')[0].querySelector('a')?.textContent);
     expect(nomes).toEqual(['Alfa Engenharia Ltda', 'Delta Pinturas e Acabamentos ME']);
-    expect(local()).toContain(`obraId=${IDS.obraFlorDeSal}`);
+    // A obra é global: não vai para a URL da página e fica salva para as próximas visitas.
+    expect(local()).toBe('/empresas');
+    expect(window.localStorage.getItem('jn-obra-selecionada')).toBe(IDS.obraFlorDeSal);
+  });
+
+  it('nova empresa com obra selecionada já nasce vinculada a ela', async () => {
+    window.localStorage.setItem('jn-obra-selecionada', IDS.obraFlorDeSal);
+    const { usuario, dialogo } = await abrirNovaEmpresa();
+    expect(within(dialogo).getByRole('checkbox', { name: 'Vincular à obra Condomínio Flor de Sal' })).toBeChecked();
+    await usuario.type(within(dialogo).getByLabelText(/Razão social/), 'Ômega Construções Ltda');
+    await usuario.type(within(dialogo).getByLabelText(/^CNPJ/), '55667788000186');
+    await usuario.type(within(dialogo).getByLabelText(/E-mail de contato/), 'contato@omega.test');
+    await usuario.click(within(dialogo).getByRole('button', { name: 'Salvar' }));
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Ômega Construções Ltda' })).toBeInTheDocument();
+    expect(screen.getByText(/vinculada à obra Condomínio Flor de Sal/)).toBeInTheDocument();
   });
 
   it('filtra por situação de acesso', async () => {

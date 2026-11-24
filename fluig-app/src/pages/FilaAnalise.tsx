@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { api, listarTodasEmpresas, listarTodasObras } from '../api/fluig';
+import { api, listarTodasEmpresas } from '../api/fluig';
 import type { StatusEnvio } from '../api/tipos';
 import { useConsulta } from '../api/useConsulta';
 import { useEhAdmin } from '../auth/contexto';
@@ -15,6 +15,7 @@ import { SeloSituacao } from '../components/Selo';
 import { Tabela } from '../components/Tabela';
 import { TituloPagina } from '../components/TituloPagina';
 import { useAviso } from '../hooks/useAviso';
+import { useObraSelecionada } from '../obra/contexto';
 import { formatarCnpj } from '../utils/cnpj';
 import { formatarDataHora, tempoDecorrido } from '../utils/datas';
 import { formatarTamanho } from '../utils/formatos';
@@ -27,9 +28,9 @@ const STATUS: { valor: StatusEnvio; rotulo: string }[] = [
   { valor: 'REJEITADO', rotulo: 'Rejeitados' },
 ];
 
+/** A obra não é filtro da página: vem do filtro geral (menu lateral). */
 interface FiltrosFila {
   status: StatusEnvio;
-  obraId: string;
   empresaId: string;
   tipoDocumentoId: string;
 }
@@ -38,7 +39,6 @@ function lerFiltros(params: URLSearchParams): FiltrosFila {
   const status = params.get('status') as StatusEnvio | null;
   return {
     status: status && STATUS.some((s) => s.valor === status) ? status : 'EM_ANALISE',
-    obraId: params.get('obraId') ?? '',
     empresaId: params.get('empresaId') ?? '',
     tipoDocumentoId: params.get('tipoDocumentoId') ?? '',
   };
@@ -51,8 +51,9 @@ export function FilaAnalise() {
   const [rascunho, setRascunho] = useState<FiltrosFila>(filtros);
   const [aviso, mostrarAviso] = useAviso();
 
-  const obras = useConsulta((s) => listarTodasObras(s), []);
-  const empresas = useConsulta((s) => listarTodasEmpresas(s), []);
+  const { obraId, obra } = useObraSelecionada();
+  // Com obra selecionada, o filtro de empresa só oferece as empresas vinculadas a ela.
+  const empresas = useConsulta((s) => listarTodasEmpresas(s, obraId || undefined), [obraId]);
   const tipos = useConsulta((s) => api.listarTipos({}, s), []);
 
   const consulta = useConsulta(
@@ -60,7 +61,7 @@ export function FilaAnalise() {
       api.listarEnvios(
         {
           status: filtros.status,
-          obraId: filtros.obraId || undefined,
+          obraId: obraId || undefined,
           empresaId: filtros.empresaId || undefined,
           tipoDocumentoId: filtros.tipoDocumentoId || undefined,
           pagina,
@@ -68,21 +69,21 @@ export function FilaAnalise() {
         },
         sinal,
       ),
-    [filtros.status, filtros.obraId, filtros.empresaId, filtros.tipoDocumentoId, pagina],
+    [filtros.status, obraId, filtros.empresaId, filtros.tipoDocumentoId, pagina],
   );
 
   function aplicar(f: FiltrosFila, novaPagina = 1) {
     const novo = new URLSearchParams();
     if (f.status !== 'EM_ANALISE') novo.set('status', f.status);
-    if (f.obraId) novo.set('obraId', f.obraId);
     if (f.empresaId) novo.set('empresaId', f.empresaId);
     if (f.tipoDocumentoId) novo.set('tipoDocumentoId', f.tipoDocumentoId);
     if (novaPagina > 1) novo.set('pagina', String(novaPagina));
     setParams(novo);
   }
 
-  const vazio: FiltrosFila = { status: 'EM_ANALISE', obraId: '', empresaId: '', tipoDocumentoId: '' };
-  const filtrado = Boolean(filtros.obraId || filtros.empresaId || filtros.tipoDocumentoId);
+  const vazio: FiltrosFila = { status: 'EM_ANALISE', empresaId: '', tipoDocumentoId: '' };
+  const filtrado = Boolean(filtros.empresaId || filtros.tipoDocumentoId);
+  const daObra = obra ? ` da obra ${obra.nome}` : '';
   const naFila = filtros.status === 'EM_ANALISE';
   const ehAdmin = useEhAdmin();
   /** Mesma rota para os dois perfis; só o administrador decide, então só ele "analisa". */
@@ -96,9 +97,9 @@ export function FilaAnalise() {
         descricao={
           naFila
             ? ehAdmin
-              ? 'Documentos enviados pelas empresas, do mais antigo para o mais novo. Abra, confira e decida.'
-              : 'Documentos enviados pelas empresas, do mais antigo para o mais novo.'
-            : 'Envios já analisados, do mais recente para o mais antigo.'
+              ? `Documentos enviados pelas empresas${daObra}, do mais antigo para o mais novo. Abra, confira e decida.`
+              : `Documentos enviados pelas empresas${daObra}, do mais antigo para o mais novo.`
+            : `Envios já analisados${daObra}, do mais recente para o mais antigo.`
         }
       />
 
@@ -124,18 +125,6 @@ export function FilaAnalise() {
           {STATUS.map((s) => (
             <option key={s.valor} value={s.valor}>
               {s.rotulo}
-            </option>
-          ))}
-        </CampoSelecao>
-        <CampoSelecao
-          rotulo="Obra"
-          value={rascunho.obraId}
-          onChange={(e) => setRascunho({ ...rascunho, obraId: e.target.value })}
-        >
-          <option value="">Todas as obras</option>
-          {(obras.dados ?? []).map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.nome}
             </option>
           ))}
         </CampoSelecao>
@@ -176,11 +165,11 @@ export function FilaAnalise() {
         naFila && !filtrado ? (
           <EstadoVazio
             icone={<IconeFila tamanho={32} />}
-            titulo="Nenhum documento aguardando análise."
+            titulo={obra ? `Nenhum documento da obra ${obra.nome} aguardando análise.` : 'Nenhum documento aguardando análise.'}
             texto="Quando uma empresa enviar um documento, ele aparece aqui."
           />
         ) : (
-          <EstadoVazio titulo="Nenhum envio encontrado com esses filtros." texto="Tente outra obra, empresa ou documento." />
+          <EstadoVazio titulo="Nenhum envio encontrado com esses filtros." texto="Tente outra empresa ou documento." />
         )
       ) : (
         <>

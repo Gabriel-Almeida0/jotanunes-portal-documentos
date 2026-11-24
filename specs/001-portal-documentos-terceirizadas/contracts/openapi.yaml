@@ -221,6 +221,13 @@ paths:
       operationId: fluigObterPainel
       summary: Indicadores do painel inicial (US5)
       security: [{ fluigAuth: [] }]
+      parameters:
+        - name: obraId
+          in: query
+          description: >-
+            Recorta os indicadores pela obra selecionada no filtro geral: só empresas vinculadas a ela (e os envios
+            delas). `obrasAtivas` continua sendo o total geral. Omitido = todas as obras.
+          schema: { type: string, format: uuid }
       responses:
         '200':
           description: Indicadores

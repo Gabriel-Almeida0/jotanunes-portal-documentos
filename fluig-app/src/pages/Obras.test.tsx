@@ -15,8 +15,10 @@ describe('Obras', () => {
     await screen.findByRole('table', { name: 'Obras' });
     await usuario.type(screen.getByLabelText('Buscar'), 'flor');
     await usuario.click(screen.getByRole('button', { name: 'Pesquisar' }));
-    await waitFor(() => expect(screen.queryByText('Residencial Vista do Rio')).not.toBeInTheDocument());
-    expect(screen.getByText('Condomínio Flor de Sal')).toBeInTheDocument();
+    // Só na tabela: o seletor de obra do menu lateral continua listando todas.
+    const tabela = () => screen.getByRole('table', { name: 'Obras' });
+    await waitFor(() => expect(within(tabela()).queryByText('Residencial Vista do Rio')).not.toBeInTheDocument());
+    expect(within(tabela()).getByText('Condomínio Flor de Sal')).toBeInTheDocument();
   });
 
   it('cria uma obra e abre o detalhe dela', async () => {

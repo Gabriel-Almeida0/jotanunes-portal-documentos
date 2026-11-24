@@ -42,7 +42,9 @@ const id = encodeURIComponent;
 export const api = {
   // Sessão
   me: (sinal?: AbortSignal) => requisicao<UsuarioFluig>('GET', '/api/fluig/me', { sinal }),
-  painel: (sinal?: AbortSignal) => requisicao<Painel>('GET', '/api/fluig/painel', { sinal }),
+  /** `obraId` = filtro geral por obra (só empresas vinculadas a ela e os envios delas). */
+  painel: (obraId?: string, sinal?: AbortSignal) =>
+    requisicao<Painel>('GET', '/api/fluig/painel', { consulta: { obraId }, sinal }),
 
   // Acesso (login próprio da área Jotanunes). `configuracaoAcesso` e `login` são anônimas: não
   // enviam o token e o 401 do login (credencial errada) não derruba sessão nenhuma.
@@ -151,5 +153,5 @@ export async function listarTodas<T>(
 export const listarTodasObras = (sinal?: AbortSignal) =>
   listarTodas((pagina) => api.listarObras({ pagina, tamanhoPagina: 100 }, sinal));
 
-export const listarTodasEmpresas = (sinal?: AbortSignal) =>
-  listarTodas((pagina) => api.listarEmpresas({ pagina, tamanhoPagina: 100 }, sinal));
+export const listarTodasEmpresas = (sinal?: AbortSignal, obraId?: string) =>
+  listarTodas((pagina) => api.listarEmpresas({ obraId, pagina, tamanhoPagina: 100 }, sinal));

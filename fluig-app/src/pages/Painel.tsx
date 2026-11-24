@@ -5,6 +5,7 @@ import { useConsulta } from '../api/useConsulta';
 import { useSessao, useUsuarioFluig } from '../auth/contexto';
 import { AvisoPagina } from '../components/AvisoPagina';
 import { useAviso } from '../hooks/useAviso';
+import { useObraSelecionada } from '../obra/contexto';
 import { AvisoSomenteAdmin } from '../components/AvisoSomenteAdmin';
 import { Carregando, EstadoErro } from '../components/Estados';
 import { IconeAlerta, IconeEmail, IconeEmpresa, IconeFila, IconeObra, IconeSeta } from '../components/icons';
@@ -44,7 +45,8 @@ export function Painel() {
   const usuario = useUsuarioFluig();
   const { consumirRecado } = useSessao();
   const [aviso, mostrarAviso] = useAviso();
-  const consulta = useConsulta((sinal) => api.painel(sinal), []);
+  const { obraId, obra } = useObraSelecionada();
+  const consulta = useConsulta((sinal) => api.painel(obraId || undefined, sinal), [obraId]);
 
   // Recado deixado pela sessão (ex.: "Senha alterada." depois da troca de senha).
   useEffect(() => {
@@ -58,7 +60,11 @@ export function Painel() {
     <>
       <TituloPagina
         titulo="Painel"
-        descricao={`Olá, ${primeiroNome}! Veja o que precisa da sua atenção nos documentos das terceirizadas.`}
+        descricao={
+          obra
+            ? `Olá, ${primeiroNome}! Veja o que precisa da sua atenção nos documentos das terceirizadas da obra ${obra.nome}.`
+            : `Olá, ${primeiroNome}! Veja o que precisa da sua atenção nos documentos das terceirizadas.`
+        }
       />
 
       <AvisoPagina aviso={aviso} onFechar={() => mostrarAviso(null)} />
@@ -119,7 +125,15 @@ export function Painel() {
               <CartaoIndicador
                 icone={<IconeEmpresa tamanho={40} />}
                 numero={p.empresasAtivas}
-                texto={p.empresasAtivas === 1 ? 'empresa ativa' : 'empresas ativas'}
+                texto={
+                  obra
+                    ? p.empresasAtivas === 1
+                      ? 'empresa ativa nesta obra'
+                      : 'empresas ativas nesta obra'
+                    : p.empresasAtivas === 1
+                      ? 'empresa ativa'
+                      : 'empresas ativas'
+                }
                 links={[{ para: '/empresas', rotulo: 'Ver empresas' }]}
               />
               <CartaoIndicador

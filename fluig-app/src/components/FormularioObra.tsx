@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { ErroApi, ehSemPermissao, mensagemDeErro } from '../api/client';
 import { api } from '../api/fluig';
 import type { Obra, Uf } from '../api/tipos';
+import { useObraSelecionada } from '../obra/contexto';
 import { UFS } from '../utils/formatos';
 import { Alerta } from './Alerta';
 import { Botao } from './Botao';
@@ -30,6 +31,7 @@ export function FormularioObra({
   const [erros, setErros] = useState<Erros>({});
   const [erroGeral, setErroGeral] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const { recarregarObras } = useObraSelecionada();
 
   async function salvar(e: FormEvent) {
     e.preventDefault();
@@ -48,6 +50,7 @@ export function FormularioObra({
       const salva = obra
         ? await api.atualizarObra(obra.id, { ...dados, ativa: obra.ativa })
         : await api.criarObra(dados);
+      recarregarObras();
       onSalvo(salva);
     } catch (erro) {
       if (ehSemPermissao(erro)) {
